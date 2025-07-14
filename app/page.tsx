@@ -8,7 +8,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Separator } from "@/components/ui/separator"
 import { Textarea } from "@/components/ui/textarea"
 import { Input } from "@/components/ui/input"
-import { Upload, Sparkles, Clock, MoreHorizontal, ArrowUp, ArrowRight } from "lucide-react"
+import { Upload, Clock, MoreHorizontal, ArrowUp, ArrowRight } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { useChatContext } from "@/lib/chat-context"
 import { useAuth } from "@/lib/auth-context"
@@ -134,19 +134,6 @@ export default function SlydPROHome() {
 
   // Show only first 6 projects on home page
   const recentProjects = projects.slice(0, 6)
-
-  if (isLoading) {
-    return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="text-center">
-          <div className="w-12 h-12 bg-gradient-to-r from-[#027659] to-[#10b981] rounded-xl flex items-center justify-center mx-auto mb-4">
-            <Sparkles className="w-6 h-6 text-white animate-pulse" />
-          </div>
-          <p className="text-muted-foreground">Loading...</p>
-        </div>
-      </div>
-    )
-  }
 
   return (
     <div className="min-h-screen bg-background flex flex-col">

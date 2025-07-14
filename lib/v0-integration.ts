@@ -42,19 +42,15 @@ class V0SlideGenerator {
   private apiKey: string | null = null
 
   constructor() {
-    // Get API key from environment variable
-    this.apiKey = process.env.NEXT_PUBLIC_V0_API_KEY || null
+    // API key will be provided by server-side calls
+    this.apiKey = null
   }
 
   private async makeV0Request(endpoint: string, data: any): Promise<V0ChatResponse> {
-    if (!this.apiKey) {
-      throw new Error("V0 API key not configured. Please set NEXT_PUBLIC_V0_API_KEY environment variable.")
-    }
-
-    const response = await fetch(`https://api.v0.dev${endpoint}`, {
+    // Use server-side API route instead of direct API calls
+    const response = await fetch(`/api/v0${endpoint}`, {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${this.apiKey}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify(data),
@@ -226,7 +222,7 @@ Content for this slide...
 ## Slide 2: Next Title
 Content for next slide...`
 
-      // Create chat with v0 API
+      // Use server-side API route
       const response = await this.makeV0Request("/chats", {
         message: slidePrompt,
       })
@@ -246,7 +242,7 @@ Content for next slide...`
       }
     } catch (error) {
       console.error("V0 API Error:", error)
-      throw new Error("Failed to generate slides. Please check your API key and try again.")
+      throw new Error("Failed to generate slides. Please try again.")
     }
   }
 
@@ -256,7 +252,7 @@ Content for next slide...`
 
 Please provide the updated slide content with the same structure using ## headers.`
 
-      // Add message to existing chat
+      // Use server-side API route
       const response = await this.makeV0Request(`/chats/${chatId}/messages`, {
         message,
       })
@@ -286,7 +282,7 @@ Please provide the updated slide content with the same structure using ## header
 
 Please provide a complete updated presentation with all slides using ## headers for each slide.`
 
-      // Add message to existing chat
+      // Use server-side API route
       const response = await this.makeV0Request(`/chats/${chatId}/messages`, {
         message,
       })
@@ -311,7 +307,8 @@ Please provide a complete updated presentation with all slides using ## headers 
   }
 
   isConfigured(): boolean {
-    return !!this.apiKey
+    // Always return true since we're using server-side API routes
+    return true
   }
 }
 
