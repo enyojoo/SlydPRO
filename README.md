@@ -1,4 +1,4 @@
-# V0 Pitch Deck Builder
+# V0 for Pitch Deck Builder
 
 *Automatically synced with your [v0.dev](https://v0.dev) deployments*
 
