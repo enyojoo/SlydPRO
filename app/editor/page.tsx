@@ -60,6 +60,7 @@ const colorThemes = [
 ]
 
 function EditorContent() {
+  const [isSmallScreen, setIsSmallScreen] = useState(false)
   const [slides, setSlides] = useState<Slide[]>([])
   const [selectedSlide, setSelectedSlide] = useState<string>("")
   const [inputMessage, setInputMessage] = useState("")
@@ -82,12 +83,21 @@ function EditorContent() {
   const nameInputRef = useRef<HTMLInputElement>(null)
   const { messages } = useChatContext()
 
-  // Scroll to bottom of chat when messages change
+  const checkScreenSize = () => {
+    setIsSmallScreen(window.innerWidth < 1024)
+  }
+
+  useEffect(() => {
+    checkScreenSize()
+    window.addEventListener("resize", checkScreenSize)
+
+    return () => window.removeEventListener("resize", checkScreenSize)
+  }, [])
+
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" })
   }, [chatMessages])
 
-  // Focus name input when editing starts
   useEffect(() => {
     if (isEditingName && nameInputRef.current) {
       nameInputRef.current.focus()
@@ -95,7 +105,6 @@ function EditorContent() {
     }
   }, [isEditingName])
 
-  // Initialize component only once
   useEffect(() => {
     if (isInitialized) return
 

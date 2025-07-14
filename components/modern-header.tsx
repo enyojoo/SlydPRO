@@ -1,5 +1,7 @@
 "use client"
 
+import { DropdownMenuItem } from "@/components/ui/dropdown-menu"
+
 import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
@@ -8,7 +10,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import {
   DropdownMenu,
   DropdownMenuContent,
-  DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
@@ -35,11 +36,11 @@ export function ModernHeader({ onAuthClick }: ModernHeaderProps) {
   return (
     <>
       <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-        <div className="container flex h-16 items-center">
+        <div className="container flex h-16 items-center px-4 sm:px-6">
           {/* Logo */}
-          <div className="mr-6 flex items-center space-x-2">
+          <div className="mr-4 sm:mr-6 flex items-center space-x-2">
             <div className="flex items-center space-x-2">
-              <img src="https://cldup.com/dAXA3nE5xd.svg" alt="SlydPRO" className="h-20 w-32" />
+              <img src="https://cldup.com/dAXA3nE5xd.svg" alt="SlydPRO" className="h-16 w-24 sm:h-20 sm:w-32" />
             </div>
           </div>
 
@@ -57,7 +58,7 @@ export function ModernHeader({ onAuthClick }: ModernHeaderProps) {
                     </Avatar>
                   </Button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent className="w-80 p-0" align="end" forceMount>
+                <DropdownMenuContent className="w-80 sm:w-80 p-0 mx-4 sm:mx-0" align="end" forceMount>
                   {/* User Profile Section */}
                   <div className="p-4 border-b">
                     <div className="flex items-center space-x-3">
@@ -209,7 +210,7 @@ export function ModernHeader({ onAuthClick }: ModernHeaderProps) {
                 </DropdownMenuContent>
               </DropdownMenu>
             ) : (
-              <div className="flex items-center space-x-2">
+              <div className="hidden lg:flex items-center space-x-2">
                 <Button variant="ghost" onClick={onAuthClick}>
                   Log in
                 </Button>
@@ -224,19 +225,59 @@ export function ModernHeader({ onAuthClick }: ModernHeaderProps) {
               <SheetTrigger asChild>
                 <Button
                   variant="ghost"
-                  className="mr-2 px-0 text-base hover:bg-transparent focus-visible:bg-transparent focus-visible:ring-0 focus-visible:ring-offset-0 md:hidden"
+                  className="mr-2 px-2 text-base hover:bg-transparent focus-visible:bg-transparent focus-visible:ring-0 focus-visible:ring-offset-0 lg:hidden"
                 >
                   <Menu className="h-5 w-5" />
                   <span className="sr-only">Toggle Menu</span>
                 </Button>
               </SheetTrigger>
-              <SheetContent side="left" className="pr-0">
+              <SheetContent side="left" className="pr-0 w-80">
                 <div className="px-7">
                   <img src="https://cldup.com/dAXA3nE5xd.svg" alt="SlydPRO" className="h-8 w-auto" />
                 </div>
                 <div className="my-4 h-[calc(100vh-8rem)] pb-10 pl-6">
                   <div className="flex flex-col space-y-3">
-                    <p className="text-sm text-muted-foreground">Menu options will be added here</p>
+                    {isAuthenticated && user ? (
+                      <div className="space-y-4">
+                        <div className="flex items-center space-x-3 p-4 bg-gray-50 rounded-lg">
+                          <Avatar className="h-10 w-10">
+                            <AvatarImage src={user.avatar || "/placeholder.svg"} alt={user.name} />
+                            <AvatarFallback className="bg-[#027659] text-white text-sm font-medium">
+                              {user.name.charAt(0).toUpperCase()}
+                            </AvatarFallback>
+                          </Avatar>
+                          <div>
+                            <p className="font-medium text-foreground">{user.name}</p>
+                            <p className="text-sm text-muted-foreground">{user.email}</p>
+                          </div>
+                        </div>
+                        <Button
+                          variant="outline"
+                          className="w-full justify-start bg-transparent"
+                          onClick={() => handleSettingsClick("profile")}
+                        >
+                          <Settings className="h-4 w-4 mr-2" />
+                          Settings
+                        </Button>
+                        <Button
+                          variant="outline"
+                          className="w-full justify-start text-red-600 bg-transparent"
+                          onClick={logout}
+                        >
+                          <LogOut className="h-4 w-4 mr-2" />
+                          Sign out
+                        </Button>
+                      </div>
+                    ) : (
+                      <div className="space-y-3">
+                        <Button variant="ghost" className="w-full justify-start" onClick={onAuthClick}>
+                          Log in
+                        </Button>
+                        <Button onClick={onAuthClick} className="w-full bg-[#027659] hover:bg-[#065f46]">
+                          Get started
+                        </Button>
+                      </div>
+                    )}
                   </div>
                 </div>
               </SheetContent>

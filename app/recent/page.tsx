@@ -90,47 +90,47 @@ export default function RecentPresentationsPage() {
       <ModernHeader />
 
       {/* Main Content */}
-      <main className="flex-1 container mx-auto px-6 py-8">
+      <main className="flex-1 container mx-auto px-4 sm:px-6 py-6 sm:py-8">
         {/* Header */}
-        <div className="mb-8">
+        <div className="mb-6 sm:mb-8">
           <div className="flex items-center mb-4">
             <Button
               variant="ghost"
               size="sm"
               onClick={() => router.push("/")}
-              className="mr-4 text-muted-foreground hover:text-foreground"
+              className="mr-2 sm:mr-4 text-muted-foreground hover:text-foreground"
             >
               <ArrowLeft className="h-4 w-4 mr-2" />
               Back
             </Button>
-            <h1 className="text-3xl font-bold text-foreground">Recent Presentations</h1>
+            <h1 className="text-2xl sm:text-3xl font-bold text-foreground">Recent Presentations</h1>
           </div>
 
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between space-y-4 sm:space-y-0">
             <p className="text-muted-foreground">
               {filteredProjects.length} presentation{filteredProjects.length !== 1 ? "s" : ""}
             </p>
 
-            <div className="flex items-center space-x-3">
-              <div className="relative">
+            <div className="flex items-center space-x-3 w-full sm:w-auto">
+              <div className="relative flex-1 sm:flex-none">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input
                   placeholder="Search presentations..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-10 w-64 bg-background border-border"
+                  className="pl-10 w-full sm:w-64 bg-background border-border"
                 />
               </div>
-              <Button variant="outline" size="sm">
+              <Button variant="outline" size="sm" className="shrink-0 bg-transparent">
                 <Filter className="h-4 w-4 mr-2" />
-                Filter
+                <span className="hidden sm:inline">Filter</span>
               </Button>
             </div>
           </div>
         </div>
 
         {/* Presentations Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6">
           {filteredProjects.map((project) => {
             const firstSlide = project.slides[0]
             return (

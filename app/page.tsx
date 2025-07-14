@@ -141,49 +141,49 @@ export default function SlydPROHome() {
       <ModernHeader onAuthClick={() => setShowAuthDialog(true)} />
 
       {/* Main Content */}
-      <main className="flex-1 container mx-auto px-6 py-12">
+      <main className="flex-1 container mx-auto px-4 sm:px-6 py-8 sm:py-12">
         {/* Hero Section */}
-        <div className="text-center mb-16">
-          <h1 className="font-bold text-foreground mb-6 leading-tight text-5xl">
+        <div className="text-center mb-12 sm:mb-16">
+          <h1 className="font-bold text-foreground mb-4 sm:mb-6 leading-tight text-3xl sm:text-4xl lg:text-5xl">
             Create something{" "}
             <span className="bg-gradient-to-r from-[#027659] to-[#10b981] bg-clip-text text-transparent">
               Presentable
             </span>
           </h1>
-          <p className="text-xl text-muted-foreground max-w-2xl mx-auto leading-relaxed">
+          <p className="text-lg sm:text-xl text-muted-foreground max-w-2xl mx-auto leading-relaxed px-4">
             Design pitch decks and presentation slides by chatting with AI
           </p>
         </div>
 
         {/* Chat Interface */}
-        <div className="max-w-2xl mx-auto mb-16">
+        <div className="max-w-2xl mx-auto mb-12 sm:mb-16 px-4 sm:px-0">
           <div className="bg-card rounded-2xl shadow-xl border border-border overflow-hidden">
-            <div className="p-6">
+            <div className="p-4 sm:p-6">
               <div className="relative">
                 <Textarea
                   value={inputMessage}
                   onChange={(e) => setInputMessage(e.target.value)}
                   placeholder="Describe your presentation idea... (e.g., 'Create a pitch deck for a food delivery startup')"
                   onKeyPress={(e) => e.key === "Enter" && !e.shiftKey && handleChatSubmit()}
-                  className="w-full bg-muted border-0 text-foreground placeholder:text-muted-foreground text-base focus-visible:ring-0 focus-visible:ring-offset-0 resize-none min-h-[120px] max-h-[200px] shadow-none outline-none focus:outline-none rounded-xl p-4"
-                  rows={5}
+                  className="w-full bg-muted border-0 text-foreground placeholder:text-muted-foreground text-sm sm:text-base focus-visible:ring-0 focus-visible:ring-offset-0 resize-none min-h-[100px] sm:min-h-[120px] max-h-[200px] shadow-none outline-none focus:outline-none rounded-xl p-3 sm:p-4"
+                  rows={4}
                 />
               </div>
-              <div className="flex items-center justify-between mt-4">
-                <div className="flex items-center space-x-3">
+              <div className="flex items-center justify-between mt-3 sm:mt-4">
+                <div className="flex items-center space-x-2 sm:space-x-3">
                   <Button
                     variant="ghost"
                     size="sm"
                     onClick={() => fileInputRef.current?.click()}
-                    className="text-muted-foreground hover:text-foreground hover:bg-muted rounded-lg px-3 py-2"
+                    className="text-muted-foreground hover:text-foreground hover:bg-muted rounded-lg px-2 sm:px-3 py-2"
                   >
-                    <Upload className="h-4 w-4 mr-2" />
-                    <span>Upload</span>
+                    <Upload className="h-4 w-4 mr-1 sm:mr-2" />
+                    <span className="hidden sm:inline">Upload</span>
                   </Button>
                 </div>
                 <Button
                   onClick={handleChatSubmit}
-                  className="bg-[#027659] hover:bg-[#065f46] text-white rounded-lg px-6 py-2 shadow-sm hover:shadow-md transition-all duration-200"
+                  className="bg-[#027659] hover:bg-[#065f46] text-white rounded-lg px-4 sm:px-6 py-2 shadow-sm hover:shadow-md transition-all duration-200"
                   disabled={!inputMessage.trim()}
                 >
                   <span className="mr-2">Create</span>
@@ -217,7 +217,7 @@ export default function SlydPROHome() {
               </Button>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6">
               {recentProjects.map((project) => {
                 const firstSlide = project.slides[0]
                 return (
@@ -306,7 +306,7 @@ export default function SlydPROHome() {
 
       {/* Auth Dialog */}
       <Dialog open={showAuthDialog} onOpenChange={setShowAuthDialog}>
-        <DialogContent className="sm:max-w-md bg-card border border-border">
+        <DialogContent className="sm:max-w-md bg-card border border-border mx-4 sm:mx-0">
           <DialogHeader>
             <DialogTitle className="text-center text-2xl font-bold text-foreground">
               {authMode === "signin" ? "Welcome back" : `Join ${PLATFORM_CONFIG.name}`}

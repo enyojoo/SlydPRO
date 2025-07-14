@@ -9,7 +9,7 @@ import { Badge } from "@/components/ui/badge"
 import { Card } from "@/components/ui/card"
 import { Separator } from "@/components/ui/separator"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { X, User, CreditCard, Check, Info } from "lucide-react"
+import { User, CreditCard, Check, Info } from "lucide-react"
 import { useAuth } from "@/lib/auth-context"
 import { useRouter } from "next/navigation"
 
@@ -42,18 +42,18 @@ export function SettingsModal({ open, onOpenChange, initialSection = "profile" }
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="max-w-6xl h-[85vh] p-0 gap-0">
+      <DialogContent className="max-w-6xl h-[85vh] p-0 gap-0 mx-4 sm:mx-0">
         <div className="flex h-full">
           {/* Left Sidebar */}
-          <div className="w-64 bg-muted/30 border-r p-6">
-            <div className="space-y-6">
+          <div className="w-full sm:w-64 bg-muted/30 border-r border-b sm:border-b-0 p-4 sm:p-6">
+            <div className="space-y-4 sm:space-y-6">
               {/* Account Section */}
               <div>
                 <h3 className="text-sm font-medium text-muted-foreground mb-3">Account</h3>
-                <div className="space-y-1">
+                <div className="flex sm:flex-col space-x-2 sm:space-x-0 sm:space-y-1">
                   <Button
                     variant={activeSection === "profile" ? "secondary" : "ghost"}
-                    className="w-full justify-start h-9"
+                    className="flex-1 sm:w-full justify-start h-9"
                     onClick={() => handleSectionChange("profile")}
                   >
                     <User className="h-4 w-4 mr-3" />
@@ -61,7 +61,7 @@ export function SettingsModal({ open, onOpenChange, initialSection = "profile" }
                   </Button>
                   <Button
                     variant={activeSection === "billing" ? "secondary" : "ghost"}
-                    className="w-full justify-start h-9"
+                    className="flex-1 sm:w-full justify-start h-9"
                     onClick={() => handleSectionChange("billing")}
                   >
                     <CreditCard className="h-4 w-4 mr-3" />
@@ -73,24 +73,23 @@ export function SettingsModal({ open, onOpenChange, initialSection = "profile" }
           </div>
 
           {/* Main Content */}
-          <div className="flex-1 flex flex-col">
+          <div className="flex-1 flex flex-col min-h-0">
             {/* Header */}
-            <div className="flex items-center justify-between p-6 border-b">
+            <div className="flex items-center justify-between p-4 sm:p-6 border-b">
               <div>
-                <h2 className="text-xl font-semibold">
+                <h2 className="text-lg sm:text-xl font-semibold">
                   {activeSection === "profile" ? "Profile Settings" : "Plans & Billing"}
                 </h2>
-                <p className="text-sm text-muted-foreground mt-1">
+                <p className="text-sm text-muted-foreground mt-1 hidden sm:block">
                   {activeSection === "profile"
                     ? "Manage your account profile and preferences"
                     : "Manage your subscription and billing information"}
                 </p>
               </div>
-              
             </div>
 
             {/* Content */}
-            <div className="flex-1 overflow-y-auto p-6 max-h-[calc(85vh-120px)]">
+            <div className="flex-1 overflow-y-auto p-4 sm:p-6 max-h-[calc(85vh-120px)]">
               {activeSection === "profile" && <ProfileSection user={user} />}
               {activeSection === "billing" && <BillingSection user={user} />}
             </div>
@@ -178,7 +177,7 @@ function BillingSection({ user }: { user: any }) {
       </div>
 
       {/* Pricing Plans */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
         {/* Free Plan */}
         <Card className="p-6 relative">
           <div className="mb-6">

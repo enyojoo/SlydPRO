@@ -10,13 +10,13 @@ export function Footer() {
 
   return (
     <footer className="bg-background border-t border-border">
-      <div className="container mx-auto px-6 py-12">
+      <div className="container mx-auto px-4 sm:px-6 py-8 sm:py-12">
         {/* Centered Brand Section */}
-        <div className="flex flex-col items-center text-center space-y-6 mb-8">
+        <div className="flex flex-col items-center text-center space-y-4 sm:space-y-6 mb-6 sm:mb-8">
           <div className="flex items-center space-x-2">
-            <img src="https://cldup.com/dAXA3nE5xd.svg" alt="SlydPRO" className="h-8 w-auto" />
+            <img src="https://cldup.com/dAXA3nE5xd.svg" alt="SlydPRO" className="h-6 sm:h-8 w-auto" />
           </div>
-          <p className="text-sm text-muted-foreground leading-relaxed max-w-md">
+          <p className="text-sm text-muted-foreground leading-relaxed max-w-md px-4 sm:px-0">
             Create professional presentations with AI assistance. Design pitch decks, business presentations, and more
             in minutes.
           </p>
@@ -44,7 +44,7 @@ export function Footer() {
             <span>© 2025 Easner, Inc. All rights reserved.</span>
           </div>
 
-          <div className="flex items-center space-x-6 text-sm">
+          <div className="flex flex-wrap items-center justify-center space-x-4 sm:space-x-6 text-sm">
             <Button variant="ghost" className="h-auto p-0 text-muted-foreground hover:text-foreground">
               Privacy Policy
             </Button>

@@ -5,7 +5,8 @@ export async function POST(request: NextRequest, { params }: { params: { chatId:
     const { message } = await request.json()
     const { chatId } = params
 
-    const apiKey = process.env.NEXT_PUBLIC_V0_API_KEY
+    // Use server-side environment variable (not NEXT_PUBLIC_)
+    const apiKey = process.env.V0_API_KEY
     if (!apiKey) {
       return NextResponse.json({ error: "V0 API key not configured" }, { status: 500 })
     }

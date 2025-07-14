@@ -11,6 +11,7 @@ const inter = Inter({ subsets: ["latin"] })
 export const metadata: Metadata = {
   title: `${PLATFORM_CONFIG.name} - AI-Powered Presentation Builder`,
   description: "Create professional pitch decks and presentations with AI assistance",
+  viewport: "width=device-width, initial-scale=1",
     generator: 'v0.dev'
 }
 
