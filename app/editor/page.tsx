@@ -3,7 +3,7 @@ import { Home } from "lucide-react" // Import Home icon
 
 import type React from "react"
 
-import { useState, useRef, useEffect, useCallback } from "react"
+import { useState, useRef, useEffect, useCallback, Suspense } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { ScrollArea } from "@/components/ui/scroll-area"
@@ -59,7 +59,7 @@ const colorThemes = [
   { name: "Dark", primary: "#1f2937", secondary: "#374151", text: "#ffffff" },
 ]
 
-export default function EditorPage() {
+function EditorContent() {
   const [slides, setSlides] = useState<Slide[]>([])
   const [selectedSlide, setSelectedSlide] = useState<string>("")
   const [inputMessage, setInputMessage] = useState("")
@@ -857,5 +857,13 @@ export default function EditorPage() {
         slideCount={slides.length}
       />
     </TooltipProvider>
+  )
+}
+
+export default function EditorPage() {
+  return (
+    <Suspense fallback={<div>Loading...</div>}>
+      <EditorContent />
+    </Suspense>
   )
 }
