@@ -1,33 +1,29 @@
 import { type NextRequest, NextResponse } from "next/server"
+import { supabase } from "@/lib/supabase"
 
 export async function POST(request: NextRequest) {
   try {
     const { email, password } = await request.json()
 
-    // TODO: Implement actual authentication
-    // For now, return mock success
-
-    // In production, you would:
-    // 1. Validate credentials against database
-    // 2. Create JWT token or session
-    // 3. Set secure cookies
-    // 4. Return user data
-
-    if (email && password) {
-      const mockUser = {
-        id: "user_123",
-        name: "John Doe",
-        email: email,
-        avatar: null,
-        monthlyCredits: 10.0,
-        purchasedCredits: 0.0,
-        plan: "free" as const,
-      }
-
-      return NextResponse.json(mockUser)
+    if (!email || !password) {
+      return NextResponse.json({ error: "Email and password are required" }, { status: 400 })
     }
 
-    return NextResponse.json({ error: "Invalid credentials" }, { status: 401 })
+    // Sign in user with Supabase Auth
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    })
+
+    if (error) {
+      return NextResponse.json({ error: error.message }, { status: 401 })
+    }
+
+    return NextResponse.json({
+      message: "Login successful",
+      user: data.user,
+      session: data.session,
+    })
   } catch (error) {
     console.error("Login error:", error)
     return NextResponse.json({ error: "Login failed" }, { status: 500 })

@@ -8,7 +8,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Separator } from "@/components/ui/separator"
 import { Textarea } from "@/components/ui/textarea"
 import { Input } from "@/components/ui/input"
-import { Upload, Clock, MoreHorizontal, ArrowUp, ArrowRight } from "lucide-react"
+import { Alert, AlertDescription } from "@/components/ui/alert"
+import { Upload, Clock, MoreHorizontal, ArrowUp, ArrowRight, Loader2, AlertCircle } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { useChatContext } from "@/lib/chat-context"
 import { useAuth } from "@/lib/auth-context"
@@ -33,10 +34,18 @@ interface Project {
 }
 
 export default function SlydPROHome() {
-  const { user, isAuthenticated, isLoading } = useAuth()
+  const { user, isAuthenticated, isLoading, login, signup } = useAuth()
   const [showAuthDialog, setShowAuthDialog] = useState(false)
   const [authMode, setAuthMode] = useState<"signin" | "signup">("signin")
   const [inputMessage, setInputMessage] = useState("")
+  const [authLoading, setAuthLoading] = useState(false)
+  const [authError, setAuthError] = useState("")
+  const [formData, setFormData] = useState({
+    name: "",
+    email: "",
+    password: "",
+    confirmPassword: "",
+  })
   const router = useRouter()
   const { addMessage, clearMessages } = useChatContext()
 
@@ -101,6 +110,35 @@ export default function SlydPROHome() {
       clearMessages()
       addMessage(userMessage)
       router.push(`/editor?file=${encodeURIComponent(file.name)}`)
+    }
+  }
+
+  const handleAuth = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setAuthLoading(true)
+    setAuthError("")
+
+    try {
+      if (authMode === "signup") {
+        if (formData.password !== formData.confirmPassword) {
+          setAuthError("Passwords do not match")
+          return
+        }
+        if (formData.password.length < 6) {
+          setAuthError("Password must be at least 6 characters")
+          return
+        }
+        await signup(formData.name, formData.email, formData.password)
+      } else {
+        await login(formData.email, formData.password)
+      }
+
+      setShowAuthDialog(false)
+      setFormData({ name: "", email: "", password: "", confirmPassword: "" })
+    } catch (error: any) {
+      setAuthError(error.message || "Authentication failed")
+    } finally {
+      setAuthLoading(false)
     }
   }
 
@@ -312,7 +350,8 @@ export default function SlydPROHome() {
               {authMode === "signin" ? "Welcome back" : `Join ${PLATFORM_CONFIG.name}`}
             </DialogTitle>
           </DialogHeader>
-          <div className="space-y-6 py-6">
+
+          <form onSubmit={handleAuth} className="space-y-6 py-6">
             <div className="text-center">
               <p className="text-sm text-muted-foreground mb-6">
                 {authMode === "signin"
@@ -321,36 +360,68 @@ export default function SlydPROHome() {
               </p>
             </div>
 
+            {authError && (
+              <Alert variant="destructive">
+                <AlertCircle className="h-4 w-4" />
+                <AlertDescription>{authError}</AlertDescription>
+              </Alert>
+            )}
+
             <div className="space-y-4">
               {authMode === "signup" && (
                 <Input
                   placeholder="Full name"
                   type="text"
+                  value={formData.name}
+                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                   className="h-12 bg-muted border-border text-foreground placeholder:text-muted-foreground"
+                  required
                 />
               )}
               <Input
                 placeholder="Email address"
                 type="email"
+                value={formData.email}
+                onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                 className="h-12 bg-muted border-border text-foreground placeholder:text-muted-foreground"
+                required
               />
               <Input
                 placeholder="Password"
                 type="password"
+                value={formData.password}
+                onChange={(e) => setFormData({ ...formData, password: e.target.value })}
                 className="h-12 bg-muted border-border text-foreground placeholder:text-muted-foreground"
+                required
               />
               {authMode === "signup" && (
                 <Input
                   placeholder="Confirm password"
                   type="password"
+                  value={formData.confirmPassword}
+                  onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })}
                   className="h-12 bg-muted border-border text-foreground placeholder:text-muted-foreground"
+                  required
                 />
               )}
             </div>
 
             <div className="space-y-3">
-              <Button className="w-full h-12 text-base bg-[#027659] text-white hover:bg-[#065f46]">
-                {authMode === "signin" ? "Sign In" : "Create Account"}
+              <Button
+                type="submit"
+                className="w-full h-12 text-base bg-[#027659] text-white hover:bg-[#065f46]"
+                disabled={authLoading}
+              >
+                {authLoading ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    {authMode === "signin" ? "Signing In..." : "Creating Account..."}
+                  </>
+                ) : authMode === "signin" ? (
+                  "Sign In"
+                ) : (
+                  "Create Account"
+                )}
               </Button>
 
               <div className="flex items-center justify-center">
@@ -360,8 +431,10 @@ export default function SlydPROHome() {
               </div>
 
               <Button
+                type="button"
                 variant="outline"
                 className="w-full h-12 bg-background border-border text-foreground hover:bg-muted"
+                disabled={authLoading}
               >
                 <svg className="w-5 h-5 mr-3" viewBox="0 0 24 24">
                   <path
@@ -387,14 +460,20 @@ export default function SlydPROHome() {
 
             <div className="text-center">
               <Button
+                type="button"
                 variant="ghost"
-                onClick={() => setAuthMode(authMode === "signin" ? "signup" : "signin")}
+                onClick={() => {
+                  setAuthMode(authMode === "signin" ? "signup" : "signin")
+                  setAuthError("")
+                  setFormData({ name: "", email: "", password: "", confirmPassword: "" })
+                }}
                 className="text-sm text-muted-foreground hover:text-foreground"
+                disabled={authLoading}
               >
                 {authMode === "signin" ? "Don't have an account? Sign up" : "Already have an account? Sign in"}
               </Button>
             </div>
-          </div>
+          </form>
         </DialogContent>
       </Dialog>
 

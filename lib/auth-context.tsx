@@ -1,24 +1,17 @@
 "use client"
 
 import { createContext, useContext, useState, useEffect, type ReactNode } from "react"
-
-interface User {
-  id: string
-  name: string
-  email: string
-  avatar?: string
-  monthlyCredits: number
-  purchasedCredits: number
-  plan: "free" | "pro" | "enterprise"
-}
+import { supabase, type User } from "./supabase"
+import type { Session } from "@supabase/supabase-js"
 
 interface AuthContextType {
   user: User | null
+  session: Session | null
   isAuthenticated: boolean
   isLoading: boolean
   login: (email: string, password: string) => Promise<void>
   signup: (name: string, email: string, password: string) => Promise<void>
-  logout: () => void
+  logout: () => Promise<void>
   updateCredits: (amount: number) => void
 }
 
@@ -26,67 +19,124 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
+  const [session, setSession] = useState<Session | null>(null)
   const [isLoading, setIsLoading] = useState(true)
 
   useEffect(() => {
-    // Check for existing session
-    const checkAuth = async () => {
-      try {
-        const response = await fetch("/api/auth/me")
-        if (response.ok) {
-          const userData = await response.json()
-          setUser(userData)
+    // Get initial session
+    const getInitialSession = async () => {
+      const {
+        data: { session },
+        error,
+      } = await supabase.auth.getSession()
+
+      if (error) {
+        console.error("Error getting session:", error)
+      } else {
+        setSession(session)
+        if (session?.user) {
+          await fetchUserProfile(session.user.id)
         }
-      } catch (error) {
-        console.error("Auth check failed:", error)
-      } finally {
-        setIsLoading(false)
       }
+
+      setIsLoading(false)
     }
 
-    checkAuth()
-  }, [])
+    getInitialSession()
 
-  const login = async (email: string, password: string) => {
-    const response = await fetch("/api/auth/login", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email, password }),
+    // Listen for auth changes
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange(async (event, session) => {
+      setSession(session)
+
+      if (session?.user) {
+        await fetchUserProfile(session.user.id)
+      } else {
+        setUser(null)
+      }
+
+      setIsLoading(false)
     })
 
-    if (!response.ok) {
-      throw new Error("Login failed")
-    }
+    return () => subscription.unsubscribe()
+  }, [])
 
-    const userData = await response.json()
-    setUser(userData)
+  const fetchUserProfile = async (userId: string) => {
+    try {
+      const { data, error } = await supabase.from("users").select("*").eq("id", userId).single()
+
+      if (error) {
+        console.error("Error fetching user profile:", error)
+        return
+      }
+
+      setUser(data)
+    } catch (error) {
+      console.error("Error fetching user profile:", error)
+    }
+  }
+
+  const login = async (email: string, password: string) => {
+    const { error } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    })
+
+    if (error) {
+      throw error
+    }
   }
 
   const signup = async (name: string, email: string, password: string) => {
-    const response = await fetch("/api/auth/signup", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name, email, password }),
+    const { data, error } = await supabase.auth.signUp({
+      email,
+      password,
+      options: {
+        data: {
+          name,
+        },
+      },
     })
 
-    if (!response.ok) {
-      throw new Error("Signup failed")
+    if (error) {
+      throw error
     }
 
-    const userData = await response.json()
-    setUser(userData)
+    // Create user profile
+    if (data.user) {
+      const { error: profileError } = await supabase.from("users").insert([
+        {
+          id: data.user.id,
+          email: data.user.email!,
+          name,
+          monthly_credits: 10.0, // Free tier credits
+          purchased_credits: 0.0,
+          plan: "free",
+        },
+      ])
+
+      if (profileError) {
+        console.error("Error creating user profile:", profileError)
+        throw profileError
+      }
+    }
   }
 
   const logout = async () => {
-    await fetch("/api/auth/logout", { method: "POST" })
+    const { error } = await supabase.auth.signOut()
+    if (error) {
+      throw error
+    }
     setUser(null)
+    setSession(null)
   }
 
   const updateCredits = (amount: number) => {
     if (user) {
       setUser({
         ...user,
-        purchasedCredits: Math.max(0, user.purchasedCredits + amount),
+        purchased_credits: Math.max(0, user.purchased_credits + amount),
       })
     }
   }
@@ -95,7 +145,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     <AuthContext.Provider
       value={{
         user,
-        isAuthenticated: !!user,
+        session,
+        isAuthenticated: !!session,
         isLoading,
         login,
         signup,

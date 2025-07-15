@@ -1,7 +1,5 @@
 "use client"
 
-import { DropdownMenuItem } from "@/components/ui/dropdown-menu"
-
 import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
@@ -12,6 +10,7 @@ import {
   DropdownMenuContent,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
+  DropdownMenuItem,
 } from "@/components/ui/dropdown-menu"
 import { Menu, Settings, Crown, HelpCircle, LogOut, Info, Sun, Moon, Monitor } from "lucide-react"
 import { useAuth } from "@/lib/auth-context"
@@ -22,7 +21,7 @@ interface ModernHeaderProps {
 }
 
 export function ModernHeader({ onAuthClick }: ModernHeaderProps) {
-  const { user, isAuthenticated, logout } = useAuth()
+  const { user, isAuthenticated, logout, isLoading } = useAuth()
   const [showSettings, setShowSettings] = useState(false)
   const [settingsSection, setSettingsSection] = useState("profile")
   const [theme, setTheme] = useState("system")
@@ -31,6 +30,29 @@ export function ModernHeader({ onAuthClick }: ModernHeaderProps) {
   const handleSettingsClick = (section = "profile") => {
     setSettingsSection(section)
     setShowSettings(true)
+  }
+
+  const handleLogout = async () => {
+    try {
+      await logout()
+    } catch (error) {
+      console.error("Logout error:", error)
+    }
+  }
+
+  if (isLoading) {
+    return (
+      <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+        <div className="container flex h-16 items-center px-4 sm:px-6">
+          <div className="mr-4 sm:mr-6 flex items-center space-x-2">
+            <img src="https://cldup.com/dAXA3nE5xd.svg" alt="SlydPRO" className="h-16 w-24 sm:h-20 sm:w-32" />
+          </div>
+          <div className="flex flex-1 items-center justify-end">
+            <div className="w-8 h-8 bg-gray-200 rounded-full animate-pulse"></div>
+          </div>
+        </div>
+      </header>
+    )
   }
 
   return (
@@ -51,7 +73,7 @@ export function ModernHeader({ onAuthClick }: ModernHeaderProps) {
                 <DropdownMenuTrigger asChild>
                   <Button variant="ghost" className="relative h-8 w-8 rounded-full">
                     <Avatar className="h-8 w-8">
-                      <AvatarImage src={user.avatar || "/placeholder.svg"} alt={user.name} />
+                      <AvatarImage src={user.avatar_url || "/placeholder.svg"} alt={user.name} />
                       <AvatarFallback className="bg-[#027659] text-white text-sm font-medium">
                         {user.name.charAt(0).toUpperCase()}
                       </AvatarFallback>
@@ -63,7 +85,7 @@ export function ModernHeader({ onAuthClick }: ModernHeaderProps) {
                   <div className="p-4 border-b">
                     <div className="flex items-center space-x-3">
                       <Avatar className="h-10 w-10">
-                        <AvatarImage src={user.avatar || "/placeholder.svg"} alt={user.name} />
+                        <AvatarImage src={user.avatar_url || "/placeholder.svg"} alt={user.name} />
                         <AvatarFallback className="bg-[#027659] text-white text-sm font-medium">
                           {user.name.charAt(0).toUpperCase()}
                         </AvatarFallback>
@@ -111,12 +133,13 @@ export function ModernHeader({ onAuthClick }: ModernHeaderProps) {
                         <div className="flex items-center justify-between text-sm">
                           <span className="text-muted-foreground">Plan</span>
                           <span className="font-medium">
-                            {Math.floor(user.monthlyCredits)}/{Math.floor(user.monthlyCredits + user.purchasedCredits)}
+                            {Math.floor(user.monthly_credits)}/
+                            {Math.floor(user.monthly_credits + user.purchased_credits)}
                           </span>
                         </div>
 
                         <div className="flex items-center justify-between text-sm">
-                          <span className="text-muted-foreground">0 of your daily credits used</span>
+                          <span className="text-muted-foreground">Credits remaining</span>
                           <Info className="h-3 w-3 text-muted-foreground" />
                         </div>
                       </div>
@@ -201,7 +224,7 @@ export function ModernHeader({ onAuthClick }: ModernHeaderProps) {
 
                     <DropdownMenuItem
                       className="px-4 py-3 cursor-pointer text-red-600 focus:text-red-600"
-                      onClick={logout}
+                      onClick={handleLogout}
                     >
                       <LogOut className="h-4 w-4 mr-3" />
                       <span>Sign out</span>
@@ -241,7 +264,7 @@ export function ModernHeader({ onAuthClick }: ModernHeaderProps) {
                       <div className="space-y-4">
                         <div className="flex items-center space-x-3 p-4 bg-gray-50 rounded-lg">
                           <Avatar className="h-10 w-10">
-                            <AvatarImage src={user.avatar || "/placeholder.svg"} alt={user.name} />
+                            <AvatarImage src={user.avatar_url || "/placeholder.svg"} alt={user.name} />
                             <AvatarFallback className="bg-[#027659] text-white text-sm font-medium">
                               {user.name.charAt(0).toUpperCase()}
                             </AvatarFallback>
@@ -262,7 +285,7 @@ export function ModernHeader({ onAuthClick }: ModernHeaderProps) {
                         <Button
                           variant="outline"
                           className="w-full justify-start text-red-600 bg-transparent"
-                          onClick={logout}
+                          onClick={handleLogout}
                         >
                           <LogOut className="h-4 w-4 mr-2" />
                           Sign out

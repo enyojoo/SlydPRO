@@ -1,16 +1,15 @@
 import { type NextRequest, NextResponse } from "next/server"
+import { supabase } from "@/lib/supabase"
 
 export async function POST(request: NextRequest) {
   try {
-    // TODO: Implement actual logout
-    // For now, return success
+    const { error } = await supabase.auth.signOut()
 
-    // In production, you would:
-    // 1. Clear JWT token or destroy session
-    // 2. Clear secure cookies
-    // 3. Optionally blacklist token
+    if (error) {
+      return NextResponse.json({ error: error.message }, { status: 400 })
+    }
 
-    return NextResponse.json({ success: true })
+    return NextResponse.json({ message: "Logout successful" })
   } catch (error) {
     console.error("Logout error:", error)
     return NextResponse.json({ error: "Logout failed" }, { status: 500 })
