@@ -123,17 +123,8 @@ export default function SlydPROHome() {
       router.push(`/editor/${presentation.id}/${slugTitle}`)
     } catch (error) {
       console.error("Failed to create presentation:", error)
-      // Fallback to old behavior if creation fails
-      const userMessage = {
-        id: Date.now().toString(),
-        type: "user" as const,
-        content: inputMessage,
-        timestamp: new Date(),
-      }
-
-      clearMessages()
-      addMessage(userMessage)
-      router.push("/editor")
+      // Show error to user
+      alert("Failed to create presentation. Please try again.")
     }
   }
 
@@ -155,7 +146,7 @@ export default function SlydPROHome() {
       try {
         // Create presentation immediately with default name
         const presentation = await presentationsAPI.createPresentation({
-          name: "Untitled Presentation",
+          name: `${file.name.split(".")[0]} Presentation`,
           description: `${inputMessage} (from uploaded file: ${file.name})`,
           slides: [], // Empty slides initially
           thumbnail: "#027659",
@@ -174,21 +165,14 @@ export default function SlydPROHome() {
         addMessage(userMessage)
 
         // Navigate to editor with presentation ID and slug
-        const slugTitle = "untitled-presentation"
-        router.push(`/editor/${presentation.id}/${slugTitle}?file=${encodeURIComponent(file.name)}`)
+        const slugTitle = presentation.name
+          .toLowerCase()
+          .replace(/[^a-z0-9]+/g, "-")
+          .replace(/^-|-$/g, "")
+        router.push(`/editor/${presentation.id}/${slugTitle}`)
       } catch (error) {
         console.error("Failed to create presentation:", error)
-        // Fallback behavior
-        const userMessage = {
-          id: Date.now().toString(),
-          type: "user" as const,
-          content: `${inputMessage}\n\n📎 Uploaded: ${file.name}`,
-          timestamp: new Date(),
-        }
-
-        clearMessages()
-        addMessage(userMessage)
-        router.push(`/editor?file=${encodeURIComponent(file.name)}`)
+        alert("Failed to upload file. Please try again.")
       }
     }
   }
