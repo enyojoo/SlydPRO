@@ -38,6 +38,14 @@ interface V0ChatResponse {
   }>
 }
 
+// Add these interfaces at the top
+interface StreamingResponse {
+  reader: ReadableStreamDefaultReader<Uint8Array>
+  onChunk: (chunk: string) => void
+  onComplete: (fullResponse: string) => void
+  onError: (error: Error) => void
+}
+
 class V0SlideGenerator {
   private apiKey: string | null = null
 
@@ -243,6 +251,123 @@ Content for next slide...`
     } catch (error) {
       console.error("V0 API Error:", error)
       throw new Error("Failed to generate slides. Please try again.")
+    }
+  }
+
+  // Add this method to the V0SlideGenerator class
+  async createStreamingChat(
+    prompt: string,
+    onChunk: (chunk: string) => void,
+    onComplete: (response: V0ChatResponse) => void,
+    onError: (error: Error) => void,
+  ): Promise<void> {
+    try {
+      const response = await fetch("/api/v0/chats/stream", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ message: prompt }),
+      })
+
+      if (!response.ok) {
+        throw new Error(`V0 API error: ${response.status}`)
+      }
+
+      const reader = response.body?.getReader()
+      if (!reader) {
+        throw new Error("No response body")
+      }
+
+      let fullResponse = ""
+      const decoder = new TextDecoder()
+
+      while (true) {
+        const { done, value } = await reader.read()
+
+        if (done) break
+
+        const chunk = decoder.decode(value, { stream: true })
+        const lines = chunk.split("\n")
+
+        for (const line of lines) {
+          if (line.startsWith("data: ")) {
+            try {
+              const data = JSON.parse(line.slice(6))
+              if (data.chunk) {
+                fullResponse += data.chunk
+                onChunk(data.chunk)
+              }
+              if (data.complete) {
+                onComplete(data.response)
+                return
+              }
+            } catch (e) {
+              // Skip invalid JSON
+            }
+          }
+        }
+      }
+    } catch (error) {
+      onError(error instanceof Error ? error : new Error("Streaming failed"))
+    }
+  }
+
+  // Add streaming version of generateSlides
+  async generateSlidesStreaming(
+    prompt: string,
+    uploadedFile?: File,
+    onChunk?: (chunk: string) => void,
+    onComplete?: (result: SlideGenerationResult) => void,
+    onError?: (error: Error) => void,
+  ): Promise<void> {
+    try {
+      let fileContent = ""
+      if (uploadedFile) {
+        fileContent = await uploadedFile.text()
+      }
+
+      const slidePrompt = `Create a professional pitch deck presentation with multiple slides based on the following:
+
+${prompt}
+
+${fileContent ? `Document content: ${fileContent}` : ""}
+
+Please structure the response with clear slide sections using ## headers. Each slide should have:
+- A clear title
+- Relevant content for that slide
+- Logical flow for a pitch presentation
+
+Include slides for: Problem, Solution, Market, Business Model, Competition, Team, Financials, and Ask.
+
+Format each slide as:
+## Slide 1: Title Here
+Content for this slide...
+
+## Slide 2: Next Title
+Content for next slide...`
+
+      await this.createStreamingChat(
+        slidePrompt,
+        onChunk || (() => {}),
+        (response) => {
+          const tokenUsage = this.calculateTokenUsage(slidePrompt, response.message || "")
+          const slides = this.parseResponseToSlides(response)
+
+          const result: SlideGenerationResult = {
+            slides,
+            chatId: response.id,
+            tokenUsage,
+            demoUrl: response.demo,
+            files: response.files,
+          }
+
+          onComplete?.(result)
+        },
+        onError || (() => {}),
+      )
+    } catch (error) {
+      onError?.(error instanceof Error ? error : new Error("Failed to generate slides"))
     }
   }
 

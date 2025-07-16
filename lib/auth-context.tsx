@@ -25,21 +25,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     // Get initial session
     const getInitialSession = async () => {
-      const {
-        data: { session },
-        error,
-      } = await supabase.auth.getSession()
+      try {
+        const {
+          data: { session },
+          error,
+        } = await supabase.auth.getSession()
 
-      if (error) {
-        console.error("Error getting session:", error)
-      } else {
-        setSession(session)
-        if (session?.user) {
-          await fetchUserProfile(session.user.id)
+        if (error) {
+          console.error("Error getting session:", error)
+        } else {
+          setSession(session)
+          if (session?.user) {
+            await fetchUserProfile(session.user.id)
+          }
         }
+      } catch (error) {
+        console.error("Error in getInitialSession:", error)
+      } finally {
+        setIsLoading(false)
       }
-
-      setIsLoading(false)
     }
 
     getInitialSession()
@@ -48,11 +52,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(async (event, session) => {
+      console.log("Auth state changed:", event, session?.user?.email)
       setSession(session)
 
       if (session?.user) {
         await fetchUserProfile(session.user.id)
       } else {
+        setUser(null)
+      }
+
+      if (event === "SIGNED_OUT") {
         setUser(null)
       }
 
@@ -71,6 +80,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return
       }
 
+      console.log("User profile fetched:", data)
       setUser(data)
     } catch (error) {
       console.error("Error fetching user profile:", error)
@@ -146,7 +156,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       value={{
         user,
         session,
-        isAuthenticated: !!session,
+        isAuthenticated: !!session && !!user,
         isLoading,
         login,
         signup,

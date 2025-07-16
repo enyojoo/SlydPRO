@@ -142,8 +142,58 @@ export function useV0Integration() {
     [user, currentChatId, updateCredits],
   )
 
+  // Add this method to the useV0Integration hook
+  const generateSlidesStreaming = useCallback(
+    async (
+      prompt: string,
+      uploadedFile?: File,
+      onChunk?: (chunk: string) => void,
+      onComplete?: (result: SlideGenerationResult) => void,
+      onError?: (error: Error) => void,
+    ): Promise<void> => {
+      if (!user) {
+        onError?.(new Error("Please sign in to generate slides"))
+        return
+      }
+
+      // Rough estimation for credit check
+      const estimatedCost = 0.1
+      if (!checkCredits(estimatedCost)) {
+        onError?.(new Error("Insufficient credits. Please purchase more credits to continue."))
+        return
+      }
+
+      setIsLoading(true)
+      setError(null)
+
+      try {
+        await v0SlideGenerator.generateSlidesStreaming(
+          prompt,
+          uploadedFile,
+          onChunk,
+          async (result) => {
+            // Deduct actual credits used
+            await deductCredits(result.tokenUsage)
+            setCurrentChatId(result.chatId)
+            onComplete?.(result)
+          },
+          onError,
+        )
+      } catch (err) {
+        const errorMessage = err instanceof Error ? err.message : "Failed to generate slides"
+        setError(errorMessage)
+        onError?.(new Error(errorMessage))
+      } finally {
+        setIsLoading(false)
+      }
+    },
+    [user, updateCredits],
+  )
+
+  // Add this to the return object
   return {
     generateSlides,
+    generateSlidesStreaming,
     editSlide,
     regenerateAllSlides,
     isLoading,

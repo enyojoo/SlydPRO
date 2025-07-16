@@ -26,12 +26,15 @@ import {
   Play,
   Download,
   Minimize,
+  Loader2,
 } from "lucide-react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { useV0Integration } from "@/hooks/useV0Integration"
 import { useChatContext } from "@/lib/chat-context"
 import { ExportDialog } from "@/components/export-dialog"
 import { getTemplateById } from "@/lib/slide-templates"
+import { presentationsAPI } from "@/lib/presentations-api"
+import { supabase } from "@/lib/supabase"
 
 interface Slide {
   id: string
@@ -74,6 +77,10 @@ function EditorContent() {
   const [isPresentationMode, setIsPresentationMode] = useState(false)
   const [isInitialized, setIsInitialized] = useState(false)
   const [isEditingName, setIsEditingName] = useState(false)
+  const [currentPresentationId, setCurrentPresentationId] = useState<string | null>(null)
+  const [isSaving, setIsSaving] = useState(false)
+  const [streamingContent, setStreamingContent] = useState("")
+  const [isStreaming, setIsStreaming] = useState(false)
 
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -82,6 +89,7 @@ function EditorContent() {
   const chatEndRef = useRef<HTMLDivElement>(null)
   const nameInputRef = useRef<HTMLInputElement>(null)
   const { messages } = useChatContext()
+  const { data: user } = supabase.auth.useUser()
 
   const checkScreenSize = () => {
     setIsSmallScreen(window.innerWidth < 1024)
@@ -99,49 +107,112 @@ function EditorContent() {
       const loadingMessage: ChatMessage = {
         id: (Date.now() + 1).toString(),
         type: "assistant",
-        content: "Creating your presentation...",
+        content: "",
         timestamp: new Date(),
         isLoading: true,
       }
 
       setChatMessages((prev) => [...prev, userMessage, loadingMessage])
+      setIsStreaming(true)
+      setStreamingContent("")
 
-      const result = await v0.generateSlides(prompt, uploadedFile)
+      // Use streaming generation
+      await v0.generateSlidesStreaming(
+        prompt,
+        uploadedFile,
+        // onChunk
+        (chunk: string) => {
+          setStreamingContent((prev) => prev + chunk)
+          setChatMessages((prev) =>
+            prev.map((msg) => (msg.isLoading ? { ...msg, content: streamingContent + chunk } : msg)),
+          )
+        },
+        // onComplete
+        async (result) => {
+          setIsStreaming(false)
 
-      // Remove loading message
-      setChatMessages((prev) => prev.filter((msg) => !msg.isLoading))
+          // Remove loading message and add final response
+          setChatMessages((prev) => prev.filter((msg) => !msg.isLoading))
 
-      if (result) {
-        const themedSlides = result.slides.map((slide, index) => ({
-          ...slide,
-          background: index === 0 ? selectedTheme.primary : selectedTheme.secondary,
-          textColor: selectedTheme.text,
-        }))
-        setSlides(themedSlides)
-        setSelectedSlide(themedSlides[0]?.id || "")
-        setCurrentSlideIndex(0)
+          if (result) {
+            const themedSlides = result.slides.map((slide, index) => ({
+              ...slide,
+              background: index === 0 ? selectedTheme.primary : selectedTheme.secondary,
+              textColor: selectedTheme.text,
+            }))
 
-        const assistantMessage: ChatMessage = {
-          id: (Date.now() + 2).toString(),
-          type: "assistant",
-          content: `Perfect! I've created ${result.slides.length} slides for your presentation. Here's what I included:\n\n${result.slides.map((slide, i) => `${i + 1}. ${slide.title}`).join("\n")}\n\nYou can now:\n• Select any slide to edit it specifically\n• Ask me to modify the content or design\n• Change the color theme\n• Add or remove slides`,
-          timestamp: new Date(),
-        }
-        setChatMessages((prev) => [...prev, assistantMessage])
-      }
+            setSlides(themedSlides)
+            setSelectedSlide(themedSlides[0]?.id || "")
+            setCurrentSlideIndex(0)
 
-      if (v0.error) {
-        const errorMessage: ChatMessage = {
-          id: (Date.now() + 3).toString(),
-          type: "assistant",
-          content: `I encountered an error: ${v0.error}\n\nPlease try again or describe your presentation differently.`,
-          timestamp: new Date(),
-        }
-        setChatMessages((prev) => [...prev, errorMessage])
-      }
+            // Save to database
+            try {
+              const presentation = await presentationsAPI.createPresentation({
+                name: projectName,
+                slides: themedSlides,
+                thumbnail: themedSlides[0]?.background,
+                category: "ai-generated",
+              })
+              setCurrentPresentationId(presentation.id)
+            } catch (error) {
+              console.error("Failed to save presentation:", error)
+            }
+
+            const assistantMessage: ChatMessage = {
+              id: (Date.now() + 2).toString(),
+              type: "assistant",
+              content: `Perfect! I've created ${result.slides.length} slides for your presentation. Here's what I included:\n\n${result.slides.map((slide, i) => `${i + 1}. ${slide.title}`).join("\n")}\n\nYour presentation has been saved automatically. You can now:\n• Select any slide to edit it specifically\n• Ask me to modify the content or design\n• Change the color theme\n• Add or remove slides`,
+              timestamp: new Date(),
+            }
+            setChatMessages((prev) => [...prev, assistantMessage])
+          }
+        },
+        // onError
+        (error) => {
+          setIsStreaming(false)
+          setChatMessages((prev) => prev.filter((msg) => !msg.isLoading))
+
+          const errorMessage: ChatMessage = {
+            id: (Date.now() + 3).toString(),
+            type: "assistant",
+            content: `I encountered an error: ${error.message}\n\nPlease try again or describe your presentation differently.`,
+            timestamp: new Date(),
+          }
+          setChatMessages((prev) => [...prev, errorMessage])
+        },
+      )
     },
-    [v0, uploadedFile, selectedTheme],
+    [v0, uploadedFile, selectedTheme, projectName],
   )
+
+  // Add this function after handleInitialGeneration
+  const autoSave = useCallback(async () => {
+    if (!currentPresentationId || !user || slides.length === 0) return
+
+    setIsSaving(true)
+    try {
+      await presentationsAPI.updatePresentation(currentPresentationId, {
+        name: projectName,
+        slides,
+        thumbnail: slides[0]?.background,
+      })
+    } catch (error) {
+      console.error("Auto-save failed:", error)
+    } finally {
+      setIsSaving(false)
+    }
+  }, [currentPresentationId, user, slides, projectName])
+
+  // Add auto-save effect
+  useEffect(() => {
+    const saveTimer = setTimeout(() => {
+      if (slides.length > 0) {
+        autoSave()
+      }
+    }, 2000) // Auto-save after 2 seconds of inactivity
+
+    return () => clearTimeout(saveTimer)
+  }, [slides, projectName, autoSave])
 
   const handleChatSubmit = async () => {
     if (!inputMessage.trim() || v0.isLoading) return
@@ -432,11 +503,15 @@ function EditorContent() {
     )
   }
 
+  const handleScreenResize = useCallback(() => {
+    checkScreenSize()
+  }, [])
+
   useEffect(() => {
     checkScreenSize()
-    window.addEventListener("resize", checkScreenSize)
+    window.addEventListener("resize", handleScreenResize)
 
-    return () => window.removeEventListener("resize", checkScreenSize)
+    return () => window.removeEventListener("resize", handleScreenResize)
   }, [])
 
   useEffect(() => {
@@ -455,23 +530,39 @@ function EditorContent() {
 
     const projectId = searchParams.get("project")
 
+    // In the useEffect where you load existing projects, replace the project loading section with:
     if (projectId) {
-      // Load existing project
-      const project = getTemplateById(projectId)
-      if (project) {
-        setSlides(project.slides)
-        setSelectedSlide(project.slides[0]?.id || "")
-        setCurrentSlideIndex(0)
-        setProjectName(project.name)
+      // Load existing project from database
+      const loadProject = async () => {
+        try {
+          const presentation = await presentationsAPI.getPresentation(projectId)
+          setSlides(presentation.slides)
+          setSelectedSlide(presentation.slides[0]?.id || "")
+          setCurrentSlideIndex(0)
+          setProjectName(presentation.name)
+          setCurrentPresentationId(presentation.id)
 
-        const welcomeMessage: ChatMessage = {
-          id: Date.now().toString(),
-          type: "assistant",
-          content: `Welcome back to "${project.name}"! This presentation has ${project.slides.length} slides and was last updated ${project.updatedAt.toLocaleDateString()}.\n\nYou can now:\n• Edit individual slides by selecting them\n• Regenerate content with new ideas\n• Change colors and themes\n• Ask me to modify specific aspects\n\nWhat would you like to work on?`,
-          timestamp: new Date(),
+          const welcomeMessage: ChatMessage = {
+            id: Date.now().toString(),
+            type: "assistant",
+            content: `Welcome back to "${presentation.name}"! This presentation has ${presentation.slides.length} slides and was last updated ${new Date(presentation.updated_at).toLocaleDateString()}.\n\nYou can now:\n• Edit individual slides by selecting them\n• Regenerate content with new ideas\n• Change colors and themes\n• Ask me to modify specific aspects\n\nWhat would you like to work on?`,
+            timestamp: new Date(),
+          }
+          setChatMessages([welcomeMessage])
+        } catch (error) {
+          console.error("Failed to load presentation:", error)
+          // Fallback to template loading
+          const project = getTemplateById(projectId)
+          if (project) {
+            setSlides(project.slides)
+            setSelectedSlide(project.slides[0]?.id || "")
+            setCurrentSlideIndex(0)
+            setProjectName(project.name)
+          }
         }
-        setChatMessages([welcomeMessage])
       }
+
+      loadProject()
     } else {
       // New presentation - set welcome message
       const welcomeMessage: ChatMessage = {
@@ -639,6 +730,12 @@ function EditorContent() {
                   placeholder="Enter presentation title..."
                   style={{ width: `${Math.max(200, projectName.length * 8 + 24)}px` }}
                 />
+                {isSaving && (
+                  <div className="flex items-center space-x-2 text-sm text-muted-foreground">
+                    <Loader2 className="h-3 w-3 animate-spin" />
+                    <span>Saving...</span>
+                  </div>
+                )}
               </div>
 
               {/* Center Section - Empty for clean look */}
