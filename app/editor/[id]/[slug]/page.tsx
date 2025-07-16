@@ -1,5 +1,5 @@
 import type { Metadata } from "next"
-import EditorWrapper from "../../editor-wrapper"
+import EditorContent from "./editor-content"
 
 export const metadata: Metadata = {
   title: "Editor - SlydPRO",
@@ -15,5 +15,5 @@ interface EditorPageProps {
 }
 
 export default function EditorPage({ params }: EditorPageProps) {
-  return <EditorWrapper presentationId={params.id} slideSlug={params.slug} />
+  return <EditorContent presentationId={params.id} slideSlug={params.slug} />
 }

@@ -1,5 +1,5 @@
 "use client"
-import { Home } from "lucide-react" // Import Home icon
+import { Home } from "lucide-react"
 
 import type React from "react"
 
@@ -21,18 +21,21 @@ import {
   Zap,
   Target,
   RefreshCw,
-  Bot,
   User,
   Play,
   Download,
   Minimize,
   Loader2,
+  Palette,
+  BarChart3,
+  ImageIcon,
+  Lightbulb,
+  Layout,
 } from "lucide-react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { useV0Integration } from "@/hooks/useV0Integration"
 import { useChatContext } from "@/lib/chat-context"
 import { ExportDialog } from "@/components/export-dialog"
-import { getTemplateById } from "@/lib/slide-templates"
 import { presentationsAPI } from "@/lib/presentations-api"
 import { useAuth } from "@/lib/auth-context"
 
@@ -42,7 +45,17 @@ interface Slide {
   content: string
   background: string
   textColor: string
-  layout: "title" | "content" | "two-column" | "image"
+  layout: "title" | "content" | "two-column" | "image" | "chart"
+  designElements?: {
+    icons?: string[]
+    charts?: {
+      type: "bar" | "pie" | "line" | "donut"
+      data?: any[]
+    }[]
+    images?: string[]
+    gradients?: string[]
+    patterns?: string[]
+  }
 }
 
 interface ChatMessage {
@@ -55,26 +68,69 @@ interface ChatMessage {
 }
 
 interface GenerationProgress {
-  stage: "thinking" | "designing" | "complete"
+  stage: "analyzing" | "designing" | "styling" | "complete"
   thinkingTime?: number
   currentSlide?: string
   totalSlides?: number
   completedSlides?: number
   version?: number
+  designPhase?: "layout" | "colors" | "icons" | "charts" | "final"
 }
 
-const colorThemes = [
-  { name: "Blue", primary: "#1e40af", secondary: "#3b82f6", text: "#ffffff" },
-  { name: "Purple", primary: "#7c3aed", secondary: "#a855f7", text: "#ffffff" },
-  { name: "Green", primary: "#059669", secondary: "#10b981", text: "#ffffff" },
-  { name: "Red", primary: "#dc2626", secondary: "#ef4444", text: "#ffffff" },
-  { name: "Orange", primary: "#ea580c", secondary: "#f97316", text: "#ffffff" },
-  { name: "Dark", primary: "#1f2937", secondary: "#374151", text: "#ffffff" },
+const modernColorPalettes = [
+  {
+    name: "Corporate Blue",
+    primary: "#1e40af",
+    secondary: "#3b82f6",
+    accent: "#60a5fa",
+    text: "#ffffff",
+    gradient: "linear-gradient(135deg, #1e40af 0%, #3b82f6 100%)",
+  },
+  {
+    name: "Startup Green",
+    primary: "#027659",
+    secondary: "#10b981",
+    accent: "#34d399",
+    text: "#ffffff",
+    gradient: "linear-gradient(135deg, #027659 0%, #10b981 100%)",
+  },
+  {
+    name: "Creative Purple",
+    primary: "#7c3aed",
+    secondary: "#a855f7",
+    accent: "#c084fc",
+    text: "#ffffff",
+    gradient: "linear-gradient(135deg, #7c3aed 0%, #a855f7 100%)",
+  },
+  {
+    name: "Energy Orange",
+    primary: "#ea580c",
+    secondary: "#f97316",
+    accent: "#fb923c",
+    text: "#ffffff",
+    gradient: "linear-gradient(135deg, #ea580c 0%, #f97316 100%)",
+  },
+  {
+    name: "Tech Dark",
+    primary: "#1f2937",
+    secondary: "#374151",
+    accent: "#6b7280",
+    text: "#ffffff",
+    gradient: "linear-gradient(135deg, #1f2937 0%, #374151 100%)",
+  },
+  {
+    name: "Modern Pink",
+    primary: "#ec4899",
+    secondary: "#f472b6",
+    accent: "#f9a8d4",
+    text: "#ffffff",
+    gradient: "linear-gradient(135deg, #ec4899 0%, #f472b6 100%)",
+  },
 ]
 
 interface EditorContentProps {
-  presentationId?: string
-  slideSlug?: string
+  presentationId: string
+  slideSlug: string
 }
 
 function EditorContent({ presentationId, slideSlug }: EditorContentProps) {
@@ -86,13 +142,12 @@ function EditorContent({ presentationId, slideSlug }: EditorContentProps) {
   const [uploadedFile, setUploadedFile] = useState<File | null>(null)
   const [currentSlideIndex, setCurrentSlideIndex] = useState(0)
   const [editMode, setEditMode] = useState<"all" | "selected">("all")
-  const [selectedTheme, setSelectedTheme] = useState(colorThemes[0])
+  const [selectedPalette, setSelectedPalette] = useState(modernColorPalettes[1]) // Default to Startup Green
   const [showExportDialog, setShowExportDialog] = useState(false)
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([])
   const [isPresentationMode, setIsPresentationMode] = useState(false)
   const [isInitialized, setIsInitialized] = useState(false)
   const [isEditingName, setIsEditingName] = useState(false)
-  const [currentPresentationId, setCurrentPresentationId] = useState<string | null>(null)
   const [isSaving, setIsSaving] = useState(false)
   const [streamingContent, setStreamingContent] = useState("")
   const [isStreaming, setIsStreaming] = useState(false)
@@ -108,6 +163,47 @@ function EditorContent({ presentationId, slideSlug }: EditorContentProps) {
 
   const checkScreenSize = () => {
     setIsSmallScreen(window.innerWidth < 1024)
+  }
+
+  // Enhanced AI prompt for expert slide design
+  const createExpertDesignPrompt = (userPrompt: string, slideContext?: string) => {
+    return `You are SlydPRO AI, an expert presentation designer specializing in modern, high-quality pitch decks and business presentations. You create visually stunning slides with professional design elements.
+
+USER REQUEST: ${userPrompt}
+
+${slideContext ? `CURRENT SLIDE CONTEXT: ${slideContext}` : ""}
+
+DESIGN EXPERTISE:
+- Create modern, professional slide layouts with visual hierarchy
+- Use appropriate icons, charts, and design elements based on content
+- Apply color psychology and modern design principles
+- Suggest charts/graphs when data is mentioned
+- Add relevant icons for key concepts
+- Use gradients, patterns, and visual elements strategically
+- Ensure content is scannable and visually engaging
+
+CONTENT ANALYSIS:
+- Analyze the content to determine the best slide type (title, content, chart, image, two-column)
+- If content mentions numbers/data → suggest charts (bar, pie, line, donut)
+- If content has comparisons → use two-column layout
+- If content is introductory → use title layout with strong visual impact
+- Add relevant emojis and icons to enhance readability
+
+DESIGN ELEMENTS TO INCLUDE:
+- 📊 Charts for data/statistics
+- 🎯 Icons for key points
+- 🎨 Color gradients and modern styling
+- 📈 Visual hierarchy with typography
+- 🖼️ Image placeholders where appropriate
+
+Please create slides with this level of design thinking and visual sophistication. Structure each slide with:
+
+## Slide [Number]: [Title]
+**Layout**: [title/content/chart/image/two-column]
+**Design Elements**: [List icons, charts, colors to use]
+**Content**: [Well-formatted content with visual elements]
+
+Focus on creating presentation-ready slides that look professional and modern.`
   }
 
   const handleInitialGeneration = useCallback(
@@ -126,9 +222,10 @@ function EditorContent({ presentationId, slideSlug }: EditorContentProps) {
         timestamp: new Date(),
         isLoading: true,
         generationProgress: {
-          stage: "thinking",
+          stage: "analyzing",
           thinkingTime: 0,
           version: 1,
+          designPhase: "layout",
         },
       }
 
@@ -136,10 +233,22 @@ function EditorContent({ presentationId, slideSlug }: EditorContentProps) {
       setIsStreaming(true)
       setStreamingContent("")
 
-      // Start real-time thinking timer
+      // Enhanced thinking timer with design phases
       let thinkingTime = 0
+      let currentPhase: "layout" | "colors" | "icons" | "charts" | "final" = "layout"
+      const phases = ["layout", "colors", "icons", "charts", "final"] as const
+
       const thinkingInterval = setInterval(() => {
         thinkingTime += 1
+
+        // Change design phase every 3 seconds
+        if (thinkingTime % 3 === 0) {
+          const currentIndex = phases.indexOf(currentPhase)
+          if (currentIndex < phases.length - 1) {
+            currentPhase = phases[currentIndex + 1]
+          }
+        }
+
         setChatMessages((prev) =>
           prev.map((msg) =>
             msg.isLoading
@@ -148,6 +257,7 @@ function EditorContent({ presentationId, slideSlug }: EditorContentProps) {
                   generationProgress: {
                     ...msg.generationProgress!,
                     thinkingTime,
+                    designPhase: currentPhase,
                   },
                 }
               : msg,
@@ -156,9 +266,11 @@ function EditorContent({ presentationId, slideSlug }: EditorContentProps) {
       }, 1000)
 
       try {
+        const expertPrompt = createExpertDesignPrompt(prompt)
+
         // Use real streaming generation
         await v0.generateSlidesStreaming(
-          prompt,
+          expertPrompt,
           uploadedFile,
           // onChunk - real-time streaming
           (chunk: string) => {
@@ -172,9 +284,10 @@ function EditorContent({ presentationId, slideSlug }: EditorContentProps) {
                       generationProgress: {
                         ...msg.generationProgress!,
                         stage: "designing",
-                        totalSlides: 7,
+                        totalSlides: 8,
                         completedSlides: 0,
-                        currentSlide: "Analyzing content...",
+                        currentSlide: "Analyzing content structure...",
+                        designPhase: "layout",
                       },
                     }
                   : msg,
@@ -188,65 +301,84 @@ function EditorContent({ presentationId, slideSlug }: EditorContentProps) {
             clearInterval(thinkingInterval)
 
             if (result) {
-              const themedSlides = result.slides.map((slide, index) => ({
-                ...slide,
-                background: index === 0 ? selectedTheme.primary : selectedTheme.secondary,
-                textColor: selectedTheme.text,
-              }))
+              // Enhanced slide processing with design elements
+              const designedSlides = result.slides.map((slide, index) => {
+                const designElements = analyzeContentForDesign(slide.content, slide.title)
 
-              setSlides(themedSlides)
-              setSelectedSlide(themedSlides[0]?.id || "")
+                return {
+                  ...slide,
+                  background: index === 0 ? selectedPalette.primary : selectedPalette.secondary,
+                  textColor: selectedPalette.text,
+                  layout: determineOptimalLayout(slide.content, slide.title),
+                  designElements,
+                } as Slide
+              })
+
+              setSlides(designedSlides)
+              setSelectedSlide(designedSlides[0]?.id || "")
               setCurrentSlideIndex(0)
 
-              // Create presentation and update URL if we don't have one yet
-              if (authUser && !currentPresentationId) {
+              // Save presentation
+              if (authUser) {
                 try {
-                  const presentation = await presentationsAPI.createPresentation({
+                  await presentationsAPI.updatePresentation(presentationId, {
                     name: projectName,
-                    slides: themedSlides,
-                    thumbnail: themedSlides[0]?.background,
+                    slides: designedSlides,
+                    thumbnail: designedSlides[0]?.background,
                     category: "ai-generated",
                   })
-                  setCurrentPresentationId(presentation.id)
 
-                  // Update URL with presentation ID and first slide title
-                  const firstSlideTitle = themedSlides[0]?.title || "untitled-slide"
+                  // Update URL with first slide title
+                  const firstSlideTitle = designedSlides[0]?.title || "untitled-slide"
                   const slugTitle = firstSlideTitle
                     .toLowerCase()
                     .replace(/[^a-z0-9]+/g, "-")
                     .replace(/^-|-$/g, "")
-                  router.replace(`/editor/${presentation.id}/${slugTitle}`)
+                  router.replace(`/editor/${presentationId}/${slugTitle}`)
                 } catch (error) {
                   console.error("Failed to save presentation:", error)
                 }
               }
 
-              // Update loading message to show completion with progress intact
+              // Enhanced completion message with design insights
               setChatMessages((prev) => {
                 return prev.map((msg) =>
                   msg.isLoading
                     ? {
                         ...msg,
                         isLoading: false,
-                        content: `✅ **Presentation Complete!**
+                        content: `🎨 **Professional Presentation Created!**
 
-I've successfully created ${result.slides.length} slides for your presentation:
+I've designed ${result.slides.length} modern slides with expert-level visual elements:
 
-${result.slides.map((slide, i) => `${i + 1}. ${slide.title}`).join("\n")}
+${result.slides
+  .map((slide, i) => {
+    const elements = analyzeContentForDesign(slide.content, slide.title)
+    const icons = elements.icons?.slice(0, 3).join(" ") || ""
+    return `${i + 1}. **${slide.title}** ${icons}`
+  })
+  .join("\n")}
 
-**What you can do next:**
-• Edit individual slides by selecting them
-• Change the overall theme or colors  
-• Ask me to modify specific content
-• Add or remove slides
-• Export your presentation
+**🎯 Design Features Applied:**
+• Modern color palette with gradients
+• Strategic icon placement for key concepts
+• Professional typography hierarchy
+• Visual elements based on content analysis
+• Chart suggestions for data visualization
 
-What would you like to improve?`,
+**✨ What you can do next:**
+• **"Make slide 3 more visual"** - Add charts/icons
+• **"Change to corporate blue theme"** - Switch color palette
+• **"Add a chart to the market slide"** - Include data visualization
+• **"Make the design more modern"** - Enhance visual elements
+
+Ready to refine your presentation design?`,
                         generationProgress: {
                           stage: "complete",
                           version: 1,
                           totalSlides: result.slides.length,
                           completedSlides: result.slides.length,
+                          designPhase: "final",
                         },
                       }
                     : msg,
@@ -263,11 +395,17 @@ What would you like to improve?`,
               const errorMessage: ChatMessage = {
                 id: (Date.now() + 3).toString(),
                 type: "assistant",
-                content: `❌ **Generation Failed**
+                content: `❌ **Design Generation Failed**
 
 I encountered an error: ${error.message}
 
-Please try again or describe your presentation differently. I'm here to help!`,
+Let me help you create something amazing! Try describing your presentation with more detail:
+• **Topic**: What's your presentation about?
+• **Audience**: Who are you presenting to?
+• **Style**: Professional, creative, minimal?
+• **Content**: Key points you want to cover?
+
+I'm ready to design your perfect presentation!`,
                 timestamp: new Date(),
               }
               return [...filtered, errorMessage]
@@ -280,15 +418,85 @@ Please try again or describe your presentation differently. I'm here to help!`,
         console.error("Generation error:", error)
       }
     },
-    [v0, uploadedFile, selectedTheme, projectName, authUser, router, currentPresentationId],
+    [v0, uploadedFile, selectedPalette, projectName, authUser, router, presentationId],
   )
 
+  // Enhanced content analysis for design elements
+  const analyzeContentForDesign = (content: string, title: string) => {
+    const designElements: Slide["designElements"] = {
+      icons: [],
+      charts: [],
+      images: [],
+      gradients: [],
+      patterns: [],
+    }
+
+    const lowerContent = (content + " " + title).toLowerCase()
+
+    // Icon suggestions based on content
+    const iconMappings = [
+      { keywords: ["problem", "challenge", "issue", "pain"], icon: "🎯" },
+      { keywords: ["solution", "solve", "fix", "answer"], icon: "💡" },
+      { keywords: ["market", "opportunity", "size", "tam"], icon: "📊" },
+      { keywords: ["business", "model", "revenue", "money"], icon: "💰" },
+      { keywords: ["team", "founder", "people", "staff"], icon: "👥" },
+      { keywords: ["growth", "scale", "expand", "increase"], icon: "📈" },
+      { keywords: ["technology", "tech", "ai", "software"], icon: "⚡" },
+      { keywords: ["customer", "user", "client", "audience"], icon: "👤" },
+      { keywords: ["competition", "competitor", "vs", "compare"], icon: "⚔️" },
+      { keywords: ["timeline", "roadmap", "plan", "future"], icon: "🗓️" },
+      { keywords: ["funding", "investment", "raise", "capital"], icon: "💎" },
+      { keywords: ["product", "feature", "demo", "showcase"], icon: "🚀" },
+    ]
+
+    iconMappings.forEach(({ keywords, icon }) => {
+      if (keywords.some((keyword) => lowerContent.includes(keyword))) {
+        designElements.icons?.push(icon)
+      }
+    })
+
+    // Chart suggestions based on content
+    if (lowerContent.includes("percent") || lowerContent.includes("%") || lowerContent.includes("share")) {
+      designElements.charts?.push({ type: "pie" })
+    }
+    if (lowerContent.includes("growth") || lowerContent.includes("trend") || lowerContent.includes("over time")) {
+      designElements.charts?.push({ type: "line" })
+    }
+    if (lowerContent.includes("compare") || lowerContent.includes("vs") || lowerContent.includes("versus")) {
+      designElements.charts?.push({ type: "bar" })
+    }
+
+    return designElements
+  }
+
+  const determineOptimalLayout = (content: string, title: string): Slide["layout"] => {
+    const lowerContent = (content + " " + title).toLowerCase()
+
+    if (
+      lowerContent.includes("welcome") ||
+      lowerContent.includes("introduction") ||
+      title.toLowerCase().includes("title")
+    ) {
+      return "title"
+    }
+    if (lowerContent.includes("chart") || lowerContent.includes("graph") || lowerContent.includes("data")) {
+      return "chart"
+    }
+    if (lowerContent.includes("vs") || lowerContent.includes("compare") || lowerContent.includes("before/after")) {
+      return "two-column"
+    }
+    if (lowerContent.includes("demo") || lowerContent.includes("screenshot") || lowerContent.includes("image")) {
+      return "image"
+    }
+    return "content"
+  }
+
   const autoSave = useCallback(async () => {
-    if (!currentPresentationId || !authUser || slides.length === 0) return
+    if (!presentationId || !authUser || slides.length === 0) return
 
     setIsSaving(true)
     try {
-      await presentationsAPI.updatePresentation(currentPresentationId, {
+      await presentationsAPI.updatePresentation(presentationId, {
         name: projectName,
         slides,
         thumbnail: slides[0]?.background,
@@ -302,7 +510,7 @@ Please try again or describe your presentation differently. I'm here to help!`,
           .replace(/[^a-z0-9]+/g, "-")
           .replace(/^-|-$/g, "")
         const currentPath = window.location.pathname
-        const expectedPath = `/editor/${currentPresentationId}/${slugTitle}`
+        const expectedPath = `/editor/${presentationId}/${slugTitle}`
 
         if (currentPath !== expectedPath) {
           router.replace(expectedPath)
@@ -313,14 +521,14 @@ Please try again or describe your presentation differently. I'm here to help!`,
     } finally {
       setIsSaving(false)
     }
-  }, [currentPresentationId, authUser, slides, projectName, selectedSlide, router])
+  }, [presentationId, authUser, slides, projectName, selectedSlide, router])
 
   useEffect(() => {
     const saveTimer = setTimeout(() => {
       if (slides.length > 0) {
         autoSave()
       }
-    }, 2000) // Auto-save after 2 seconds of inactivity
+    }, 2000)
 
     return () => clearTimeout(saveTimer)
   }, [slides, projectName, autoSave])
@@ -342,9 +550,10 @@ Please try again or describe your presentation differently. I'm here to help!`,
       timestamp: new Date(),
       isLoading: true,
       generationProgress: {
-        stage: "thinking",
+        stage: "analyzing",
         thinkingTime: 0,
         version: chatMessages.filter((m) => m.generationProgress?.stage === "complete").length + 1,
+        designPhase: "layout",
       },
     }
 
@@ -353,10 +562,21 @@ Please try again or describe your presentation differently. I'm here to help!`,
     setInputMessage("")
     setIsStreaming(true)
 
-    // Start real-time thinking timer
+    // Enhanced thinking timer with design phases
     let thinkingTime = 0
+    let currentPhase: "layout" | "colors" | "icons" | "charts" | "final" = "layout"
+    const phases = ["layout", "colors", "icons", "charts", "final"] as const
+
     const thinkingInterval = setInterval(() => {
       thinkingTime += 1
+
+      if (thinkingTime % 2 === 0) {
+        const currentIndex = phases.indexOf(currentPhase)
+        if (currentIndex < phases.length - 1) {
+          currentPhase = phases[currentIndex + 1]
+        }
+      }
+
       setChatMessages((prev) =>
         prev.map((msg) =>
           msg.isLoading
@@ -365,6 +585,7 @@ Please try again or describe your presentation differently. I'm here to help!`,
                 generationProgress: {
                   ...msg.generationProgress!,
                   thinkingTime,
+                  designPhase: currentPhase,
                 },
               }
             : msg,
@@ -374,10 +595,9 @@ Please try again or describe your presentation differently. I'm here to help!`,
 
     try {
       if (editMode === "selected" && selectedSlide) {
-        // Edit only the selected slide
+        // Edit only the selected slide with expert design
         const slide = slides.find((s) => s.id === selectedSlide)
         if (slide) {
-          // Switch to designing phase
           setTimeout(() => {
             clearInterval(thinkingInterval)
             setChatMessages((prev) =>
@@ -391,6 +611,7 @@ Please try again or describe your presentation differently. I'm here to help!`,
                         totalSlides: 1,
                         completedSlides: 0,
                         currentSlide: slide.title,
+                        designPhase: "styling",
                       },
                     }
                   : msg,
@@ -398,28 +619,37 @@ Please try again or describe your presentation differently. I'm here to help!`,
             )
           }, 2000)
 
-          const result = await v0.editSlide(selectedSlide, slide.title, currentInput)
+          const expertPrompt = createExpertDesignPrompt(
+            currentInput,
+            `Current slide: "${slide.title}" - ${slide.content}`,
+          )
+          const result = await v0.editSlide(selectedSlide, slide.title, expertPrompt)
 
           setIsStreaming(false)
           clearInterval(thinkingInterval)
 
           if (result) {
-            const themedSlides = result.slides.map((s, index) => ({
-              ...s,
-              background: index === 0 ? selectedTheme.primary : selectedTheme.secondary,
-              textColor: selectedTheme.text,
-            }))
+            const designedSlides = result.slides.map((s, index) => {
+              const designElements = analyzeContentForDesign(s.content, s.title)
+              return {
+                ...s,
+                background: index === 0 ? selectedPalette.primary : selectedPalette.secondary,
+                textColor: selectedPalette.text,
+                layout: determineOptimalLayout(s.content, s.title),
+                designElements,
+              } as Slide
+            })
 
-            setSlides(themedSlides)
+            setSlides(designedSlides)
 
             // Update URL if slide title changed
-            const updatedSlide = themedSlides.find((s) => s.id === selectedSlide)
-            if (updatedSlide && currentPresentationId) {
+            const updatedSlide = designedSlides.find((s) => s.id === selectedSlide)
+            if (updatedSlide) {
               const slugTitle = updatedSlide.title
                 .toLowerCase()
                 .replace(/[^a-z0-9]+/g, "-")
                 .replace(/^-|-$/g, "")
-              router.replace(`/editor/${currentPresentationId}/${slugTitle}`)
+              router.replace(`/editor/${presentationId}/${slugTitle}`)
             }
 
             setChatMessages((prev) => {
@@ -428,22 +658,33 @@ Please try again or describe your presentation differently. I'm here to help!`,
                   ? {
                       ...msg,
                       isLoading: false,
-                      content: `✅ **Slide Updated!**
+                      content: `🎨 **Slide Design Updated!**
 
-I've successfully updated "${slide.title}" based on your request.
+I've enhanced "${slide.title}" with professional design elements:
 
-**What's next?**
-• Continue editing this slide
-• Select another slide to modify
-• Switch to "All Slides" mode for broader changes
-• Ask me to adjust colors or themes
+**✨ Design Improvements:**
+• Modern visual hierarchy and typography
+• Strategic color application
+• Content-based icon suggestions
+• Optimized layout for readability
+• Professional styling elements
 
-What else would you like to improve?`,
+**🎯 Applied Design Elements:**
+${designedSlides[0]?.designElements?.icons?.slice(0, 3).join(" ") || "• Visual enhancements"}
+
+**Continue refining:**
+• **"Make it more visual"** - Add charts/graphics
+• **"Change the color scheme"** - Try different palette
+• **"Add more icons"** - Enhance visual elements
+• **"Make it corporate style"** - Adjust design tone
+
+What other design improvements would you like?`,
                       generationProgress: {
                         stage: "complete",
                         version: loadingMessage.generationProgress!.version,
                         totalSlides: 1,
                         completedSlides: 1,
+                        designPhase: "final",
                       },
                     }
                   : msg,
@@ -452,10 +693,7 @@ What else would you like to improve?`,
           }
         }
       } else {
-        // Regenerate all slides or create new ones
-        let result
-
-        // Switch to designing phase
+        // Regenerate all slides with expert design
         setTimeout(() => {
           clearInterval(thinkingInterval)
           setChatMessages((prev) =>
@@ -466,9 +704,10 @@ What else would you like to improve?`,
                     generationProgress: {
                       ...msg.generationProgress!,
                       stage: "designing",
-                      totalSlides: slides.length || 7,
+                      totalSlides: slides.length || 8,
                       completedSlides: 0,
-                      currentSlide: "Analyzing changes...",
+                      currentSlide: "Redesigning presentation...",
+                      designPhase: "styling",
                     },
                   }
                 : msg,
@@ -476,62 +715,51 @@ What else would you like to improve?`,
           )
         }, 2000)
 
+        const expertPrompt = createExpertDesignPrompt(currentInput)
+        let result
+
         if (slides.length > 0 && v0.currentChatId) {
-          result = await v0.regenerateAllSlides(v0.currentChatId, currentInput)
+          result = await v0.regenerateAllSlides(v0.currentChatId, expertPrompt)
         } else {
-          result = await v0.generateSlides(currentInput, uploadedFile)
+          result = await v0.generateSlides(expertPrompt, uploadedFile)
         }
 
         setIsStreaming(false)
         clearInterval(thinkingInterval)
 
         if (result) {
-          const themedSlides = result.slides.map((slide, index) => ({
-            ...slide,
-            background: index === 0 ? selectedTheme.primary : selectedTheme.secondary,
-            textColor: selectedTheme.text,
-          }))
+          const designedSlides = result.slides.map((slide, index) => {
+            const designElements = analyzeContentForDesign(slide.content, slide.title)
+            return {
+              ...slide,
+              background: index === 0 ? selectedPalette.primary : selectedPalette.secondary,
+              textColor: selectedPalette.text,
+              layout: determineOptimalLayout(slide.content, slide.title),
+              designElements,
+            } as Slide
+          })
 
-          setSlides(themedSlides)
-          if (themedSlides.length > 0 && !selectedSlide) {
-            setSelectedSlide(themedSlides[0].id)
+          setSlides(designedSlides)
+          if (designedSlides.length > 0 && !selectedSlide) {
+            setSelectedSlide(designedSlides[0].id)
             setCurrentSlideIndex(0)
           }
 
-          // Create or update presentation and URL
+          // Update presentation
           if (authUser) {
             try {
-              if (!currentPresentationId) {
-                // Create new presentation
-                const presentation = await presentationsAPI.createPresentation({
-                  name: projectName,
-                  slides: themedSlides,
-                  thumbnail: themedSlides[0]?.background,
-                  category: "ai-generated",
-                })
-                setCurrentPresentationId(presentation.id)
+              await presentationsAPI.updatePresentation(presentationId, {
+                name: projectName,
+                slides: designedSlides,
+                thumbnail: designedSlides[0]?.background,
+              })
 
-                const firstSlideTitle = themedSlides[0]?.title || "untitled-slide"
-                const slugTitle = firstSlideTitle
-                  .toLowerCase()
-                  .replace(/[^a-z0-9]+/g, "-")
-                  .replace(/^-|-$/g, "")
-                router.replace(`/editor/${presentation.id}/${slugTitle}`)
-              } else {
-                // Update existing presentation
-                await presentationsAPI.updatePresentation(currentPresentationId, {
-                  name: projectName,
-                  slides: themedSlides,
-                  thumbnail: themedSlides[0]?.background,
-                })
-
-                const firstSlideTitle = themedSlides[0]?.title || "untitled-slide"
-                const slugTitle = firstSlideTitle
-                  .toLowerCase()
-                  .replace(/[^a-z0-9]+/g, "-")
-                  .replace(/^-|-$/g, "")
-                router.replace(`/editor/${currentPresentationId}/${slugTitle}`)
-              }
+              const firstSlideTitle = designedSlides[0]?.title || "untitled-slide"
+              const slugTitle = firstSlideTitle
+                .toLowerCase()
+                .replace(/[^a-z0-9]+/g, "-")
+                .replace(/^-|-$/g, "")
+              router.replace(`/editor/${presentationId}/${slugTitle}`)
             } catch (error) {
               console.error("Failed to save presentation:", error)
             }
@@ -543,39 +771,38 @@ What else would you like to improve?`,
                 ? {
                     ...msg,
                     isLoading: false,
-                    content:
-                      slides.length > 0
-                        ? `✅ **Presentation Updated!**
+                    content: `🎨 **Presentation Redesigned!**
 
-I've successfully updated all ${result.slides.length} slides based on your feedback:
+I've applied expert design principles to all ${result.slides.length} slides:
 
-${result.slides.map((slide, i) => `${i + 1}. ${slide.title}`).join("\n")}
+${result.slides
+  .map((slide, i) => {
+    const elements = analyzeContentForDesign(slide.content, slide.title)
+    const icons = elements.icons?.slice(0, 2).join(" ") || ""
+    return `${i + 1}. **${slide.title}** ${icons}`
+  })
+  .join("\n")}
 
-**Continue improving:**
-• Select specific slides to edit
-• Ask for theme or color changes
-• Request content modifications
-• Add or remove slides
+**🚀 Professional Design Features:**
+• Modern color palette and gradients
+• Content-aware icon placement
+• Optimized layouts for each slide type
+• Professional typography hierarchy
+• Visual elements that enhance comprehension
 
-What would you like to adjust next?`
-                        : `✅ **New Presentation Created!**
+**🎯 Design Customization Options:**
+• **"Make it more corporate"** - Professional business style
+• **"Add more charts to data slides"** - Enhanced visualizations
+• **"Use warmer colors"** - Different color psychology
+• **"Make slide 3 more visual"** - Specific slide enhancements
 
-I've created ${result.slides.length} slides for you:
-
-${result.slides.map((slide, i) => `${i + 1}. ${slide.title}`).join("\n")}
-
-**Ready for customization:**
-• Edit individual slides
-• Change themes and colors
-• Modify content and structure
-• Export when ready
-
-How can I help you improve it?`,
+Ready for more design refinements?`,
                     generationProgress: {
                       stage: "complete",
                       version: loadingMessage.generationProgress!.version,
                       totalSlides: result.slides.length,
                       completedSlides: result.slides.length,
+                      designPhase: "final",
                     },
                   }
                 : msg,
@@ -592,11 +819,17 @@ How can I help you improve it?`,
         const errorMessage: ChatMessage = {
           id: (Date.now() + 3).toString(),
           type: "assistant",
-          content: `❌ **Update Failed**
+          content: `❌ **Design Update Failed**
 
 I encountered an error: ${error instanceof Error ? error.message : "Unknown error"}
 
-Please try rephrasing your request or try again. I'm here to help!`,
+Let me help you with specific design improvements:
+• **"Make slide 2 more visual"** - Add charts and icons
+• **"Change to blue color theme"** - Switch color palette
+• **"Add icons to key points"** - Enhance visual elements
+• **"Make it look more professional"** - Apply corporate styling
+
+What design aspect would you like me to focus on?`,
           timestamp: new Date(),
         }
         return [...filtered, errorMessage]
@@ -619,32 +852,50 @@ Please try rephrasing your request or try again. I'm here to help!`,
       const loadingMessage: ChatMessage = {
         id: (Date.now() + 1).toString(),
         type: "assistant",
-        content: "Analyzing your document and creating slides...",
+        content: "🎨 Analyzing your document and creating professionally designed slides...",
         timestamp: new Date(),
         isLoading: true,
       }
 
       setChatMessages((prev) => [...prev, userMessage, loadingMessage])
 
-      const result = await v0.generateSlides("Create a presentation from this document", file)
+      const expertPrompt = createExpertDesignPrompt(
+        "Create a professional presentation from this document with modern design elements",
+      )
+      const result = await v0.generateSlides(expertPrompt, file)
 
-      // Remove loading message
       setChatMessages((prev) => prev.filter((msg) => !msg.isLoading))
 
       if (result) {
-        const themedSlides = result.slides.map((slide, index) => ({
-          ...slide,
-          background: index === 0 ? selectedTheme.primary : selectedTheme.secondary,
-          textColor: selectedTheme.text,
-        }))
-        setSlides(themedSlides)
-        setSelectedSlide(themedSlides[0]?.id || "")
+        const designedSlides = result.slides.map((slide, index) => {
+          const designElements = analyzeContentForDesign(slide.content, slide.title)
+          return {
+            ...slide,
+            background: index === 0 ? selectedPalette.primary : selectedPalette.secondary,
+            textColor: selectedPalette.text,
+            layout: determineOptimalLayout(slide.content, slide.title),
+            designElements,
+          } as Slide
+        })
+
+        setSlides(designedSlides)
+        setSelectedSlide(designedSlides[0]?.id || "")
         setCurrentSlideIndex(0)
 
         const assistantMessage: ChatMessage = {
           id: (Date.now() + 2).toString(),
           type: "assistant",
-          content: `Great! I've analyzed your document and created ${result.slides.length} slides. The presentation covers the key points from your file. Feel free to ask me to adjust any content or styling.`,
+          content: `🎨 **Professional Design Applied!**
+
+I've analyzed your document and created ${result.slides.length} expertly designed slides with:
+
+• **Modern visual hierarchy** for better readability
+• **Strategic color application** using professional palette
+• **Content-aware icons** for key concepts
+• **Optimized layouts** based on content type
+• **Professional styling** throughout
+
+Your presentation is ready for refinement! Ask me to adjust colors, add charts, or enhance specific slides.`,
           timestamp: new Date(),
         }
         setChatMessages((prev) => [...prev, assistantMessage])
@@ -658,61 +909,79 @@ Please try rephrasing your request or try again. I'm here to help!`,
     setEditMode("selected")
 
     const slide = slides.find((s) => s.id === slideId)
-    if (slide && currentPresentationId) {
+    if (slide) {
       // Update URL with selected slide
       const slugTitle = slide.title
         .toLowerCase()
         .replace(/[^a-z0-9]+/g, "-")
         .replace(/^-|-$/g, "")
-      router.replace(`/editor/${currentPresentationId}/${slugTitle}`)
+      router.replace(`/editor/${presentationId}/${slugTitle}`)
 
+      const designElements = slide.designElements
       const contextMessage: ChatMessage = {
         id: Date.now().toString(),
         type: "assistant",
         content: `🎯 **Now Editing: "${slide.title}"** (Slide ${index + 1})
 
-I'm ready to help you modify this specific slide. You can ask me to:
+**Current Design Elements:**
+${designElements?.icons?.length ? `• Icons: ${designElements.icons.join(" ")}` : ""}
+${designElements?.charts?.length ? `• Charts: ${designElements.charts.map((c) => c.type).join(", ")}` : ""}
+• Layout: ${slide.layout}
+• Color: ${selectedPalette.name}
 
-• **Content**: Change messaging, add/remove points, adjust tone
-• **Layout**: Modify structure, bullet points, or formatting  
-• **Design**: Adjust colors, fonts, or visual elements
-• **Focus**: Emphasize different aspects or angles
+**🎨 Design Enhancement Options:**
+• **"Make this slide more visual"** - Add charts, icons, graphics
+• **"Change the layout to two-column"** - Restructure content
+• **"Add a chart for the data"** - Include data visualization
+• **"Use more icons for key points"** - Enhance visual elements
+• **"Make it more professional"** - Apply corporate styling
+• **"Change colors to blue theme"** - Switch color palette
 
-What would you like to change about this slide?`,
+What design improvements would you like for this slide?`,
         timestamp: new Date(),
       }
       setChatMessages((prev) => [...prev, contextMessage])
     }
   }
 
-  const handleThemeChange = (themeName: string) => {
-    const theme = colorThemes.find((t) => t.name === themeName) || colorThemes[0]
-    setSelectedTheme(theme)
+  const handlePaletteChange = (paletteName: string) => {
+    const palette = modernColorPalettes.find((p) => p.name === paletteName) || modernColorPalettes[0]
+    setSelectedPalette(palette)
 
     const themedSlides = slides.map((slide, index) => ({
       ...slide,
-      background: index === 0 ? theme.primary : theme.secondary,
-      textColor: theme.text,
+      background: index === 0 ? palette.primary : palette.secondary,
+      textColor: palette.text,
     }))
     setSlides(themedSlides)
 
-    const themeMessage: ChatMessage = {
+    const paletteMessage: ChatMessage = {
       id: Date.now().toString(),
       type: "assistant",
-      content: `Perfect! I've applied the ${theme.name} theme to all your slides. The new color scheme gives your presentation a fresh look.`,
+      content: `🎨 **${palette.name} Theme Applied!**
+
+I've updated your entire presentation with the ${palette.name} color palette. This modern color scheme enhances visual appeal and maintains professional consistency across all slides.
+
+**Color Psychology:**
+${palette.name === "Corporate Blue" ? "• Blue conveys trust, stability, and professionalism" : ""}
+${palette.name === "Startup Green" ? "• Green represents growth, innovation, and success" : ""}
+${palette.name === "Creative Purple" ? "• Purple suggests creativity, luxury, and innovation" : ""}
+${palette.name === "Energy Orange" ? "• Orange conveys enthusiasm, energy, and confidence" : ""}
+${palette.name === "Tech Dark" ? "• Dark themes suggest sophistication and modernity" : ""}
+${palette.name === "Modern Pink" ? "• Pink represents creativity, compassion, and modernity" : ""}
+
+The new theme works perfectly with your content structure and design elements!`,
       timestamp: new Date(),
     }
-    setChatMessages((prev) => [...prev, themeMessage])
+    setChatMessages((prev) => [...prev, paletteMessage])
   }
 
   const handleNameSave = () => {
     setIsEditingName(false)
-    // Auto-save logic can be added here
   }
 
   const handlePresentationMode = () => {
     setIsPresentationMode(true)
-    // Enter fullscreen presentation mode
     if (document.documentElement.requestFullscreen) {
       document.documentElement.requestFullscreen()
     }
@@ -747,7 +1016,6 @@ What would you like to change about this slide?`,
 
   useEffect(() => {
     window.addEventListener("resize", handleScreenResize)
-
     return () => window.removeEventListener("resize", handleScreenResize)
   }, [handleScreenResize])
 
@@ -769,141 +1037,83 @@ What would you like to change about this slide?`,
   useEffect(() => {
     if (isInitialized) return
 
-    // Handle URL-based loading first
-    if (presentationId) {
-      const loadProject = async () => {
-        try {
-          if (authUser) {
-            const presentation = await presentationsAPI.getPresentation(presentationId)
-            setSlides(presentation.slides)
-            setCurrentPresentationId(presentation.id)
-            setProjectName(presentation.name)
+    // Load presentation data
+    const loadPresentation = async () => {
+      try {
+        if (authUser && presentationId) {
+          const presentation = await presentationsAPI.getPresentation(presentationId)
+          setSlides(presentation.slides)
+          setProjectName(presentation.name)
 
-            // Find slide by slug or default to first
-            let slideIndex = 0
-            if (slideSlug && presentation.slides.length > 0) {
-              const foundIndex = presentation.slides.findIndex((slide) => {
-                const slugTitle = slide.title
-                  .toLowerCase()
-                  .replace(/[^a-z0-9]+/g, "-")
-                  .replace(/^-|-$/g, "")
-                return slugTitle === slideSlug
-              })
-              if (foundIndex !== -1) {
-                slideIndex = foundIndex
-              }
+          // Find slide by slug or default to first
+          let slideIndex = 0
+          if (slideSlug && presentation.slides.length > 0) {
+            const foundIndex = presentation.slides.findIndex((slide) => {
+              const slugTitle = slide.title
+                .toLowerCase()
+                .replace(/[^a-z0-9]+/g, "-")
+                .replace(/^-|-$/g, "")
+              return slugTitle === slideSlug
+            })
+            if (foundIndex !== -1) {
+              slideIndex = foundIndex
             }
+          }
 
-            setSelectedSlide(presentation.slides[slideIndex]?.id || "")
-            setCurrentSlideIndex(slideIndex)
+          setSelectedSlide(presentation.slides[slideIndex]?.id || "")
+          setCurrentSlideIndex(slideIndex)
 
+          // Check for messages from chat context (from home page)
+          if (messages.length > 0) {
+            // Process initial generation from home page
+            const lastMessage = messages[messages.length - 1]
+            if (lastMessage.type === "user") {
+              await handleInitialGeneration(lastMessage.content)
+            }
+            clearMessages()
+          } else {
+            // Show welcome message for existing presentation
             const welcomeMessage: ChatMessage = {
               id: Date.now().toString(),
               type: "assistant",
-              content: `👋 **Welcome back to "${presentation.name}"!**
+              content: `🎨 **Welcome back to "${presentation.name}"!**
 
-This presentation has ${presentation.slides.length} slides and was last updated ${new Date(presentation.updated_at).toLocaleDateString()}.
+I'm your expert presentation designer, ready to help you create stunning slides with:
 
-**You can now:**
-• Edit individual slides by selecting them
-• Regenerate content with new ideas  
-• Change colors and themes
-• Ask me to modify specific aspects
-• Export your presentation
+**🚀 Professional Design Capabilities:**
+• Modern layouts with visual hierarchy
+• Strategic color palettes and gradients
+• Content-aware icons and graphics
+• Data visualization with charts
+• Professional typography and spacing
 
-Currently viewing: **${presentation.slides[slideIndex]?.title || "Slide 1"}**
+**✨ Current Presentation:**
+• ${presentation.slides.length} slides designed
+• Last updated: ${new Date(presentation.updated_at).toLocaleDateString()}
+• Currently viewing: **${presentation.slides[slideIndex]?.title || "Slide 1"}**
 
-What would you like to work on?`,
+**🎯 What I can help you with:**
+• **"Make slide 3 more visual"** - Add charts, icons, graphics
+• **"Change to corporate blue theme"** - Switch color palette
+• **"Add icons to key points"** - Enhance visual elements
+• **"Redesign the layout"** - Optimize slide structure
+• **"Make it more professional"** - Apply business styling
+
+What design improvements would you like to make?`,
               timestamp: new Date(),
             }
             setChatMessages([welcomeMessage])
           }
-        } catch (error) {
-          console.error("Failed to load presentation:", error)
-          router.push("/editor")
         }
-      }
-
-      loadProject()
-    } else {
-      // Handle legacy URL parameters or new presentation
-      const searchProjectId = searchParams.get("project")
-
-      if (searchProjectId) {
-        const loadProject = async () => {
-          try {
-            if (authUser) {
-              const presentation = await presentationsAPI.getPresentation(searchProjectId)
-              setSlides(presentation.slides)
-              setSelectedSlide(presentation.slides[0]?.id || "")
-              setCurrentSlideIndex(0)
-              setProjectName(presentation.name)
-              setCurrentPresentationId(presentation.id)
-
-              // Redirect to new URL format
-              const firstSlideTitle = presentation.slides[0]?.title || "untitled-slide"
-              const slugTitle = firstSlideTitle
-                .toLowerCase()
-                .replace(/[^a-z0-9]+/g, "-")
-                .replace(/^-|-$/g, "")
-              router.replace(`/editor/${presentation.id}/${slugTitle}`)
-            } else {
-              // Fallback to template loading
-              const project = getTemplateById(searchProjectId)
-              if (project) {
-                setSlides(project.slides)
-                setSelectedSlide(project.slides[0]?.id || "")
-                setCurrentSlideIndex(0)
-                setProjectName(project.name)
-              }
-            }
-          } catch (error) {
-            console.error("Failed to load presentation:", error)
-          }
-        }
-
-        loadProject()
-      } else {
-        // New presentation - set welcome message
-        const welcomeMessage: ChatMessage = {
-          id: Date.now().toString(),
-          type: "assistant",
-          content: `🚀 **Ready to Create Something Amazing!**
-
-I'm your AI presentation assistant. Describe what kind of presentation you'd like to create, and I'll help you build it slide by slide.
-
-**Popular requests:**
-• "Create a startup pitch deck for a food delivery app"
-• "Make a quarterly business review presentation"  
-• "Build a product launch presentation"
-• "Design a sales proposal for enterprise clients"
-
-**Or upload a document** and I'll create slides from your content.
-
-What presentation would you like to create today?`,
-          timestamp: new Date(),
-        }
-        setChatMessages([welcomeMessage])
-
-        // Check if there's an initial message from home page
-        if (messages.length > 0) {
-          const lastMessage = messages[messages.length - 1]
-          if (lastMessage.type === "user") {
-            // Clear the messages from context since we're handling it here
-            clearMessages()
-            setTimeout(() => {
-              handleInitialGeneration(lastMessage.content)
-            }, 100)
-          }
-        }
+      } catch (error) {
+        console.error("Failed to load presentation:", error)
+        router.push("/")
       }
     }
 
+    loadPresentation()
     setIsInitialized(true)
-  }, [authUser, messages, presentationId, slideSlug, router, searchParams, clearMessages])
-
-  // Rest of the component remains the same...
-  // [Previous implementation continues here with all the UI components]
+  }, [authUser, messages, presentationId, slideSlug, router, clearMessages, handleInitialGeneration])
 
   // Presentation Mode View
   if (isPresentationMode) {
@@ -913,7 +1123,7 @@ What presentation would you like to create today?`,
           <div
             className="w-full h-full flex items-center justify-center"
             style={{
-              backgroundColor: currentSlide.background,
+              background: currentSlide.designElements?.gradients?.[0] || currentSlide.background,
               color: currentSlide.textColor,
             }}
           >
@@ -922,13 +1132,45 @@ What presentation would you like to create today?`,
                 <div className="text-center">
                   <h1 className="text-8xl font-bold mb-12 leading-tight">{currentSlide.title}</h1>
                   <p className="text-4xl opacity-90 leading-relaxed">{currentSlide.content}</p>
+                  {currentSlide.designElements?.icons && (
+                    <div className="text-6xl mt-8 space-x-4">
+                      {currentSlide.designElements.icons.slice(0, 3).map((icon, i) => (
+                        <span key={i}>{icon}</span>
+                      ))}
+                    </div>
+                  )}
                 </div>
-              ) : (
+              ) : currentSlide.layout === "chart" ? (
                 <>
-                  <h1 className="text-7xl font-bold mb-16 leading-tight">{currentSlide.title}</h1>
+                  <h1 className="text-7xl font-bold mb-16 leading-tight flex items-center">
+                    <BarChart3 className="mr-6" />
+                    {currentSlide.title}
+                  </h1>
                   <div className="text-4xl leading-relaxed opacity-90 space-y-8">
                     {currentSlide.content.split("\n").map((line, index) => (
-                      <p key={index}>{line}</p>
+                      <p key={index} className="flex items-center">
+                        <span className="text-5xl mr-4">📊</span>
+                        {line}
+                      </p>
+                    ))}
+                  </div>
+                </>
+              ) : (
+                <>
+                  <h1 className="text-7xl font-bold mb-16 leading-tight flex items-center">
+                    {currentSlide.designElements?.icons?.[0] && (
+                      <span className="text-8xl mr-6">{currentSlide.designElements.icons[0]}</span>
+                    )}
+                    {currentSlide.title}
+                  </h1>
+                  <div className="text-4xl leading-relaxed opacity-90 space-y-8">
+                    {currentSlide.content.split("\n").map((line, index) => (
+                      <p key={index} className="flex items-center">
+                        {currentSlide.designElements?.icons?.[index + 1] && (
+                          <span className="text-5xl mr-4">{currentSlide.designElements.icons[index + 1]}</span>
+                        )}
+                        {line}
+                      </p>
                     ))}
                   </div>
                 </>
@@ -1003,7 +1245,7 @@ What presentation would you like to create today?`,
             </div>
           </div>
 
-          {/* Add Slide Button - Fixed */}
+          {/* Add Slide Button */}
           <div className="p-4 border-b border-gray-100">
             <Button
               variant="outline"
@@ -1018,12 +1260,11 @@ What presentation would you like to create today?`,
             </Button>
           </div>
 
-          {/* Slide Thumbnails - Scrollable */}
+          {/* Slide Thumbnails */}
           <ScrollArea className="flex-1">
             <div className="p-2 space-y-2">
               {isStreaming
-                ? // Skeleton thumbnails while loading
-                  Array.from({ length: 7 }, (_, index) => (
+                ? Array.from({ length: 8 }, (_, index) => (
                     <div
                       key={`skeleton-${index}`}
                       className="relative group rounded-lg border-2 border-gray-200 bg-white"
@@ -1070,15 +1311,25 @@ What presentation would you like to create today?`,
                         <div
                           className="w-full aspect-video rounded border overflow-hidden text-xs"
                           style={{
-                            backgroundColor: slide.background,
+                            background: slide.designElements?.gradients?.[0] || slide.background,
                             color: slide.textColor,
                           }}
                         >
                           <div className="p-2 h-full flex flex-col">
-                            <div className="font-bold text-[8px] mb-1 truncate">{slide.title}</div>
+                            <div className="font-bold text-[8px] mb-1 truncate flex items-center">
+                              {slide.designElements?.icons?.[0] && (
+                                <span className="mr-1">{slide.designElements.icons[0]}</span>
+                              )}
+                              {slide.title}
+                            </div>
                             <div className="text-[7px] opacity-80 line-clamp-3">
                               {slide.content.substring(0, 60)}...
                             </div>
+                            {slide.layout === "chart" && (
+                              <div className="mt-1">
+                                <BarChart3 className="w-3 h-3 opacity-60" />
+                              </div>
+                            )}
                           </div>
                         </div>
                       </div>
@@ -1130,10 +1381,27 @@ What presentation would you like to create today?`,
                 )}
               </div>
 
-              {/* Center Section - Empty for clean look */}
-              <div></div>
+              {/* Center Section - Color Palette Selector */}
+              <div className="flex items-center space-x-2">
+                <Palette className="h-4 w-4 text-gray-500" />
+                <div className="flex space-x-1">
+                  {modernColorPalettes.map((palette) => (
+                    <button
+                      key={palette.name}
+                      onClick={() => handlePaletteChange(palette.name)}
+                      className={`w-6 h-6 rounded-full border-2 transition-all ${
+                        selectedPalette.name === palette.name
+                          ? "border-gray-800 scale-110"
+                          : "border-gray-300 hover:border-gray-500"
+                      }`}
+                      style={{ background: palette.gradient }}
+                      title={palette.name}
+                    />
+                  ))}
+                </div>
+              </div>
 
-              {/* Right Section - Play and Share */}
+              {/* Right Section - Play and Export */}
               <div className="flex items-center space-x-3">
                 <Button variant="outline" onClick={handlePresentationMode} className="flex items-center bg-transparent">
                   <Play className="h-4 w-4 mr-2" />
@@ -1155,25 +1423,28 @@ What presentation would you like to create today?`,
           <div className="flex-1 flex items-center justify-center bg-gray-100 p-8">
             {isStreaming ? (
               <div className="relative">
-                {/* Skeleton Slide */}
+                {/* Enhanced Skeleton Slide with Design Elements */}
                 <div className="w-[960px] h-[540px] shadow-2xl rounded-lg overflow-hidden border-4 border-white bg-gradient-to-br from-gray-200 to-gray-300 animate-pulse">
                   <div className="h-full p-12 flex flex-col justify-center items-center">
                     <div className="text-center space-y-6">
-                      <div className="w-16 h-16 bg-[#027659]/20 rounded-2xl flex items-center justify-center mx-auto animate-pulse">
-                        <Loader2 className="w-8 h-8 text-[#027659] animate-spin" />
+                      <div className="w-20 h-20 bg-[#027659]/20 rounded-2xl flex items-center justify-center mx-auto animate-pulse">
+                        <Palette className="w-10 h-10 text-[#027659] animate-spin" />
                       </div>
-                      <h2 className="text-4xl font-bold text-gray-600">SlydPRO Designing</h2>
-                      <p className="text-xl text-gray-500">Creating your presentation slides...</p>
-                      <div className="flex space-x-2 justify-center">
-                        <div className="w-3 h-3 bg-[#027659] rounded-full animate-bounce"></div>
-                        <div
-                          className="w-3 h-3 bg-[#027659] rounded-full animate-bounce"
-                          style={{ animationDelay: "0.1s" }}
-                        ></div>
-                        <div
-                          className="w-3 h-3 bg-[#027659] rounded-full animate-bounce"
-                          style={{ animationDelay: "0.2s" }}
-                        ></div>
+                      <h2 className="text-4xl font-bold text-gray-600">🎨 SlydPRO Designing</h2>
+                      <p className="text-xl text-gray-500">
+                        Creating professional slides with modern design elements...
+                      </p>
+                      <div className="flex space-x-4 justify-center text-2xl">
+                        <span className="animate-bounce">🎯</span>
+                        <span className="animate-bounce" style={{ animationDelay: "0.1s" }}>
+                          📊
+                        </span>
+                        <span className="animate-bounce" style={{ animationDelay: "0.2s" }}>
+                          💡
+                        </span>
+                        <span className="animate-bounce" style={{ animationDelay: "0.3s" }}>
+                          🚀
+                        </span>
                       </div>
                     </div>
                   </div>
@@ -1181,26 +1452,105 @@ What presentation would you like to create today?`,
               </div>
             ) : currentSlide ? (
               <div className="relative">
-                {/* Main Slide */}
+                {/* Enhanced Main Slide with Design Elements */}
                 <div
                   className="w-[960px] h-[540px] shadow-2xl rounded-lg overflow-hidden border-4 border-white"
                   style={{
-                    backgroundColor: currentSlide.background,
+                    background: currentSlide.designElements?.gradients?.[0] || currentSlide.background,
                     color: currentSlide.textColor,
                   }}
                 >
                   <div className="h-full p-12 flex flex-col justify-center relative">
                     {currentSlide.layout === "title" ? (
                       <div className="text-center">
-                        <h1 className="text-7xl font-bold mb-8 leading-tight">{currentSlide.title}</h1>
+                        <h1 className="text-7xl font-bold mb-8 leading-tight flex items-center justify-center">
+                          {currentSlide.designElements?.icons?.[0] && (
+                            <span className="text-8xl mr-6">{currentSlide.designElements.icons[0]}</span>
+                          )}
+                          {currentSlide.title}
+                        </h1>
                         <p className="text-3xl opacity-90 leading-relaxed max-w-4xl mx-auto">{currentSlide.content}</p>
+                        {currentSlide.designElements?.icons && currentSlide.designElements.icons.length > 1 && (
+                          <div className="text-5xl mt-8 space-x-4">
+                            {currentSlide.designElements.icons.slice(1, 4).map((icon, i) => (
+                              <span key={i} className="inline-block animate-pulse">
+                                {icon}
+                              </span>
+                            ))}
+                          </div>
+                        )}
                       </div>
-                    ) : (
+                    ) : currentSlide.layout === "chart" ? (
                       <>
-                        <h1 className="text-6xl font-bold mb-12 leading-tight">{currentSlide.title}</h1>
+                        <h1 className="text-6xl font-bold mb-12 leading-tight flex items-center">
+                          <BarChart3 className="mr-6 text-7xl" />
+                          {currentSlide.title}
+                        </h1>
                         <div className="text-3xl leading-relaxed opacity-90 space-y-6">
                           {currentSlide.content.split("\n").map((line, index) => (
-                            <p key={index}>{line}</p>
+                            <p key={index} className="flex items-center">
+                              <span className="text-4xl mr-4">📊</span>
+                              {line}
+                            </p>
+                          ))}
+                        </div>
+                      </>
+                    ) : currentSlide.layout === "two-column" ? (
+                      <>
+                        <h1 className="text-6xl font-bold mb-12 leading-tight text-center">{currentSlide.title}</h1>
+                        <div className="grid grid-cols-2 gap-12 text-2xl leading-relaxed opacity-90">
+                          <div className="space-y-4">
+                            {currentSlide.content
+                              .split("\n")
+                              .slice(0, Math.ceil(currentSlide.content.split("\n").length / 2))
+                              .map((line, index) => (
+                                <p key={index} className="flex items-center">
+                                  {currentSlide.designElements?.icons?.[index] && (
+                                    <span className="text-3xl mr-3">{currentSlide.designElements.icons[index]}</span>
+                                  )}
+                                  {line}
+                                </p>
+                              ))}
+                          </div>
+                          <div className="space-y-4">
+                            {currentSlide.content
+                              .split("\n")
+                              .slice(Math.ceil(currentSlide.content.split("\n").length / 2))
+                              .map((line, index) => (
+                                <p key={index} className="flex items-center">
+                                  {currentSlide.designElements?.icons?.[
+                                    index + Math.ceil(currentSlide.content.split("\n").length / 2)
+                                  ] && (
+                                    <span className="text-3xl mr-3">
+                                      {
+                                        currentSlide.designElements.icons[
+                                          index + Math.ceil(currentSlide.content.split("\n").length / 2)
+                                        ]
+                                      }
+                                    </span>
+                                  )}
+                                  {line}
+                                </p>
+                              ))}
+                          </div>
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        <h1 className="text-6xl font-bold mb-12 leading-tight flex items-center">
+                          {currentSlide.designElements?.icons?.[0] && (
+                            <span className="text-7xl mr-6">{currentSlide.designElements.icons[0]}</span>
+                          )}
+                          {currentSlide.title}
+                        </h1>
+                        <div className="text-3xl leading-relaxed opacity-90 space-y-6">
+                          {currentSlide.content.split("\n").map((line, index) => (
+                            <p key={index} className="flex items-center">
+                              {currentSlide.designElements?.icons?.[index + 1] && (
+                                <span className="text-4xl mr-4">{currentSlide.designElements.icons[index + 1]}</span>
+                              )}
+                              {line}
+                            </p>
                           ))}
                         </div>
                       </>
@@ -1266,10 +1616,20 @@ What presentation would you like to create today?`,
           </div>
         </div>
 
-        {/* Right Sidebar - AI Chat */}
+        {/* Right Sidebar - Enhanced AI Chat */}
         <div className="w-96 bg-white border-l border-gray-200 flex flex-col shadow-lg">
           {/* Chat Header */}
           <div className="p-6 border-b border-gray-100 bg-gradient-to-r from-blue-50 to-indigo-50">
+            <div className="flex items-center space-x-3 mb-4">
+              <div className="w-10 h-10 bg-gradient-to-r from-[#027659] to-[#10b981] rounded-lg flex items-center justify-center">
+                <Palette className="h-5 w-5 text-white" />
+              </div>
+              <div>
+                <h3 className="font-semibold text-gray-900">SlydPRO Designer AI</h3>
+                <p className="text-xs text-gray-600">Expert Presentation Designer</p>
+              </div>
+            </div>
+
             {/* Edit Mode Toggle */}
             <div className="flex items-center space-x-2">
               <Button
@@ -1312,11 +1672,15 @@ What presentation would you like to create today?`,
               {chatMessages.map((message) => (
                 <div key={message.id} className="flex items-start space-x-3">
                   <Avatar className="w-8 h-8 mt-1">
-                    <AvatarFallback className={message.type === "user" ? "bg-[#027659]/10" : "bg-gray-100"}>
+                    <AvatarFallback
+                      className={
+                        message.type === "user" ? "bg-[#027659]/10" : "bg-gradient-to-r from-blue-100 to-indigo-100"
+                      }
+                    >
                       {message.type === "user" ? (
                         <User className="w-4 h-4 text-[#027659]" />
                       ) : (
-                        <Bot className="w-4 h-4 text-gray-600" />
+                        <Palette className="w-4 h-4 text-blue-600" />
                       )}
                     </AvatarFallback>
                   </Avatar>
@@ -1328,34 +1692,70 @@ What presentation would you like to create today?`,
                     >
                       {message.isLoading || message.generationProgress ? (
                         <div className="space-y-3">
-                          {message.isLoading && message.generationProgress?.stage === "thinking" && (
+                          {message.isLoading && message.generationProgress?.stage === "analyzing" && (
                             <div className="flex items-center space-x-2">
                               <div className="flex space-x-1">
-                                <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"></div>
+                                <div className="w-2 h-2 bg-blue-400 rounded-full animate-bounce"></div>
                                 <div
-                                  className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"
+                                  className="w-2 h-2 bg-blue-400 rounded-full animate-bounce"
                                   style={{ animationDelay: "0.1s" }}
                                 ></div>
                                 <div
-                                  className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"
+                                  className="w-2 h-2 bg-blue-400 rounded-full animate-bounce"
                                   style={{ animationDelay: "0.2s" }}
                                 ></div>
                               </div>
                               <span className="text-sm">
-                                Thinking for {message.generationProgress.thinkingTime} seconds...
+                                Analyzing content for {message.generationProgress.thinkingTime}s...
                               </span>
                             </div>
                           )}
 
-                          {message.generationProgress?.stage === "designing" ||
+                          {message.generationProgress?.designPhase && message.isLoading && (
+                            <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-3">
+                              <div className="flex items-center justify-between mb-2">
+                                <span className="text-sm font-medium text-blue-700">
+                                  Design Phase: {message.generationProgress.designPhase}
+                                </span>
+                                <div className="flex space-x-1">
+                                  {message.generationProgress.designPhase === "layout" && (
+                                    <Layout className="h-4 w-4 text-blue-600" />
+                                  )}
+                                  {message.generationProgress.designPhase === "colors" && (
+                                    <Palette className="h-4 w-4 text-blue-600" />
+                                  )}
+                                  {message.generationProgress.designPhase === "icons" && (
+                                    <Lightbulb className="h-4 w-4 text-blue-600" />
+                                  )}
+                                  {message.generationProgress.designPhase === "charts" && (
+                                    <BarChart3 className="h-4 w-4 text-blue-600" />
+                                  )}
+                                  {message.generationProgress.designPhase === "final" && (
+                                    <Zap className="h-4 w-4 text-blue-600" />
+                                  )}
+                                </div>
+                              </div>
+                              <div className="text-xs text-blue-600">
+                                {message.generationProgress.designPhase === "layout" && "Structuring slide layouts..."}
+                                {message.generationProgress.designPhase === "colors" && "Applying color psychology..."}
+                                {message.generationProgress.designPhase === "icons" && "Adding visual elements..."}
+                                {message.generationProgress.designPhase === "charts" &&
+                                  "Creating data visualizations..."}
+                                {message.generationProgress.designPhase === "final" && "Finalizing design elements..."}
+                              </div>
+                            </div>
+                          )}
+
+                          {(message.isLoading && message.generationProgress?.stage === "designing") ||
+                          message.generationProgress?.stage === "styling" ||
                           message.generationProgress?.stage === "complete" ? (
                             <div className="border border-gray-200 rounded-lg p-3 bg-white mb-3">
                               <div className="flex items-center justify-between mb-2">
                                 <span className="text-sm font-medium text-gray-700">
-                                  Version {message.generationProgress.version}
+                                  Design Version {message.generationProgress.version}
                                 </span>
                                 <span
-                                  className={`text-xs ${message.generationProgress.stage === "complete" ? "text-green-600" : "text-gray-500"}`}
+                                  className={`text-xs ${message.generationProgress.stage === "complete" ? "text-green-600" : "text-blue-500"}`}
                                 >
                                   {message.generationProgress.stage === "complete" ? "Complete" : "Designing"}
                                 </span>
@@ -1379,7 +1779,7 @@ What presentation would you like to create today?`,
                                       Slide {i + 1}:{" "}
                                       {i === (message.generationProgress?.completedSlides || 0) && message.isLoading
                                         ? message.generationProgress?.currentSlide
-                                        : `Slide ${i + 1}`}
+                                        : `Professional Design`}
                                     </span>
                                   </div>
                                 ))}
@@ -1431,7 +1831,7 @@ What presentation would you like to create today?`,
             </div>
           </ScrollArea>
 
-          {/* Chat Input */}
+          {/* Enhanced Chat Input */}
           <div className="p-4 border-t border-gray-100 bg-white">
             <div className="space-y-3">
               <div className="bg-gray-50 rounded-2xl border border-gray-200 overflow-hidden">
@@ -1440,10 +1840,10 @@ What presentation would you like to create today?`,
                   onChange={(e) => setInputMessage(e.target.value)}
                   placeholder={
                     editMode === "selected"
-                      ? "How should I modify this slide?"
+                      ? "How should I enhance this slide's design?"
                       : slides.length > 0
-                        ? "Ask me to modify your presentation..."
-                        : "Describe the presentation you want to create..."
+                        ? "Ask me to improve your presentation design..."
+                        : "Describe the presentation you want me to design..."
                   }
                   onKeyPress={(e) => e.key === "Enter" && !e.shiftKey && handleChatSubmit()}
                   className="w-full bg-transparent border-0 text-gray-900 placeholder:text-gray-500 text-sm focus-visible:ring-0 focus-visible:ring-offset-0 resize-none min-h-[80px] max-h-[120px] shadow-none outline-none focus:outline-none p-4"
@@ -1468,6 +1868,30 @@ What presentation would you like to create today?`,
                     >
                       <Upload className="h-4 w-4" />
                     </Button>
+
+                    {/* Design Suggestion Buttons */}
+                    <div className="flex space-x-1">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setInputMessage("Make this more visual with icons and charts")}
+                        className="text-xs text-gray-500 hover:text-gray-700 h-8 px-2"
+                        disabled={v0.isLoading}
+                      >
+                        <ImageIcon className="h-3 w-3 mr-1" />
+                        Visual
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setInputMessage("Add charts and data visualization")}
+                        className="text-xs text-gray-500 hover:text-gray-700 h-8 px-2"
+                        disabled={v0.isLoading}
+                      >
+                        <BarChart3 className="h-3 w-3 mr-1" />
+                        Charts
+                      </Button>
+                    </div>
                   </div>
                   <Button
                     onClick={
@@ -1492,6 +1916,37 @@ What presentation would you like to create today?`,
                     )}
                   </Button>
                 </div>
+              </div>
+
+              {/* Design Quick Actions */}
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setInputMessage("Make the design more professional and corporate")}
+                  className="text-xs bg-transparent"
+                  disabled={v0.isLoading}
+                >
+                  🏢 Corporate
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setInputMessage("Add more icons and visual elements")}
+                  className="text-xs bg-transparent"
+                  disabled={v0.isLoading}
+                >
+                  ✨ Visual
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setInputMessage("Make it more modern and creative")}
+                  className="text-xs bg-transparent"
+                  disabled={v0.isLoading}
+                >
+                  🎨 Modern
+                </Button>
               </div>
             </div>
           </div>

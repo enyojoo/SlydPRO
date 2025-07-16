@@ -18,7 +18,6 @@ import { Footer } from "@/components/footer"
 import { PLATFORM_CONFIG } from "@/lib/constants"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { Edit2, Trash2 } from "lucide-react"
-import { useV0Integration } from "@/hooks/useV0Integration"
 import { presentationsAPI } from "@/lib/presentations-api"
 
 interface Presentation {
@@ -43,7 +42,6 @@ export default function SlydPROHome() {
   const [authError, setAuthError] = useState("")
   const [presentations, setPresentations] = useState<Presentation[]>([])
   const [presentationsLoading, setPresentationsLoading] = useState(false)
-  const [isGenerating, setIsGenerating] = useState(false)
   const [formData, setFormData] = useState({
     name: "",
     email: "",
@@ -52,7 +50,6 @@ export default function SlydPROHome() {
   })
   const router = useRouter()
   const { addMessage, clearMessages } = useChatContext()
-  const v0 = useV0Integration()
 
   const fileInputRef = useRef<HTMLInputElement>(null)
 
@@ -100,44 +97,33 @@ export default function SlydPROHome() {
       return
     }
 
-    setIsGenerating(true)
-
     try {
-      // Generate slides directly and create presentation
-      const result = await v0.generateSlides(inputMessage)
+      // Create presentation immediately with default name
+      const presentation = await presentationsAPI.createPresentation({
+        name: "Untitled Presentation",
+        description: inputMessage,
+        slides: [], // Empty slides initially
+        thumbnail: "#027659",
+        category: "ai-generated",
+      })
 
-      if (result && result.slides.length > 0) {
-        // Create presentation in database
-        const presentation = await presentationsAPI.createPresentation({
-          name: `Presentation - ${new Date().toLocaleDateString()}`,
-          description: inputMessage,
-          slides: result.slides,
-          thumbnail: result.slides[0]?.background || "#027659",
-          category: "ai-generated",
-        })
-
-        // Clear chat context and add the user message
-        clearMessages()
-        const userMessage = {
-          id: Date.now().toString(),
-          type: "user" as const,
-          content: inputMessage,
-          timestamp: new Date(),
-        }
-        addMessage(userMessage)
-
-        // Navigate to the new presentation with proper URL structure
-        const firstSlideTitle = result.slides[0]?.title || "untitled-slide"
-        const slugTitle = firstSlideTitle
-          .toLowerCase()
-          .replace(/[^a-z0-9]+/g, "-")
-          .replace(/^-|-$/g, "")
-
-        router.push(`/editor/${presentation.id}/${slugTitle}`)
+      // Add message to chat context
+      const userMessage = {
+        id: Date.now().toString(),
+        type: "user" as const,
+        content: inputMessage,
+        timestamp: new Date(),
       }
+
+      clearMessages()
+      addMessage(userMessage)
+
+      // Navigate to editor with presentation ID and slug from default name
+      const slugTitle = "untitled-presentation"
+      router.push(`/editor/${presentation.id}/${slugTitle}`)
     } catch (error) {
-      console.error("Failed to generate presentation:", error)
-      // Fallback to old behavior if generation fails
+      console.error("Failed to create presentation:", error)
+      // Fallback to old behavior if creation fails
       const userMessage = {
         id: Date.now().toString(),
         type: "user" as const,
@@ -148,8 +134,6 @@ export default function SlydPROHome() {
       clearMessages()
       addMessage(userMessage)
       router.push("/editor")
-    } finally {
-      setIsGenerating(false)
     }
   }
 
@@ -161,56 +145,50 @@ export default function SlydPROHome() {
         return
       }
 
-      setIsGenerating(true)
+      // Check if there's text in the input - file upload requires context
+      if (!inputMessage.trim()) {
+        // You could show an error message here or set a default message
+        setInputMessage(`Create a presentation from the uploaded file: ${file.name}`)
+        return
+      }
 
       try {
-        // Generate slides from uploaded file
-        const result = await v0.generateSlides("Create a presentation from this document", file)
+        // Create presentation immediately with default name
+        const presentation = await presentationsAPI.createPresentation({
+          name: "Untitled Presentation",
+          description: `${inputMessage} (from uploaded file: ${file.name})`,
+          slides: [], // Empty slides initially
+          thumbnail: "#027659",
+          category: "document-upload",
+        })
 
-        if (result && result.slides.length > 0) {
-          // Create presentation in database
-          const presentation = await presentationsAPI.createPresentation({
-            name: file.name.replace(/\.[^/.]+$/, ""), // Remove file extension
-            description: `Presentation created from ${file.name}`,
-            slides: result.slides,
-            thumbnail: result.slides[0]?.background || "#027659",
-            category: "document-upload",
-          })
-
-          // Clear chat context and add the file upload message
-          clearMessages()
-          const userMessage = {
-            id: Date.now().toString(),
-            type: "user" as const,
-            content: `📎 Uploaded: ${file.name}`,
-            timestamp: new Date(),
-          }
-          addMessage(userMessage)
-
-          // Navigate to the new presentation with proper URL structure
-          const firstSlideTitle = result.slides[0]?.title || "untitled-slide"
-          const slugTitle = firstSlideTitle
-            .toLowerCase()
-            .replace(/[^a-z0-9]+/g, "-")
-            .replace(/^-|-$/g, "")
-
-          router.push(`/editor/${presentation.id}/${slugTitle}`)
-        }
-      } catch (error) {
-        console.error("Failed to generate presentation from file:", error)
-        // Fallback to old behavior if generation fails
+        // Add file upload message to chat context
         const userMessage = {
           id: Date.now().toString(),
           type: "user" as const,
-          content: `Uploaded: ${file.name}`,
+          content: `${inputMessage}\n\n📎 Uploaded: ${file.name}`,
+          timestamp: new Date(),
+        }
+
+        clearMessages()
+        addMessage(userMessage)
+
+        // Navigate to editor with presentation ID and slug
+        const slugTitle = "untitled-presentation"
+        router.push(`/editor/${presentation.id}/${slugTitle}?file=${encodeURIComponent(file.name)}`)
+      } catch (error) {
+        console.error("Failed to create presentation:", error)
+        // Fallback behavior
+        const userMessage = {
+          id: Date.now().toString(),
+          type: "user" as const,
+          content: `${inputMessage}\n\n📎 Uploaded: ${file.name}`,
           timestamp: new Date(),
         }
 
         clearMessages()
         addMessage(userMessage)
         router.push(`/editor?file=${encodeURIComponent(file.name)}`)
-      } finally {
-        setIsGenerating(false)
       }
     }
   }
@@ -338,25 +316,27 @@ export default function SlydPROHome() {
                   onKeyPress={(e) => e.key === "Enter" && !e.shiftKey && handleChatSubmit()}
                   className="w-full bg-muted border-0 text-foreground placeholder:text-muted-foreground text-sm sm:text-base focus-visible:ring-0 focus-visible:ring-offset-0 resize-none min-h-[100px] sm:min-h-[120px] max-h-[200px] shadow-none outline-none focus:outline-none rounded-xl p-3 sm:p-4"
                   rows={4}
-                  disabled={isGenerating}
                 />
-                {isGenerating && (
-                  <div className="absolute inset-0 bg-muted/50 rounded-xl flex items-center justify-center">
-                    <div className="flex items-center space-x-3 text-[#027659]">
-                      <Loader2 className="h-5 w-5 animate-spin" />
-                      <span className="text-sm font-medium">Creating your presentation...</span>
-                    </div>
-                  </div>
-                )}
               </div>
               <div className="flex items-center justify-between mt-3 sm:mt-4">
                 <div className="flex items-center space-x-2 sm:space-x-3">
                   <Button
                     variant="ghost"
                     size="sm"
-                    onClick={() => fileInputRef.current?.click()}
+                    onClick={() => {
+                      if (!inputMessage.trim()) {
+                        // Focus the textarea and show a hint
+                        const textarea = document.querySelector("textarea")
+                        if (textarea) {
+                          textarea.focus()
+                          textarea.placeholder =
+                            "Please describe what kind of presentation you want before uploading a file..."
+                        }
+                        return
+                      }
+                      fileInputRef.current?.click()
+                    }}
                     className="text-muted-foreground hover:text-foreground hover:bg-muted rounded-lg px-2 sm:px-3 py-2"
-                    disabled={isGenerating}
                   >
                     <Upload className="h-4 w-4 mr-1 sm:mr-2" />
                     <span className="hidden sm:inline">Upload</span>
@@ -365,19 +345,10 @@ export default function SlydPROHome() {
                 <Button
                   onClick={handleChatSubmit}
                   className="bg-[#027659] hover:bg-[#065f46] text-white rounded-lg px-4 sm:px-6 py-2 shadow-sm hover:shadow-md transition-all duration-200"
-                  disabled={!inputMessage.trim() || isGenerating}
+                  disabled={!inputMessage.trim()}
                 >
-                  {isGenerating ? (
-                    <>
-                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                      <span>Creating...</span>
-                    </>
-                  ) : (
-                    <>
-                      <span className="mr-2">Create</span>
-                      <ArrowUp className="h-4 w-4" />
-                    </>
-                  )}
+                  <span className="mr-2">Create</span>
+                  <ArrowUp className="h-4 w-4" />
                 </Button>
               </div>
             </div>
