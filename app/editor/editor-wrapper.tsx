@@ -14,6 +14,11 @@ const EditorContent = dynamic(() => import("./editor-content"), {
   ),
 })
 
-export default function EditorWrapper() {
-  return <EditorContent />
+interface EditorWrapperProps {
+  presentationId?: string
+  slideSlug?: string
+}
+
+export default function EditorWrapper({ presentationId, slideSlug }: EditorWrapperProps) {
+  return <EditorContent presentationId={presentationId} slideSlug={slideSlug} />
 }

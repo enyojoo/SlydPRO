@@ -310,7 +310,14 @@ export default function SlydPROHome() {
                   <Card
                     key={presentation.id}
                     className="cursor-pointer hover:shadow-lg transition-all duration-200 border border-border hover:border-muted-foreground bg-card overflow-hidden"
-                    onClick={() => router.push(`/editor?project=${presentation.id}`)}
+                    onClick={() => {
+                      const firstSlideTitle = presentation.slides[0]?.title || "untitled-slide"
+                      const slugTitle = firstSlideTitle
+                        .toLowerCase()
+                        .replace(/[^a-z0-9]+/g, "-")
+                        .replace(/^-|-$/g, "")
+                      router.push(`/editor/${presentation.id}/${slugTitle}`)
+                    }}
                   >
                     {/* Actual Slide Thumbnail */}
                     <div

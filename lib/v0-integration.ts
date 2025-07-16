@@ -372,14 +372,30 @@ Content for this slide...
 ## Slide 2: Next Title
 Content for next slide...`
 
+      // Simulate more realistic streaming with progress updates
+      let accumulatedContent = ""
+      let slideCount = 0
+
       await this.createStreamingChat(
         slidePrompt,
-        onChunk || (() => {}),
+        (chunk) => {
+          accumulatedContent += chunk
+          onChunk?.(chunk)
+
+          // Count slides as they're being generated
+          const slideMatches = accumulatedContent.match(/##\s*(?:Slide\s*\d+:?\s*)?/g)
+          const newSlideCount = slideMatches ? slideMatches.length : 0
+
+          if (newSlideCount > slideCount) {
+            slideCount = newSlideCount
+            // You could emit progress updates here if needed
+          }
+        },
         (response) => {
           const responseContent =
             (response.messages && response.messages.length > 0
               ? response.messages.find((m: any) => m.role === "assistant")?.content
-              : response.message) || ""
+              : response.message) || accumulatedContent
 
           const tokenUsage = this.calculateTokenUsage(slidePrompt, responseContent)
           const slides = this.parseResponseToSlides(response)

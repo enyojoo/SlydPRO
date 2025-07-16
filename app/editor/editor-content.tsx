@@ -72,7 +72,12 @@ const colorThemes = [
   { name: "Dark", primary: "#1f2937", secondary: "#374151", text: "#ffffff" },
 ]
 
-function EditorContent() {
+interface EditorContentProps {
+  presentationId?: string
+  slideSlug?: string
+}
+
+function EditorContent({ presentationId, slideSlug }: EditorContentProps) {
   const [isSmallScreen, setIsSmallScreen] = useState(false)
   const [slides, setSlides] = useState<Slide[]>([])
   const [selectedSlide, setSelectedSlide] = useState<string>("")
@@ -131,7 +136,7 @@ function EditorContent() {
       setIsStreaming(true)
       setStreamingContent("")
 
-      // Start thinking timer
+      // Start real-time thinking timer
       let thinkingTime = 0
       const thinkingInterval = setInterval(() => {
         thinkingTime += 1
@@ -150,39 +155,15 @@ function EditorContent() {
         )
       }, 1000)
 
-      // Simulate design phase after thinking
-      setTimeout(() => {
-        clearInterval(thinkingInterval)
-        setChatMessages((prev) =>
-          prev.map((msg) =>
-            msg.isLoading
-              ? {
-                  ...msg,
-                  generationProgress: {
-                    ...msg.generationProgress!,
-                    stage: "designing",
-                    totalSlides: 7, // Estimated slides
-                    completedSlides: 0,
-                  },
-                }
-              : msg,
-          ),
-        )
-
-        // Simulate slide generation progress
-        let completedSlides = 0
-        const slideNames = [
-          "Title Slide",
-          "Problem Statement",
-          "Solution Overview",
-          "Market Analysis",
-          "Business Model",
-          "Financial Projections",
-          "Call to Action",
-        ]
-
-        const slideInterval = setInterval(() => {
-          if (completedSlides < slideNames.length) {
+      try {
+        // Use real streaming generation
+        await v0.generateSlidesStreaming(
+          prompt,
+          uploadedFile,
+          // onChunk - real-time streaming
+          (chunk: string) => {
+            // Switch to designing phase on first chunk
+            clearInterval(thinkingInterval)
             setChatMessages((prev) =>
               prev.map((msg) =>
                 msg.isLoading
@@ -190,92 +171,115 @@ function EditorContent() {
                       ...msg,
                       generationProgress: {
                         ...msg.generationProgress!,
-                        currentSlide: slideNames[completedSlides],
-                        completedSlides: completedSlides + 1,
+                        stage: "designing",
+                        totalSlides: 7,
+                        completedSlides: 0,
+                        currentSlide: "Analyzing content...",
                       },
                     }
                   : msg,
               ),
             )
-            completedSlides++
-          } else {
-            clearInterval(slideInterval)
-          }
-        }, 800)
-      }, 3000)
+            setStreamingContent((prev) => prev + chunk)
+          },
+          // onComplete
+          async (result) => {
+            setIsStreaming(false)
+            clearInterval(thinkingInterval)
 
-      // Use streaming generation
-      await v0.generateSlidesStreaming(
-        prompt,
-        uploadedFile,
-        // onChunk
-        (chunk: string) => {
-          setStreamingContent((prev) => prev + chunk)
-        },
-        // onComplete
-        async (result) => {
-          setIsStreaming(false)
-          clearInterval(thinkingInterval)
+            if (result) {
+              const themedSlides = result.slides.map((slide, index) => ({
+                ...slide,
+                background: index === 0 ? selectedTheme.primary : selectedTheme.secondary,
+                textColor: selectedTheme.text,
+              }))
 
-          // Remove loading message and add completion
-          setChatMessages((prev) => prev.filter((msg) => !msg.isLoading))
+              setSlides(themedSlides)
+              setSelectedSlide(themedSlides[0]?.id || "")
+              setCurrentSlideIndex(0)
 
-          if (result) {
-            const themedSlides = result.slides.map((slide, index) => ({
-              ...slide,
-              background: index === 0 ? selectedTheme.primary : selectedTheme.secondary,
-              textColor: selectedTheme.text,
-            }))
+              // Create presentation and update URL
+              if (authUser) {
+                try {
+                  const presentation = await presentationsAPI.createPresentation({
+                    name: projectName,
+                    slides: themedSlides,
+                    thumbnail: themedSlides[0]?.background,
+                    category: "ai-generated",
+                  })
+                  setCurrentPresentationId(presentation.id)
 
-            setSlides(themedSlides)
-            setSelectedSlide(themedSlides[0]?.id || "")
-            setCurrentSlideIndex(0)
-
-            // Save to database only if user is authenticated
-            if (authUser) {
-              try {
-                const presentation = await presentationsAPI.createPresentation({
-                  name: projectName,
-                  slides: themedSlides,
-                  thumbnail: themedSlides[0]?.background,
-                  category: "ai-generated",
-                })
-                setCurrentPresentationId(presentation.id)
-              } catch (error) {
-                console.error("Failed to save presentation:", error)
+                  // Update URL with presentation ID and first slide title
+                  const firstSlideTitle = themedSlides[0]?.title || "untitled-slide"
+                  const slugTitle = firstSlideTitle
+                    .toLowerCase()
+                    .replace(/[^a-z0-9]+/g, "-")
+                    .replace(/^-|-$/g, "")
+                  router.replace(`/editor/${presentation.id}/${slugTitle}`)
+                } catch (error) {
+                  console.error("Failed to save presentation:", error)
+                }
               }
-            }
 
-            const assistantMessage: ChatMessage = {
-              id: (Date.now() + 2).toString(),
-              type: "assistant",
-              content: `✅ Your slides have been designed! Check the preview.\n\nI've created ${result.slides.length} slides for your presentation:\n\n${result.slides.map((slide, i) => `${i + 1}. ${slide.title}`).join("\n")}\n\nYou can make further improvements - just tell me what to change!`,
-              timestamp: new Date(),
-              generationProgress: {
-                stage: "complete",
-                version: 1,
-              },
-            }
-            setChatMessages((prev) => [...prev, assistantMessage])
-          }
-        },
-        // onError
-        (error) => {
-          setIsStreaming(false)
-          clearInterval(thinkingInterval)
-          setChatMessages((prev) => prev.filter((msg) => !msg.isLoading))
+              // Remove loading message and show completion with progress summary
+              setChatMessages((prev) => {
+                const filtered = prev.filter((msg) => !msg.isLoading)
+                const completionMessage: ChatMessage = {
+                  id: (Date.now() + 2).toString(),
+                  type: "assistant",
+                  content: `✅ **Presentation Complete!**
 
-          const errorMessage: ChatMessage = {
-            id: (Date.now() + 3).toString(),
-            type: "assistant",
-            content: `I encountered an error: ${error.message}\n\nPlease try again or describe your presentation differently.`,
-            timestamp: new Date(),
-          }
-          setChatMessages((prev) => [...prev, errorMessage])
-        },
-      )
+I've successfully created ${result.slides.length} slides for your presentation:
+
+${result.slides.map((slide, i) => `${i + 1}. ${slide.title}`).join("\n")}
+
+**What you can do next:**
+• Edit individual slides by selecting them
+• Change the overall theme or colors  
+• Ask me to modify specific content
+• Add or remove slides
+• Export your presentation
+
+What would you like to improve?`,
+                  timestamp: new Date(),
+                  generationProgress: {
+                    stage: "complete",
+                    version: 1,
+                    totalSlides: result.slides.length,
+                    completedSlides: result.slides.length,
+                  },
+                }
+                return [...filtered, completionMessage]
+              })
+            }
+          },
+          // onError
+          (error) => {
+            setIsStreaming(false)
+            clearInterval(thinkingInterval)
+            setChatMessages((prev) => {
+              const filtered = prev.filter((msg) => !msg.isLoading)
+              const errorMessage: ChatMessage = {
+                id: (Date.now() + 3).toString(),
+                type: "assistant",
+                content: `❌ **Generation Failed**
+
+I encountered an error: ${error.message}
+
+Please try again or describe your presentation differently. I'm here to help!`,
+                timestamp: new Date(),
+              }
+              return [...filtered, errorMessage]
+            })
+          },
+        )
+      } catch (error) {
+        setIsStreaming(false)
+        clearInterval(thinkingInterval)
+        console.error("Generation error:", error)
+      }
     },
-    [v0, uploadedFile, selectedTheme, projectName, authUser],
+    [v0, uploadedFile, selectedTheme, projectName, authUser, router],
   )
 
   const autoSave = useCallback(async () => {
@@ -288,12 +292,27 @@ function EditorContent() {
         slides,
         thumbnail: slides[0]?.background,
       })
+
+      // Update URL if current slide title changed
+      const currentSlide = slides.find((s) => s.id === selectedSlide)
+      if (currentSlide) {
+        const slugTitle = currentSlide.title
+          .toLowerCase()
+          .replace(/[^a-z0-9]+/g, "-")
+          .replace(/^-|-$/g, "")
+        const currentPath = window.location.pathname
+        const expectedPath = `/editor/${currentPresentationId}/${slugTitle}`
+
+        if (currentPath !== expectedPath) {
+          router.replace(expectedPath)
+        }
+      }
     } catch (error) {
       console.error("Auto-save failed:", error)
     } finally {
       setIsSaving(false)
     }
-  }, [currentPresentationId, authUser, slides, projectName])
+  }, [currentPresentationId, authUser, slides, projectName, selectedSlide, router])
 
   useEffect(() => {
     const saveTimer = setTimeout(() => {
@@ -306,7 +325,7 @@ function EditorContent() {
   }, [slides, projectName, autoSave])
 
   const handleChatSubmit = async () => {
-    if (!inputMessage.trim() || v0.isLoading) return
+    if (!inputMessage.trim() || v0.isLoading || isStreaming) return
 
     const userMessage: ChatMessage = {
       id: Date.now().toString(),
@@ -318,89 +337,238 @@ function EditorContent() {
     const loadingMessage: ChatMessage = {
       id: (Date.now() + 1).toString(),
       type: "assistant",
-      content: "Working on it...",
+      content: "",
       timestamp: new Date(),
       isLoading: true,
+      generationProgress: {
+        stage: "thinking",
+        thinkingTime: 0,
+        version: chatMessages.filter((m) => m.generationProgress?.stage === "complete").length + 1,
+      },
     }
 
     setChatMessages((prev) => [...prev, userMessage, loadingMessage])
     const currentInput = inputMessage
     setInputMessage("")
+    setIsStreaming(true)
 
-    if (editMode === "selected" && selectedSlide) {
-      // Edit only the selected slide
-      const slide = slides.find((s) => s.id === selectedSlide)
-      if (slide) {
-        const result = await v0.editSlide(selectedSlide, slide.title, currentInput)
+    // Start real-time thinking timer
+    let thinkingTime = 0
+    const thinkingInterval = setInterval(() => {
+      thinkingTime += 1
+      setChatMessages((prev) =>
+        prev.map((msg) =>
+          msg.isLoading
+            ? {
+                ...msg,
+                generationProgress: {
+                  ...msg.generationProgress!,
+                  thinkingTime,
+                },
+              }
+            : msg,
+        ),
+      )
+    }, 1000)
 
-        // Remove loading message
-        setChatMessages((prev) => prev.filter((msg) => !msg.isLoading))
+    try {
+      if (editMode === "selected" && selectedSlide) {
+        // Edit only the selected slide
+        const slide = slides.find((s) => s.id === selectedSlide)
+        if (slide) {
+          // Switch to designing phase
+          setTimeout(() => {
+            clearInterval(thinkingInterval)
+            setChatMessages((prev) =>
+              prev.map((msg) =>
+                msg.isLoading
+                  ? {
+                      ...msg,
+                      generationProgress: {
+                        ...msg.generationProgress!,
+                        stage: "designing",
+                        totalSlides: 1,
+                        completedSlides: 0,
+                        currentSlide: slide.title,
+                      },
+                    }
+                  : msg,
+              ),
+            )
+          }, 2000)
 
-        if (result) {
-          setSlides(
-            result.slides.map((s, index) => ({
+          const result = await v0.editSlide(selectedSlide, slide.title, currentInput)
+
+          setIsStreaming(false)
+          clearInterval(thinkingInterval)
+
+          if (result) {
+            const themedSlides = result.slides.map((s, index) => ({
               ...s,
               background: index === 0 ? selectedTheme.primary : selectedTheme.secondary,
               textColor: selectedTheme.text,
-            })),
-          )
-          const assistantMessage: ChatMessage = {
-            id: (Date.now() + 2).toString(),
-            type: "assistant",
-            content: `Great! I've updated the "${slide.title}" slide based on your request. The changes should now be visible in the preview.`,
-            timestamp: new Date(),
+            }))
+
+            setSlides(themedSlides)
+
+            // Update URL if slide title changed
+            const updatedSlide = themedSlides.find((s) => s.id === selectedSlide)
+            if (updatedSlide && currentPresentationId) {
+              const slugTitle = updatedSlide.title
+                .toLowerCase()
+                .replace(/[^a-z0-9]+/g, "-")
+                .replace(/^-|-$/g, "")
+              router.replace(`/editor/${currentPresentationId}/${slugTitle}`)
+            }
+
+            setChatMessages((prev) => {
+              const filtered = prev.filter((msg) => !msg.isLoading)
+              const completionMessage: ChatMessage = {
+                id: (Date.now() + 2).toString(),
+                type: "assistant",
+                content: `✅ **Slide Updated!**
+
+I've successfully updated "${slide.title}" based on your request.
+
+**What's next?**
+• Continue editing this slide
+• Select another slide to modify
+• Switch to "All Slides" mode for broader changes
+• Ask me to adjust colors or themes
+
+What else would you like to improve?`,
+                timestamp: new Date(),
+                generationProgress: {
+                  stage: "complete",
+                  version: loadingMessage.generationProgress!.version,
+                  totalSlides: 1,
+                  completedSlides: 1,
+                },
+              }
+              return [...filtered, completionMessage]
+            })
           }
-          setChatMessages((prev) => [...prev, assistantMessage])
         }
-      }
-    } else {
-      // Regenerate all slides or create new ones
-      let result
-      if (slides.length > 0) {
-        result = await v0.regenerateAllSlides(currentInput)
       } else {
-        result = await v0.generateSlides(currentInput, uploadedFile)
-      }
+        // Regenerate all slides or create new ones
+        let result
 
-      // Remove loading message
-      setChatMessages((prev) => prev.filter((msg) => !msg.isLoading))
+        // Switch to designing phase
+        setTimeout(() => {
+          clearInterval(thinkingInterval)
+          setChatMessages((prev) =>
+            prev.map((msg) =>
+              msg.isLoading
+                ? {
+                    ...msg,
+                    generationProgress: {
+                      ...msg.generationProgress!,
+                      stage: "designing",
+                      totalSlides: slides.length || 7,
+                      completedSlides: 0,
+                      currentSlide: "Analyzing changes...",
+                    },
+                  }
+                : msg,
+            ),
+          )
+        }, 2000)
 
-      if (result) {
-        const themedSlides = result.slides.map((slide, index) => ({
-          ...slide,
-          background: index === 0 ? selectedTheme.primary : selectedTheme.secondary,
-          textColor: selectedTheme.text,
-        }))
-        setSlides(themedSlides)
-        if (themedSlides.length > 0 && !selectedSlide) {
-          setSelectedSlide(themedSlides[0].id)
-          setCurrentSlideIndex(0)
+        if (slides.length > 0 && v0.currentChatId) {
+          result = await v0.regenerateAllSlides(v0.currentChatId, currentInput)
+        } else {
+          result = await v0.generateSlides(currentInput, uploadedFile)
         }
 
-        const assistantMessage: ChatMessage = {
-          id: (Date.now() + 2).toString(),
+        setIsStreaming(false)
+        clearInterval(thinkingInterval)
+
+        if (result) {
+          const themedSlides = result.slides.map((slide, index) => ({
+            ...slide,
+            background: index === 0 ? selectedTheme.primary : selectedTheme.secondary,
+            textColor: selectedTheme.text,
+          }))
+
+          setSlides(themedSlides)
+          if (themedSlides.length > 0 && !selectedSlide) {
+            setSelectedSlide(themedSlides[0].id)
+            setCurrentSlideIndex(0)
+          }
+
+          // Update URL with first slide
+          if (currentPresentationId && themedSlides.length > 0) {
+            const firstSlideTitle = themedSlides[0].title
+            const slugTitle = firstSlideTitle
+              .toLowerCase()
+              .replace(/[^a-z0-9]+/g, "-")
+              .replace(/^-|-$/g, "")
+            router.replace(`/editor/${currentPresentationId}/${slugTitle}`)
+          }
+
+          setChatMessages((prev) => {
+            const filtered = prev.filter((msg) => !msg.isLoading)
+            const completionMessage: ChatMessage = {
+              id: (Date.now() + 2).toString(),
+              type: "assistant",
+              content:
+                slides.length > 0
+                  ? `✅ **Presentation Updated!**
+
+I've successfully updated all ${result.slides.length} slides based on your feedback:
+
+${result.slides.map((slide, i) => `${i + 1}. ${slide.title}`).join("\n")}
+
+**Continue improving:**
+• Select specific slides to edit
+• Ask for theme or color changes
+• Request content modifications
+• Add or remove slides
+
+What would you like to adjust next?`
+                  : `✅ **New Presentation Created!**
+
+I've created ${result.slides.length} slides for you:
+
+${result.slides.map((slide, i) => `${i + 1}. ${slide.title}`).join("\n")}
+
+**Ready for customization:**
+• Edit individual slides
+• Change themes and colors
+• Modify content and structure
+• Export when ready
+
+How can I help you improve it?`,
+              timestamp: new Date(),
+              generationProgress: {
+                stage: "complete",
+                version: loadingMessage.generationProgress!.version,
+                totalSlides: result.slides.length,
+                completedSlides: result.slides.length,
+              },
+            }
+            return [...filtered, completionMessage]
+          })
+        }
+      }
+    } catch (error) {
+      setIsStreaming(false)
+      clearInterval(thinkingInterval)
+
+      setChatMessages((prev) => {
+        const filtered = prev.filter((msg) => !msg.isLoading)
+        const errorMessage: ChatMessage = {
+          id: (Date.now() + 3).toString(),
           type: "assistant",
-          content:
-            slides.length > 0
-              ? "Perfect! I've updated all slides based on your feedback. Take a look at the changes in the preview."
-              : `Excellent! I've created ${result.slides.length} slides for your presentation. You can now review them, make edits, or ask for specific changes.`,
+          content: `❌ **Update Failed**
+
+I encountered an error: ${error instanceof Error ? error.message : "Unknown error"}
+
+Please try rephrasing your request or try again. I'm here to help!`,
           timestamp: new Date(),
         }
-        setChatMessages((prev) => [...prev, assistantMessage])
-      }
-    }
-
-    if (v0.error) {
-      // Remove loading message
-      setChatMessages((prev) => prev.filter((msg) => !msg.isLoading))
-
-      const errorMessage: ChatMessage = {
-        id: (Date.now() + 3).toString(),
-        type: "assistant",
-        content: `I encountered an error: ${v0.error}\n\nPlease try rephrasing your request or try again.`,
-        timestamp: new Date(),
-      }
-      setChatMessages((prev) => [...prev, errorMessage])
+        return [...filtered, errorMessage]
+      })
     }
   }
 
@@ -458,11 +626,27 @@ function EditorContent() {
     setEditMode("selected")
 
     const slide = slides.find((s) => s.id === slideId)
-    if (slide) {
+    if (slide && currentPresentationId) {
+      // Update URL with selected slide
+      const slugTitle = slide.title
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, "-")
+        .replace(/^-|-$/g, "")
+      router.replace(`/editor/${currentPresentationId}/${slugTitle}`)
+
       const contextMessage: ChatMessage = {
         id: Date.now().toString(),
         type: "assistant",
-        content: `Now editing: "${slide.title}" (Slide ${index + 1})\n\nI'm ready to help you modify this specific slide. You can ask me to:\n• Change the content or messaging\n• Adjust the layout or design\n• Add or remove elements\n• Modify the tone or style`,
+        content: `🎯 **Now Editing: "${slide.title}"** (Slide ${index + 1})
+
+I'm ready to help you modify this specific slide. You can ask me to:
+
+• **Content**: Change messaging, add/remove points, adjust tone
+• **Layout**: Modify structure, bullet points, or formatting  
+• **Design**: Adjust colors, fonts, or visual elements
+• **Focus**: Emphasize different aspects or angles
+
+What would you like to change about this slide?`,
         timestamp: new Date(),
       }
       setChatMessages((prev) => [...prev, contextMessage])
@@ -510,6 +694,179 @@ function EditorContent() {
   }
 
   const currentSlide = slides.find((slide) => slide.id === selectedSlide)
+
+  const handleScreenResize = useCallback(() => {
+    checkScreenSize()
+  }, [])
+
+  const handleNameInputFocus = useCallback(() => {
+    setIsEditingName(true)
+  }, [])
+
+  const handleNameInputBlur = useCallback(() => {
+    handleNameSave()
+  }, [])
+
+  const handleNameInputKeyPress = useCallback((e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Enter") {
+      handleNameSave()
+    }
+  }, [])
+
+  useEffect(() => {
+    window.addEventListener("resize", handleScreenResize)
+
+    return () => window.removeEventListener("resize", handleScreenResize)
+  }, [handleScreenResize])
+
+  useEffect(() => {
+    checkScreenSize()
+  }, [])
+
+  useEffect(() => {
+    chatEndRef.current?.scrollIntoView({ behavior: "smooth" })
+  }, [chatMessages])
+
+  useEffect(() => {
+    if (isEditingName && nameInputRef.current) {
+      nameInputRef.current.focus()
+      nameInputRef.current.select()
+    }
+  }, [isEditingName])
+
+  useEffect(() => {
+    if (isInitialized) return
+
+    // Handle URL-based loading
+    if (presentationId) {
+      const loadProject = async () => {
+        try {
+          if (authUser) {
+            const presentation = await presentationsAPI.getPresentation(presentationId)
+            setSlides(presentation.slides)
+            setCurrentPresentationId(presentation.id)
+            setProjectName(presentation.name)
+
+            // Find slide by slug or default to first
+            let slideIndex = 0
+            if (slideSlug && presentation.slides.length > 0) {
+              const foundIndex = presentation.slides.findIndex((slide) => {
+                const slugTitle = slide.title
+                  .toLowerCase()
+                  .replace(/[^a-z0-9]+/g, "-")
+                  .replace(/^-|-$/g, "")
+                return slugTitle === slideSlug
+              })
+              if (foundIndex !== -1) {
+                slideIndex = foundIndex
+              }
+            }
+
+            setSelectedSlide(presentation.slides[slideIndex]?.id || "")
+            setCurrentSlideIndex(slideIndex)
+
+            const welcomeMessage: ChatMessage = {
+              id: Date.now().toString(),
+              type: "assistant",
+              content: `👋 **Welcome back to "${presentation.name}"!**
+
+This presentation has ${presentation.slides.length} slides and was last updated ${new Date(presentation.updated_at).toLocaleDateString()}.
+
+**You can now:**
+• Edit individual slides by selecting them
+• Regenerate content with new ideas  
+• Change colors and themes
+• Ask me to modify specific aspects
+• Export your presentation
+
+Currently viewing: **${presentation.slides[slideIndex]?.title || "Slide 1"}**
+
+What would you like to work on?`,
+              timestamp: new Date(),
+            }
+            setChatMessages([welcomeMessage])
+          }
+        } catch (error) {
+          console.error("Failed to load presentation:", error)
+          router.push("/editor")
+        }
+      }
+
+      loadProject()
+    } else {
+      // Handle legacy URL parameters
+      const searchProjectId = searchParams.get("project")
+
+      if (searchProjectId) {
+        const loadProject = async () => {
+          try {
+            if (authUser) {
+              const presentation = await presentationsAPI.getPresentation(searchProjectId)
+              setSlides(presentation.slides)
+              setSelectedSlide(presentation.slides[0]?.id || "")
+              setCurrentSlideIndex(0)
+              setProjectName(presentation.name)
+              setCurrentPresentationId(presentation.id)
+
+              // Redirect to new URL format
+              const firstSlideTitle = presentation.slides[0]?.title || "untitled-slide"
+              const slugTitle = firstSlideTitle
+                .toLowerCase()
+                .replace(/[^a-z0-9]+/g, "-")
+                .replace(/^-|-$/g, "")
+              router.replace(`/editor/${presentation.id}/${slugTitle}`)
+            } else {
+              // Fallback to template loading
+              const project = getTemplateById(searchProjectId)
+              if (project) {
+                setSlides(project.slides)
+                setSelectedSlide(project.slides[0]?.id || "")
+                setCurrentSlideIndex(0)
+                setProjectName(project.name)
+              }
+            }
+          } catch (error) {
+            console.error("Failed to load presentation:", error)
+          }
+        }
+
+        loadProject()
+      } else {
+        // New presentation - set welcome message
+        const welcomeMessage: ChatMessage = {
+          id: Date.now().toString(),
+          type: "assistant",
+          content: `🚀 **Ready to Create Something Amazing!**
+
+I'm your AI presentation assistant. Describe what kind of presentation you'd like to create, and I'll help you build it slide by slide.
+
+**Popular requests:**
+• "Create a startup pitch deck for a food delivery app"
+• "Make a quarterly business review presentation"  
+• "Build a product launch presentation"
+• "Design a sales proposal for enterprise clients"
+
+**Or upload a document** and I'll create slides from your content.
+
+What presentation would you like to create today?`,
+          timestamp: new Date(),
+        }
+        setChatMessages([welcomeMessage])
+
+        // Check if there's an initial message from home page
+        if (messages.length > 0) {
+          const lastMessage = messages[messages.length - 1]
+          if (lastMessage.type === "user") {
+            setTimeout(() => {
+              handleInitialGeneration(lastMessage.content)
+            }, 100)
+          }
+        }
+      }
+    }
+
+    setIsInitialized(true)
+  }, [authUser, messages, presentationId, slideSlug, router])
 
   // Presentation Mode View
   if (isPresentationMode) {
@@ -589,153 +946,6 @@ function EditorContent() {
           >
             <Minimize className="h-5 w-5" />
           </Button>
-        </div>
-      </div>
-    )
-  }
-
-  const handleScreenResize = useCallback(() => {
-    checkScreenSize()
-  }, [])
-
-  const handleNameInputFocus = useCallback(() => {
-    setIsEditingName(true)
-  }, [])
-
-  const handleNameInputBlur = useCallback(() => {
-    handleNameSave()
-  }, [])
-
-  const handleNameInputKeyPress = useCallback((e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === "Enter") {
-      handleNameSave()
-    }
-  }, [])
-
-  useEffect(() => {
-    window.addEventListener("resize", handleScreenResize)
-
-    return () => window.removeEventListener("resize", handleScreenResize)
-  }, [])
-
-  useEffect(() => {
-    checkScreenSize()
-  }, [])
-
-  useEffect(() => {
-    chatEndRef.current?.scrollIntoView({ behavior: "smooth" })
-  }, [chatMessages])
-
-  useEffect(() => {
-    if (isEditingName && nameInputRef.current) {
-      nameInputRef.current.focus()
-      nameInputRef.current.select()
-    }
-  }, [isEditingName])
-
-  useEffect(() => {
-    if (isInitialized) return
-
-    const projectId = searchParams.get("project")
-
-    if (projectId) {
-      // Load existing project from database
-      const loadProject = async () => {
-        try {
-          if (authUser) {
-            const presentation = await presentationsAPI.getPresentation(projectId)
-            setSlides(presentation.slides)
-            setSelectedSlide(presentation.slides[0]?.id || "")
-            setCurrentSlideIndex(0)
-            setProjectName(presentation.name)
-            setCurrentPresentationId(presentation.id)
-
-            const welcomeMessage: ChatMessage = {
-              id: Date.now().toString(),
-              type: "assistant",
-              content: `Welcome back to "${presentation.name}"! This presentation has ${presentation.slides.length} slides and was last updated ${new Date(presentation.updated_at).toLocaleDateString()}.\n\nYou can now:\n• Edit individual slides by selecting them\n• Regenerate content with new ideas\n• Change colors and themes\n• Ask me to modify specific aspects\n\nWhat would you like to work on?`,
-              timestamp: new Date(),
-            }
-            setChatMessages([welcomeMessage])
-          } else {
-            // Fallback to template loading if not authenticated
-            const project = getTemplateById(projectId)
-            if (project) {
-              setSlides(project.slides)
-              setSelectedSlide(project.slides[0]?.id || "")
-              setCurrentSlideIndex(0)
-              setProjectName(project.name)
-            }
-          }
-        } catch (error) {
-          console.error("Failed to load presentation:", error)
-          // Fallback to template loading
-          const project = getTemplateById(projectId)
-          if (project) {
-            setSlides(project.slides)
-            setSelectedSlide(project.slides[0]?.id || "")
-            setCurrentSlideIndex(0)
-            setProjectName(project.name)
-          }
-        }
-      }
-
-      loadProject()
-    } else {
-      // New presentation - set welcome message
-      const welcomeMessage: ChatMessage = {
-        id: Date.now().toString(),
-        type: "assistant",
-        content:
-          "Hi! I'm your AI presentation assistant. Describe what kind of presentation you'd like to create, and I'll help you build it slide by slide. \n\nFor example:\n• 'Create a startup pitch deck for a food delivery app'\n• 'Make a quarterly business review presentation'\n• 'Build a product launch presentation'",
-        timestamp: new Date(),
-      }
-      setChatMessages([welcomeMessage])
-
-      // Check if there's an initial message from home page
-      if (messages.length > 0) {
-        const lastMessage = messages[messages.length - 1]
-        if (lastMessage.type === "user") {
-          // Process the initial message
-          setTimeout(() => {
-            handleInitialGeneration(lastMessage.content)
-          }, 100)
-        }
-      }
-    }
-
-    setIsInitialized(true)
-  }, [authUser, messages]) // Add authUser and messages as dependencies
-
-  // Show warning for small screens
-  if (isSmallScreen) {
-    return (
-      <div className="min-h-screen bg-background flex flex-col items-center justify-center p-6">
-        <div className="max-w-md text-center space-y-6">
-          <div className="w-16 h-16 bg-[#027659]/10 rounded-2xl flex items-center justify-center mx-auto">
-            <svg className="w-8 h-8 text-[#027659]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"
-              />
-            </svg>
-          </div>
-          <div>
-            <h2 className="text-2xl font-bold text-foreground mb-2">Editor requires laptop/desktop</h2>
-            <p className="text-muted-foreground">
-              Please use a device with 1024px or wider screen to access the presentation editor.
-            </p>
-          </div>
-          <div className="space-y-3">
-            <Button onClick={() => router.push("/")} className="w-full bg-[#027659] hover:bg-[#065f46] text-white">
-              Back to Home
-            </Button>
-            <Button variant="outline" onClick={() => window.open("/features", "_blank")} className="w-full">
-              Learn about our editor
-            </Button>
-          </div>
         </div>
       </div>
     )
