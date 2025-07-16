@@ -3,9 +3,11 @@
 import { supabase, type Presentation } from "./supabase"
 
 export class PresentationsAPI {
-  private getAuthHeaders() {
-    const session = supabase.auth.getSession()
-    return session ? { Authorization: `Bearer ${session}` } : {}
+  private async getAuthHeaders() {
+    const {
+      data: { session },
+    } = await supabase.auth.getSession()
+    return session ? { Authorization: `Bearer ${session.access_token}` } : {}
   }
 
   async createPresentation(data: {
@@ -19,7 +21,7 @@ export class PresentationsAPI {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        ...this.getAuthHeaders(),
+        ...(await this.getAuthHeaders()),
       },
       body: JSON.stringify(data),
     })
@@ -36,7 +38,7 @@ export class PresentationsAPI {
       method: "PUT",
       headers: {
         "Content-Type": "application/json",
-        ...this.getAuthHeaders(),
+        ...(await this.getAuthHeaders()),
       },
       body: JSON.stringify(data),
     })
@@ -51,7 +53,7 @@ export class PresentationsAPI {
   async deletePresentation(id: string): Promise<void> {
     const response = await fetch(`/api/presentations/${id}`, {
       method: "DELETE",
-      headers: this.getAuthHeaders(),
+      headers: await this.getAuthHeaders(),
     })
 
     if (!response.ok) {
@@ -61,7 +63,7 @@ export class PresentationsAPI {
 
   async getPresentation(id: string): Promise<Presentation> {
     const response = await fetch(`/api/presentations/${id}`, {
-      headers: this.getAuthHeaders(),
+      headers: await this.getAuthHeaders(),
     })
 
     if (!response.ok) {
@@ -73,7 +75,7 @@ export class PresentationsAPI {
 
   async getUserPresentations(): Promise<Presentation[]> {
     const response = await fetch("/api/presentations", {
-      headers: this.getAuthHeaders(),
+      headers: await this.getAuthHeaders(),
     })
 
     if (!response.ok) {

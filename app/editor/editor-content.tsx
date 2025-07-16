@@ -34,7 +34,7 @@ import { useChatContext } from "@/lib/chat-context"
 import { ExportDialog } from "@/components/export-dialog"
 import { getTemplateById } from "@/lib/slide-templates"
 import { presentationsAPI } from "@/lib/presentations-api"
-import { supabase } from "@/lib/supabase"
+import { useAuth } from "@/lib/auth-context"
 
 interface Slide {
   id: string
@@ -89,7 +89,19 @@ function EditorContent() {
   const chatEndRef = useRef<HTMLDivElement>(null)
   const nameInputRef = useRef<HTMLInputElement>(null)
   const { messages } = useChatContext()
-  const { data: user } = supabase.auth.useUser()
+  const { user: authUser, isLoading: authLoading } = useAuth()
+
+  // Show loading while auth is being checked
+  if (authLoading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="text-center space-y-4">
+          <div className="w-8 h-8 border-4 border-[#027659] border-t-transparent rounded-full animate-spin mx-auto"></div>
+          <p className="text-muted-foreground">Loading editor...</p>
+        </div>
+      </div>
+    )
+  }
 
   const checkScreenSize = () => {
     setIsSmallScreen(window.innerWidth < 1024)
@@ -145,23 +157,25 @@ function EditorContent() {
             setSelectedSlide(themedSlides[0]?.id || "")
             setCurrentSlideIndex(0)
 
-            // Save to database
-            try {
-              const presentation = await presentationsAPI.createPresentation({
-                name: projectName,
-                slides: themedSlides,
-                thumbnail: themedSlides[0]?.background,
-                category: "ai-generated",
-              })
-              setCurrentPresentationId(presentation.id)
-            } catch (error) {
-              console.error("Failed to save presentation:", error)
+            // Save to database only if user is authenticated
+            if (authUser) {
+              try {
+                const presentation = await presentationsAPI.createPresentation({
+                  name: projectName,
+                  slides: themedSlides,
+                  thumbnail: themedSlides[0]?.background,
+                  category: "ai-generated",
+                })
+                setCurrentPresentationId(presentation.id)
+              } catch (error) {
+                console.error("Failed to save presentation:", error)
+              }
             }
 
             const assistantMessage: ChatMessage = {
               id: (Date.now() + 2).toString(),
               type: "assistant",
-              content: `Perfect! I've created ${result.slides.length} slides for your presentation. Here's what I included:\n\n${result.slides.map((slide, i) => `${i + 1}. ${slide.title}`).join("\n")}\n\nYour presentation has been saved automatically. You can now:\n• Select any slide to edit it specifically\n• Ask me to modify the content or design\n• Change the color theme\n• Add or remove slides`,
+              content: `Perfect! I've created ${result.slides.length} slides for your presentation. Here's what I included:\n\n${result.slides.map((slide, i) => `${i + 1}. ${slide.title}`).join("\n")}\n\n${authUser ? "Your presentation has been saved automatically. " : ""}You can now:\n• Select any slide to edit it specifically\n• Ask me to modify the content or design\n• Change the color theme\n• Add or remove slides`,
               timestamp: new Date(),
             }
             setChatMessages((prev) => [...prev, assistantMessage])
@@ -182,12 +196,12 @@ function EditorContent() {
         },
       )
     },
-    [v0, uploadedFile, selectedTheme, projectName],
+    [v0, uploadedFile, selectedTheme, projectName, authUser],
   )
 
   // Add this function after handleInitialGeneration
   const autoSave = useCallback(async () => {
-    if (!currentPresentationId || !user || slides.length === 0) return
+    if (!currentPresentationId || !authUser || slides.length === 0) return
 
     setIsSaving(true)
     try {
@@ -201,7 +215,7 @@ function EditorContent() {
     } finally {
       setIsSaving(false)
     }
-  }, [currentPresentationId, user, slides, projectName])
+  }, [currentPresentationId, authUser, slides, projectName])
 
   // Add auto-save effect
   useEffect(() => {
@@ -507,11 +521,28 @@ function EditorContent() {
     checkScreenSize()
   }, [])
 
+  const handleNameInputFocus = useCallback(() => {
+    setIsEditingName(true)
+  }, [])
+
+  const handleNameInputBlur = useCallback(() => {
+    handleNameSave()
+  }, [])
+
+  const handleNameInputKeyPress = useCallback((e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Enter") {
+      handleNameSave()
+    }
+  }, [])
+
   useEffect(() => {
-    checkScreenSize()
     window.addEventListener("resize", handleScreenResize)
 
     return () => window.removeEventListener("resize", handleScreenResize)
+  }, [])
+
+  useEffect(() => {
+    checkScreenSize()
   }, [])
 
   useEffect(() => {
@@ -530,25 +561,35 @@ function EditorContent() {
 
     const projectId = searchParams.get("project")
 
-    // In the useEffect where you load existing projects, replace the project loading section with:
     if (projectId) {
       // Load existing project from database
       const loadProject = async () => {
         try {
-          const presentation = await presentationsAPI.getPresentation(projectId)
-          setSlides(presentation.slides)
-          setSelectedSlide(presentation.slides[0]?.id || "")
-          setCurrentSlideIndex(0)
-          setProjectName(presentation.name)
-          setCurrentPresentationId(presentation.id)
+          if (authUser) {
+            const presentation = await presentationsAPI.getPresentation(projectId)
+            setSlides(presentation.slides)
+            setSelectedSlide(presentation.slides[0]?.id || "")
+            setCurrentSlideIndex(0)
+            setProjectName(presentation.name)
+            setCurrentPresentationId(presentation.id)
 
-          const welcomeMessage: ChatMessage = {
-            id: Date.now().toString(),
-            type: "assistant",
-            content: `Welcome back to "${presentation.name}"! This presentation has ${presentation.slides.length} slides and was last updated ${new Date(presentation.updated_at).toLocaleDateString()}.\n\nYou can now:\n• Edit individual slides by selecting them\n• Regenerate content with new ideas\n• Change colors and themes\n• Ask me to modify specific aspects\n\nWhat would you like to work on?`,
-            timestamp: new Date(),
+            const welcomeMessage: ChatMessage = {
+              id: Date.now().toString(),
+              type: "assistant",
+              content: `Welcome back to "${presentation.name}"! This presentation has ${presentation.slides.length} slides and was last updated ${new Date(presentation.updated_at).toLocaleDateString()}.\n\nYou can now:\n• Edit individual slides by selecting them\n• Regenerate content with new ideas\n• Change colors and themes\n• Ask me to modify specific aspects\n\nWhat would you like to work on?`,
+              timestamp: new Date(),
+            }
+            setChatMessages([welcomeMessage])
+          } else {
+            // Fallback to template loading if not authenticated
+            const project = getTemplateById(projectId)
+            if (project) {
+              setSlides(project.slides)
+              setSelectedSlide(project.slides[0]?.id || "")
+              setCurrentSlideIndex(0)
+              setProjectName(project.name)
+            }
           }
-          setChatMessages([welcomeMessage])
         } catch (error) {
           console.error("Failed to load presentation:", error)
           // Fallback to template loading
@@ -587,7 +628,7 @@ function EditorContent() {
     }
 
     setIsInitialized(true)
-  }, []) // Empty dependency array - only run once
+  }, [authUser, messages]) // Add authUser and messages as dependencies
 
   // Show warning for small screens
   if (isSmallScreen) {
@@ -723,9 +764,9 @@ function EditorContent() {
                   ref={nameInputRef}
                   value={projectName}
                   onChange={(e) => setProjectName(e.target.value)}
-                  onFocus={() => setIsEditingName(true)}
-                  onBlur={handleNameSave}
-                  onKeyPress={(e) => e.key === "Enter" && handleNameSave()}
+                  onFocus={handleNameInputFocus}
+                  onBlur={handleNameInputBlur}
+                  onKeyPress={handleNameInputKeyPress}
                   className="w-auto min-w-[200px] max-w-md bg-transparent border-0 text-base font-normal text-gray-900 placeholder:text-gray-500 focus-visible:ring-0 focus-visible:ring-offset-0 shadow-none outline-none focus:outline-none px-3 py-2 h-auto hover:bg-gray-50 focus:bg-gray-50 rounded-lg transition-colors"
                   placeholder="Enter presentation title..."
                   style={{ width: `${Math.max(200, projectName.length * 8 + 24)}px` }}
