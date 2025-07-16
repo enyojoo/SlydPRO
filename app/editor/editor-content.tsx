@@ -51,6 +51,16 @@ interface ChatMessage {
   content: string
   timestamp: Date
   isLoading?: boolean
+  generationProgress?: GenerationProgress
+}
+
+interface GenerationProgress {
+  stage: "thinking" | "designing" | "complete"
+  thinkingTime?: number
+  currentSlide?: string
+  totalSlides?: number
+  completedSlides?: number
+  version?: number
 }
 
 const colorThemes = [
@@ -91,18 +101,6 @@ function EditorContent() {
   const { messages } = useChatContext()
   const { user: authUser, isLoading: authLoading } = useAuth()
 
-  // Show loading while auth is being checked
-  if (authLoading) {
-    return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="text-center space-y-4">
-          <div className="w-8 h-8 border-4 border-[#027659] border-t-transparent rounded-full animate-spin mx-auto"></div>
-          <p className="text-muted-foreground">Loading editor...</p>
-        </div>
-      </div>
-    )
-  }
-
   const checkScreenSize = () => {
     setIsSmallScreen(window.innerWidth < 1024)
   }
@@ -122,11 +120,89 @@ function EditorContent() {
         content: "",
         timestamp: new Date(),
         isLoading: true,
+        generationProgress: {
+          stage: "thinking",
+          thinkingTime: 0,
+          version: 1,
+        },
       }
 
       setChatMessages((prev) => [...prev, userMessage, loadingMessage])
       setIsStreaming(true)
       setStreamingContent("")
+
+      // Start thinking timer
+      let thinkingTime = 0
+      const thinkingInterval = setInterval(() => {
+        thinkingTime += 1
+        setChatMessages((prev) =>
+          prev.map((msg) =>
+            msg.isLoading
+              ? {
+                  ...msg,
+                  generationProgress: {
+                    ...msg.generationProgress!,
+                    thinkingTime,
+                  },
+                }
+              : msg,
+          ),
+        )
+      }, 1000)
+
+      // Simulate design phase after thinking
+      setTimeout(() => {
+        clearInterval(thinkingInterval)
+        setChatMessages((prev) =>
+          prev.map((msg) =>
+            msg.isLoading
+              ? {
+                  ...msg,
+                  generationProgress: {
+                    ...msg.generationProgress!,
+                    stage: "designing",
+                    totalSlides: 7, // Estimated slides
+                    completedSlides: 0,
+                  },
+                }
+              : msg,
+          ),
+        )
+
+        // Simulate slide generation progress
+        let completedSlides = 0
+        const slideNames = [
+          "Title Slide",
+          "Problem Statement",
+          "Solution Overview",
+          "Market Analysis",
+          "Business Model",
+          "Financial Projections",
+          "Call to Action",
+        ]
+
+        const slideInterval = setInterval(() => {
+          if (completedSlides < slideNames.length) {
+            setChatMessages((prev) =>
+              prev.map((msg) =>
+                msg.isLoading
+                  ? {
+                      ...msg,
+                      generationProgress: {
+                        ...msg.generationProgress!,
+                        currentSlide: slideNames[completedSlides],
+                        completedSlides: completedSlides + 1,
+                      },
+                    }
+                  : msg,
+              ),
+            )
+            completedSlides++
+          } else {
+            clearInterval(slideInterval)
+          }
+        }, 800)
+      }, 3000)
 
       // Use streaming generation
       await v0.generateSlidesStreaming(
@@ -135,15 +211,13 @@ function EditorContent() {
         // onChunk
         (chunk: string) => {
           setStreamingContent((prev) => prev + chunk)
-          setChatMessages((prev) =>
-            prev.map((msg) => (msg.isLoading ? { ...msg, content: streamingContent + chunk } : msg)),
-          )
         },
         // onComplete
         async (result) => {
           setIsStreaming(false)
+          clearInterval(thinkingInterval)
 
-          // Remove loading message and add final response
+          // Remove loading message and add completion
           setChatMessages((prev) => prev.filter((msg) => !msg.isLoading))
 
           if (result) {
@@ -175,8 +249,12 @@ function EditorContent() {
             const assistantMessage: ChatMessage = {
               id: (Date.now() + 2).toString(),
               type: "assistant",
-              content: `Perfect! I've created ${result.slides.length} slides for your presentation. Here's what I included:\n\n${result.slides.map((slide, i) => `${i + 1}. ${slide.title}`).join("\n")}\n\n${authUser ? "Your presentation has been saved automatically. " : ""}You can now:\n• Select any slide to edit it specifically\n• Ask me to modify the content or design\n• Change the color theme\n• Add or remove slides`,
+              content: `✅ Your slides have been designed! Check the preview.\n\nI've created ${result.slides.length} slides for your presentation:\n\n${result.slides.map((slide, i) => `${i + 1}. ${slide.title}`).join("\n")}\n\nYou can make further improvements - just tell me what to change!`,
               timestamp: new Date(),
+              generationProgress: {
+                stage: "complete",
+                version: 1,
+              },
             }
             setChatMessages((prev) => [...prev, assistantMessage])
           }
@@ -184,6 +262,7 @@ function EditorContent() {
         // onError
         (error) => {
           setIsStreaming(false)
+          clearInterval(thinkingInterval)
           setChatMessages((prev) => prev.filter((msg) => !msg.isLoading))
 
           const errorMessage: ChatMessage = {
@@ -199,7 +278,6 @@ function EditorContent() {
     [v0, uploadedFile, selectedTheme, projectName, authUser],
   )
 
-  // Add this function after handleInitialGeneration
   const autoSave = useCallback(async () => {
     if (!currentPresentationId || !authUser || slides.length === 0) return
 
@@ -217,7 +295,6 @@ function EditorContent() {
     }
   }, [currentPresentationId, authUser, slides, projectName])
 
-  // Add auto-save effect
   useEffect(() => {
     const saveTimer = setTimeout(() => {
       if (slides.length > 0) {
@@ -697,58 +774,85 @@ function EditorContent() {
           {/* Slide Thumbnails - Scrollable */}
           <ScrollArea className="flex-1">
             <div className="p-2 space-y-2">
-              {slides.map((slide, index) => (
-                <div
-                  key={slide.id}
-                  className={`relative group cursor-pointer rounded-lg border-2 transition-all ${
-                    selectedSlide === slide.id
-                      ? "border-[#027659] bg-[#027659]/5"
-                      : "border-gray-200 hover:border-gray-300 bg-white"
-                  }`}
-                  onClick={() => handleSlideSelect(slide.id, index)}
-                >
-                  {/* Slide Number */}
-                  <div className="absolute -left-2 top-2 z-10">
+              {isStreaming
+                ? // Skeleton thumbnails while loading
+                  Array.from({ length: 7 }, (_, index) => (
                     <div
-                      className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-medium ${
-                        selectedSlide === slide.id
-                          ? "bg-[#027659] text-white"
-                          : "bg-gray-100 text-gray-600 group-hover:bg-gray-200"
-                      }`}
+                      key={`skeleton-${index}`}
+                      className="relative group rounded-lg border-2 border-gray-200 bg-white"
                     >
-                      {index + 1}
-                    </div>
-                  </div>
-
-                  {/* Slide Preview */}
-                  <div className="p-3 pt-4">
-                    <div
-                      className="w-full aspect-video rounded border overflow-hidden text-xs"
-                      style={{
-                        backgroundColor: slide.background,
-                        color: slide.textColor,
-                      }}
-                    >
-                      <div className="p-2 h-full flex flex-col">
-                        <div className="font-bold text-[8px] mb-1 truncate">{slide.title}</div>
-                        <div className="text-[7px] opacity-80 line-clamp-3">{slide.content.substring(0, 60)}...</div>
+                      <div className="absolute -left-2 top-2 z-10">
+                        <div className="w-6 h-6 rounded-full bg-gray-200 animate-pulse"></div>
+                      </div>
+                      <div className="p-3 pt-4">
+                        <div className="w-full aspect-video rounded border overflow-hidden bg-gray-200 animate-pulse">
+                          <div className="p-2 h-full flex flex-col space-y-2">
+                            <div className="h-2 bg-gray-300 rounded animate-pulse"></div>
+                            <div className="h-1 bg-gray-300 rounded animate-pulse w-3/4"></div>
+                            <div className="h-1 bg-gray-300 rounded animate-pulse w-1/2"></div>
+                          </div>
+                        </div>
                       </div>
                     </div>
-                  </div>
+                  ))
+                : slides.map((slide, index) => (
+                    <div
+                      key={slide.id}
+                      className={`relative group cursor-pointer rounded-lg border-2 transition-all ${
+                        selectedSlide === slide.id
+                          ? "border-[#027659] bg-[#027659]/5"
+                          : "border-gray-200 hover:border-gray-300 bg-white"
+                      }`}
+                      onClick={() => handleSlideSelect(slide.id, index)}
+                    >
+                      {/* Slide Number */}
+                      <div className="absolute -left-2 top-2 z-10">
+                        <div
+                          className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-medium ${
+                            selectedSlide === slide.id
+                              ? "bg-[#027659] text-white"
+                              : "bg-gray-100 text-gray-600 group-hover:bg-gray-200"
+                          }`}
+                        >
+                          {index + 1}
+                        </div>
+                      </div>
 
-                  {/* Hover Actions */}
-                  <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <div className="flex space-x-1">
-                      <Button size="icon" variant="ghost" className="h-6 w-6 bg-white/80 hover:bg-white">
-                        <Copy className="h-3 w-3" />
-                      </Button>
-                      <Button size="icon" variant="ghost" className="h-6 w-6 bg-white/80 hover:bg-white">
-                        <Trash2 className="h-3 w-3 text-red-500" />
-                      </Button>
+                      {/* Slide Preview */}
+                      <div className="p-3 pt-4">
+                        <div
+                          className="w-full aspect-video rounded border overflow-hidden text-xs"
+                          style={{
+                            backgroundColor: slide.background,
+                            color: slide.textColor,
+                          }}
+                        >
+                          <div className="p-2 h-full flex flex-col">
+                            <div className="font-bold text-[8px] mb-1 truncate">{slide.title}</div>
+                            <div className="text-[7px] opacity-80 line-clamp-3">
+                              {slide.content.substring(0, 60)}...
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Hover Actions */}
+                      <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <div className="flex space-x-1">
+                          <Button size="icon" variant="ghost" className="h-6 w-6 bg-white/80 hover:bg-white">
+                            <Copy className="h-3 w-3" />
+                          </Button>
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            className="h-6 w-6 bg-white/80 hover:bg-white text-red-500 hover:text-red-600"
+                          >
+                            <Trash2 className="h-3 w-3" />
+                          </Button>
+                        </div>
+                      </div>
                     </div>
-                  </div>
-                </div>
-              ))}
+                  ))}
             </div>
           </ScrollArea>
         </div>
@@ -802,7 +906,33 @@ function EditorContent() {
 
           {/* Slide Preview Area */}
           <div className="flex-1 flex items-center justify-center bg-gray-100 p-8">
-            {currentSlide ? (
+            {isStreaming ? (
+              <div className="relative">
+                {/* Skeleton Slide */}
+                <div className="w-[960px] h-[540px] shadow-2xl rounded-lg overflow-hidden border-4 border-white bg-gradient-to-br from-gray-200 to-gray-300 animate-pulse">
+                  <div className="h-full p-12 flex flex-col justify-center items-center">
+                    <div className="text-center space-y-6">
+                      <div className="w-16 h-16 bg-[#027659]/20 rounded-2xl flex items-center justify-center mx-auto animate-pulse">
+                        <Loader2 className="w-8 h-8 text-[#027659] animate-spin" />
+                      </div>
+                      <h2 className="text-4xl font-bold text-gray-600">SlydPRO Designing</h2>
+                      <p className="text-xl text-gray-500">Creating your presentation slides...</p>
+                      <div className="flex space-x-2 justify-center">
+                        <div className="w-3 h-3 bg-[#027659] rounded-full animate-bounce"></div>
+                        <div
+                          className="w-3 h-3 bg-[#027659] rounded-full animate-bounce"
+                          style={{ animationDelay: "0.1s" }}
+                        ></div>
+                        <div
+                          className="w-3 h-3 bg-[#027659] rounded-full animate-bounce"
+                          style={{ animationDelay: "0.2s" }}
+                        ></div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ) : currentSlide ? (
               <div className="relative">
                 {/* Main Slide */}
                 <div
@@ -945,27 +1075,93 @@ function EditorContent() {
                   </Avatar>
                   <div className="flex-1 min-w-0">
                     <div
-                      className={`rounded-2xl px-4 py-3 max-w-full ${
+                      className={`rounded-2xl px-4 py-3 max-w-full relative group ${
                         message.type === "user" ? "bg-[#027659] text-white ml-4" : "bg-gray-100 text-gray-900 mr-4"
                       }`}
                     >
                       {message.isLoading ? (
-                        <div className="flex items-center space-x-2">
-                          <div className="flex space-x-1">
-                            <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"></div>
-                            <div
-                              className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"
-                              style={{ animationDelay: "0.1s" }}
-                            ></div>
-                            <div
-                              className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"
-                              style={{ animationDelay: "0.2s" }}
-                            ></div>
-                          </div>
-                          <span className="text-sm">Thinking...</span>
+                        <div className="space-y-3">
+                          {message.generationProgress?.stage === "thinking" && (
+                            <div className="flex items-center space-x-2">
+                              <div className="flex space-x-1">
+                                <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"></div>
+                                <div
+                                  className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"
+                                  style={{ animationDelay: "0.1s" }}
+                                ></div>
+                                <div
+                                  className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"
+                                  style={{ animationDelay: "0.2s" }}
+                                ></div>
+                              </div>
+                              <span className="text-sm">
+                                Thinking for {message.generationProgress.thinkingTime} seconds...
+                              </span>
+                            </div>
+                          )}
+
+                          {message.generationProgress?.stage === "designing" && (
+                            <div className="border border-gray-200 rounded-lg p-3 bg-white">
+                              <div className="flex items-center justify-between mb-2">
+                                <span className="text-sm font-medium text-gray-700">
+                                  Version {message.generationProgress.version}
+                                </span>
+                                <span className="text-xs text-gray-500">Designing</span>
+                              </div>
+                              <div className="space-y-2">
+                                {Array.from({ length: message.generationProgress.totalSlides || 0 }, (_, i) => (
+                                  <div key={i} className="flex items-center space-x-2 text-xs">
+                                    <div className="w-4 h-4 flex items-center justify-center">
+                                      {i < (message.generationProgress?.completedSlides || 0) ? (
+                                        <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                                      ) : i === (message.generationProgress?.completedSlides || 0) ? (
+                                        <Loader2 className="w-3 h-3 animate-spin text-blue-500" />
+                                      ) : (
+                                        <div className="w-2 h-2 bg-gray-300 rounded-full"></div>
+                                      )}
+                                    </div>
+                                    <span
+                                      className={`${i < (message.generationProgress?.completedSlides || 0) ? "text-green-600" : i === (message.generationProgress?.completedSlides || 0) ? "text-blue-600" : "text-gray-400"}`}
+                                    >
+                                      Slide {i + 1}:{" "}
+                                      {i === (message.generationProgress?.completedSlides || 0)
+                                        ? message.generationProgress?.currentSlide
+                                        : `Slide ${i + 1}`}
+                                    </span>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
                         </div>
                       ) : (
                         <p className="text-sm whitespace-pre-wrap">{message.content}</p>
+                      )}
+
+                      {/* Message Actions for User Messages */}
+                      {message.type === "user" && !message.isLoading && (
+                        <div className="absolute -right-2 top-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <div className="flex space-x-1">
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              className="h-6 w-6 bg-white/90 hover:bg-white shadow-sm"
+                              onClick={() => navigator.clipboard.writeText(message.content)}
+                            >
+                              <Copy className="h-3 w-3" />
+                            </Button>
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              className="h-6 w-6 bg-white/90 hover:bg-white shadow-sm text-red-500 hover:text-red-600"
+                              onClick={() => {
+                                setChatMessages((prev) => prev.filter((m) => m.id !== message.id))
+                              }}
+                            >
+                              <Trash2 className="h-3 w-3" />
+                            </Button>
+                          </div>
+                        </div>
                       )}
                     </div>
                     <span className="text-xs text-gray-500 mt-1 block">
@@ -1017,12 +1213,26 @@ function EditorContent() {
                     </Button>
                   </div>
                   <Button
-                    onClick={handleChatSubmit}
+                    onClick={
+                      isStreaming
+                        ? () => {
+                            setIsStreaming(false)
+                            setChatMessages((prev) => prev.filter((msg) => !msg.isLoading))
+                          }
+                        : handleChatSubmit
+                    }
                     size="sm"
-                    disabled={!inputMessage.trim() || v0.isLoading}
-                    className="bg-[#027659] hover:bg-[#065f46] text-white rounded-lg px-4 py-2"
+                    disabled={!isStreaming && !inputMessage.trim()}
+                    className={`${isStreaming ? "bg-red-600 hover:bg-red-700" : "bg-[#027659] hover:bg-[#065f46]"} text-white rounded-lg px-4 py-2`}
                   >
-                    <Send className="h-4 w-4" />
+                    {isStreaming ? (
+                      <>
+                        <div className="w-3 h-3 bg-white rounded-sm mr-2"></div>
+                        Stop
+                      </>
+                    ) : (
+                      <Send className="h-4 w-4" />
+                    )}
                   </Button>
                 </div>
               </div>
