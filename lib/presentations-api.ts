@@ -23,7 +23,6 @@ export class PresentationsAPI {
     description?: string
     slides: any[]
     thumbnail?: string
-    category?: string
   }): Promise<Presentation> {
     try {
       const headers = await this.getAuthHeaders()
@@ -36,7 +35,6 @@ export class PresentationsAPI {
           description: data.description || "",
           slides: data.slides,
           thumbnail: data.thumbnail || data.slides[0]?.background || "#027659",
-          category: data.category || "ai-generated",
           is_starred: false,
           views: 0,
         }),

@@ -325,7 +325,6 @@ Focus on creating presentation-ready slides that look professional and modern.`
                     name: projectName,
                     slides: designedSlides,
                     thumbnail: designedSlides[0]?.background,
-                    category: "ai-generated",
                   })
 
                   // Update URL with first slide title

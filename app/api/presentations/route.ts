@@ -40,9 +40,9 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const { name, description, slides, thumbnail, category, is_starred, views } = await request.json()
+    const { name, description, slides, thumbnail, is_starred, views } = await request.json()
 
-    console.log("Creating presentation with data:", { name, slidesCount: slides?.length, category })
+    console.log("Creating presentation with data:", { name, slidesCount: slides?.length })
 
     // Get the session from the request headers
     const authHeader = request.headers.get("authorization")
@@ -77,7 +77,6 @@ export async function POST(request: NextRequest) {
           description: description || "",
           slides: slides || [],
           thumbnail: thumbnail || "#027659",
-          category: category || "ai-generated",
           is_starred: is_starred || false,
           views: views || 0,
         },

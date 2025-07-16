@@ -27,7 +27,6 @@ export interface Presentation {
   thumbnail?: string
   is_starred: boolean
   views: number
-  category?: string
   created_at: string
   updated_at: string
 }

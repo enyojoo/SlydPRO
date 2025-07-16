@@ -24,7 +24,6 @@ CREATE TABLE IF NOT EXISTS presentations (
   thumbnail TEXT,
   is_starred BOOLEAN DEFAULT FALSE,
   views INTEGER DEFAULT 0,
-  category VARCHAR(50),
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
