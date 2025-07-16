@@ -21,10 +21,10 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
       return NextResponse.json({ error: "Invalid session" }, { status: 401 })
     }
 
-    // Fetch the specific presentation
+    // Fetch the specific presentation - only use existing columns
     const { data: presentation, error } = await supabase
       .from("presentations")
-      .select("*")
+      .select("id, user_id, name, slides, thumbnail, created_at, updated_at")
       .eq("id", id)
       .eq("user_id", user.id)
       .single()
@@ -62,7 +62,7 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
       return NextResponse.json({ error: "Invalid session" }, { status: 401 })
     }
 
-    // Update the presentation
+    // Update the presentation - only use existing columns
     const { data: presentation, error } = await supabase
       .from("presentations")
       .update({
@@ -72,7 +72,7 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
       })
       .eq("id", id)
       .eq("user_id", user.id)
-      .select()
+      .select("id, user_id, name, slides, thumbnail, created_at, updated_at")
       .single()
 
     if (error) {

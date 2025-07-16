@@ -19,10 +19,10 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Invalid session" }, { status: 401 })
     }
 
-    // Fetch user's presentations
+    // Fetch user's presentations - only use existing columns
     const { data: presentations, error } = await supabase
       .from("presentations")
-      .select("*")
+      .select("id, user_id, name, slides, thumbnail, created_at, updated_at")
       .eq("user_id", user.id)
       .order("updated_at", { ascending: false })
 
@@ -67,7 +67,7 @@ export async function POST(request: NextRequest) {
 
     console.log("User authenticated:", user.id)
 
-    // Create new presentation
+    // Create new presentation - only use existing columns
     const { data: presentation, error } = await supabase
       .from("presentations")
       .insert([
@@ -78,7 +78,7 @@ export async function POST(request: NextRequest) {
           thumbnail: thumbnail || "#027659",
         },
       ])
-      .select()
+      .select("id, user_id, name, slides, thumbnail, created_at, updated_at")
       .single()
 
     if (error) {

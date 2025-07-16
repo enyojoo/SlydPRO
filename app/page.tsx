@@ -231,8 +231,9 @@ export default function SlydPROHome() {
           Authorization: `Bearer ${session.access_token}`,
         },
         body: JSON.stringify({
-          ...selectedPresentation,
           name: newName.trim(),
+          slides: selectedPresentation.slides,
+          thumbnail: selectedPresentation.thumbnail,
         }),
       })
 
@@ -397,10 +398,21 @@ export default function SlydPROHome() {
                             color: firstSlide?.textColor || "#ffffff",
                           }}
                         >
-                          <h3 className="text-lg font-bold mb-2 line-clamp-2 leading-tight">{firstSlide.title}</h3>
+                          <h3 className="text-lg font-bold mb-2 line-clamp-2 leading-tight flex items-center">
+                            {firstSlide.designElements?.icons?.[0] && (
+                              <span className="mr-2">{firstSlide.designElements.icons[0]}</span>
+                            )}
+                            {firstSlide.title}
+                          </h3>
                           <p className="text-sm opacity-80 line-clamp-3 leading-relaxed">
                             {firstSlide.content.substring(0, 120)}...
                           </p>
+                          {firstSlide.layout === "chart" && (
+                            <div className="mt-2 flex items-center">
+                              <div className="w-4 h-4 border border-white/60 rounded mr-2"></div>
+                              <span className="text-xs opacity-60">Chart</span>
+                            </div>
+                          )}
                         </div>
                       ) : (
                         <div
@@ -420,6 +432,8 @@ export default function SlydPROHome() {
                           <div className="flex items-center text-xs text-muted-foreground">
                             <Clock className="h-3 w-3 mr-1" />
                             <span>{new Date(presentation.created_at).toLocaleDateString()}</span>
+                            <span className="mx-2">•</span>
+                            <span>{presentation.slides.length} slides</span>
                           </div>
                         </div>
                         <DropdownMenu>

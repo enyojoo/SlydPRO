@@ -68,7 +68,11 @@ export class PresentationsAPI {
         "Content-Type": "application/json",
         ...(await this.getAuthHeaders()),
       },
-      body: JSON.stringify(data),
+      body: JSON.stringify({
+        name: data.name,
+        slides: data.slides,
+        thumbnail: data.thumbnail,
+      }),
     })
 
     if (!response.ok) {
