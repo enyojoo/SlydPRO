@@ -221,13 +221,14 @@ function EditorContent({ presentationId, slideSlug }: EditorContentProps) {
                 }
               }
 
-              // Remove loading message and show completion with progress summary
+              // Update loading message to show completion with progress intact
               setChatMessages((prev) => {
-                const filtered = prev.filter((msg) => !msg.isLoading)
-                const completionMessage: ChatMessage = {
-                  id: (Date.now() + 2).toString(),
-                  type: "assistant",
-                  content: `✅ **Presentation Complete!**
+                return prev.map((msg) =>
+                  msg.isLoading
+                    ? {
+                        ...msg,
+                        isLoading: false,
+                        content: `✅ **Presentation Complete!**
 
 I've successfully created ${result.slides.length} slides for your presentation:
 
@@ -241,15 +242,15 @@ ${result.slides.map((slide, i) => `${i + 1}. ${slide.title}`).join("\n")}
 • Export your presentation
 
 What would you like to improve?`,
-                  timestamp: new Date(),
-                  generationProgress: {
-                    stage: "complete",
-                    version: 1,
-                    totalSlides: result.slides.length,
-                    completedSlides: result.slides.length,
-                  },
-                }
-                return [...filtered, completionMessage]
+                        generationProgress: {
+                          stage: "complete",
+                          version: 1,
+                          totalSlides: result.slides.length,
+                          completedSlides: result.slides.length,
+                        },
+                      }
+                    : msg,
+                )
               })
             }
           },
@@ -422,11 +423,12 @@ Please try again or describe your presentation differently. I'm here to help!`,
             }
 
             setChatMessages((prev) => {
-              const filtered = prev.filter((msg) => !msg.isLoading)
-              const completionMessage: ChatMessage = {
-                id: (Date.now() + 2).toString(),
-                type: "assistant",
-                content: `✅ **Slide Updated!**
+              return prev.map((msg) =>
+                msg.isLoading
+                  ? {
+                      ...msg,
+                      isLoading: false,
+                      content: `✅ **Slide Updated!**
 
 I've successfully updated "${slide.title}" based on your request.
 
@@ -437,15 +439,15 @@ I've successfully updated "${slide.title}" based on your request.
 • Ask me to adjust colors or themes
 
 What else would you like to improve?`,
-                timestamp: new Date(),
-                generationProgress: {
-                  stage: "complete",
-                  version: loadingMessage.generationProgress!.version,
-                  totalSlides: 1,
-                  completedSlides: 1,
-                },
-              }
-              return [...filtered, completionMessage]
+                      generationProgress: {
+                        stage: "complete",
+                        version: loadingMessage.generationProgress!.version,
+                        totalSlides: 1,
+                        completedSlides: 1,
+                      },
+                    }
+                  : msg,
+              )
             })
           }
         }
@@ -496,24 +498,54 @@ What else would you like to improve?`,
             setCurrentSlideIndex(0)
           }
 
-          // Update URL with first slide
-          if (currentPresentationId && themedSlides.length > 0) {
-            const firstSlideTitle = themedSlides[0].title
-            const slugTitle = firstSlideTitle
-              .toLowerCase()
-              .replace(/[^a-z0-9]+/g, "-")
-              .replace(/^-|-$/g, "")
-            router.replace(`/editor/${currentPresentationId}/${slugTitle}`)
+          // Create or update presentation and URL
+          if (authUser) {
+            try {
+              if (!currentPresentationId) {
+                // Create new presentation
+                const presentation = await presentationsAPI.createPresentation({
+                  name: projectName,
+                  slides: themedSlides,
+                  thumbnail: themedSlides[0]?.background,
+                  category: "ai-generated",
+                })
+                setCurrentPresentationId(presentation.id)
+
+                const firstSlideTitle = themedSlides[0]?.title || "untitled-slide"
+                const slugTitle = firstSlideTitle
+                  .toLowerCase()
+                  .replace(/[^a-z0-9]+/g, "-")
+                  .replace(/^-|-$/g, "")
+                router.replace(`/editor/${presentation.id}/${slugTitle}`)
+              } else {
+                // Update existing presentation
+                await presentationsAPI.updatePresentation(currentPresentationId, {
+                  name: projectName,
+                  slides: themedSlides,
+                  thumbnail: themedSlides[0]?.background,
+                })
+
+                const firstSlideTitle = themedSlides[0]?.title || "untitled-slide"
+                const slugTitle = firstSlideTitle
+                  .toLowerCase()
+                  .replace(/[^a-z0-9]+/g, "-")
+                  .replace(/^-|-$/g, "")
+                router.replace(`/editor/${currentPresentationId}/${slugTitle}`)
+              }
+            } catch (error) {
+              console.error("Failed to save presentation:", error)
+            }
           }
 
           setChatMessages((prev) => {
-            const filtered = prev.filter((msg) => !msg.isLoading)
-            const completionMessage: ChatMessage = {
-              id: (Date.now() + 2).toString(),
-              type: "assistant",
-              content:
-                slides.length > 0
-                  ? `✅ **Presentation Updated!**
+            return prev.map((msg) =>
+              msg.isLoading
+                ? {
+                    ...msg,
+                    isLoading: false,
+                    content:
+                      slides.length > 0
+                        ? `✅ **Presentation Updated!**
 
 I've successfully updated all ${result.slides.length} slides based on your feedback:
 
@@ -526,7 +558,7 @@ ${result.slides.map((slide, i) => `${i + 1}. ${slide.title}`).join("\n")}
 • Add or remove slides
 
 What would you like to adjust next?`
-                  : `✅ **New Presentation Created!**
+                        : `✅ **New Presentation Created!**
 
 I've created ${result.slides.length} slides for you:
 
@@ -539,15 +571,15 @@ ${result.slides.map((slide, i) => `${i + 1}. ${slide.title}`).join("\n")}
 • Export when ready
 
 How can I help you improve it?`,
-              timestamp: new Date(),
-              generationProgress: {
-                stage: "complete",
-                version: loadingMessage.generationProgress!.version,
-                totalSlides: result.slides.length,
-                completedSlides: result.slides.length,
-              },
-            }
-            return [...filtered, completionMessage]
+                    generationProgress: {
+                      stage: "complete",
+                      version: loadingMessage.generationProgress!.version,
+                      totalSlides: result.slides.length,
+                      completedSlides: result.slides.length,
+                    },
+                  }
+                : msg,
+            )
           })
         }
       }
@@ -737,7 +769,7 @@ What would you like to change about this slide?`,
   useEffect(() => {
     if (isInitialized) return
 
-    // Handle URL-based loading
+    // Handle URL-based loading first
     if (presentationId) {
       const loadProject = async () => {
         try {
@@ -794,7 +826,7 @@ What would you like to work on?`,
 
       loadProject()
     } else {
-      // Handle legacy URL parameters
+      // Handle legacy URL parameters or new presentation
       const searchProjectId = searchParams.get("project")
 
       if (searchProjectId) {
@@ -866,7 +898,7 @@ What presentation would you like to create today?`,
     }
 
     setIsInitialized(true)
-  }, [authUser, messages, presentationId, slideSlug, router])
+  }, [authUser, messages, presentationId, slideSlug, router, searchParams])
 
   // Presentation Mode View
   if (isPresentationMode) {
@@ -1289,9 +1321,9 @@ What presentation would you like to create today?`,
                         message.type === "user" ? "bg-[#027659] text-white ml-4" : "bg-gray-100 text-gray-900 mr-4"
                       }`}
                     >
-                      {message.isLoading ? (
+                      {message.isLoading || message.generationProgress ? (
                         <div className="space-y-3">
-                          {message.generationProgress?.stage === "thinking" && (
+                          {message.isLoading && message.generationProgress?.stage === "thinking" && (
                             <div className="flex items-center space-x-2">
                               <div className="flex space-x-1">
                                 <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"></div>
@@ -1310,13 +1342,18 @@ What presentation would you like to create today?`,
                             </div>
                           )}
 
-                          {message.generationProgress?.stage === "designing" && (
-                            <div className="border border-gray-200 rounded-lg p-3 bg-white">
+                          {message.generationProgress?.stage === "designing" ||
+                          message.generationProgress?.stage === "complete" ? (
+                            <div className="border border-gray-200 rounded-lg p-3 bg-white mb-3">
                               <div className="flex items-center justify-between mb-2">
                                 <span className="text-sm font-medium text-gray-700">
                                   Version {message.generationProgress.version}
                                 </span>
-                                <span className="text-xs text-gray-500">Designing</span>
+                                <span
+                                  className={`text-xs ${message.generationProgress.stage === "complete" ? "text-green-600" : "text-gray-500"}`}
+                                >
+                                  {message.generationProgress.stage === "complete" ? "Complete" : "Designing"}
+                                </span>
                               </div>
                               <div className="space-y-2">
                                 {Array.from({ length: message.generationProgress.totalSlides || 0 }, (_, i) => (
@@ -1324,17 +1361,18 @@ What presentation would you like to create today?`,
                                     <div className="w-4 h-4 flex items-center justify-center">
                                       {i < (message.generationProgress?.completedSlides || 0) ? (
                                         <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                                      ) : i === (message.generationProgress?.completedSlides || 0) ? (
+                                      ) : i === (message.generationProgress?.completedSlides || 0) &&
+                                        message.isLoading ? (
                                         <Loader2 className="w-3 h-3 animate-spin text-blue-500" />
                                       ) : (
                                         <div className="w-2 h-2 bg-gray-300 rounded-full"></div>
                                       )}
                                     </div>
                                     <span
-                                      className={`${i < (message.generationProgress?.completedSlides || 0) ? "text-green-600" : i === (message.generationProgress?.completedSlides || 0) ? "text-blue-600" : "text-gray-400"}`}
+                                      className={`${i < (message.generationProgress?.completedSlides || 0) ? "text-green-600" : i === (message.generationProgress?.completedSlides || 0) && message.isLoading ? "text-blue-600" : "text-gray-400"}`}
                                     >
                                       Slide {i + 1}:{" "}
-                                      {i === (message.generationProgress?.completedSlides || 0)
+                                      {i === (message.generationProgress?.completedSlides || 0) && message.isLoading
                                         ? message.generationProgress?.currentSlide
                                         : `Slide ${i + 1}`}
                                     </span>
@@ -1342,6 +1380,10 @@ What presentation would you like to create today?`,
                                 ))}
                               </div>
                             </div>
+                          ) : null}
+
+                          {!message.isLoading && message.content && (
+                            <p className="text-sm whitespace-pre-wrap">{message.content}</p>
                           )}
                         </div>
                       ) : (

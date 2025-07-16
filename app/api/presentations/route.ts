@@ -40,7 +40,9 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const { name, description, slides, thumbnail, category } = await request.json()
+    const { name, description, slides, thumbnail, category, is_starred, views } = await request.json()
+
+    console.log("Creating presentation with data:", { name, slidesCount: slides?.length, category })
 
     // Get the session from the request headers
     const authHeader = request.headers.get("authorization")
@@ -64,13 +66,13 @@ export async function POST(request: NextRequest) {
       .insert([
         {
           user_id: user.id,
-          name,
-          description,
+          name: name || "Untitled Presentation",
+          description: description || "",
           slides: slides || [],
-          thumbnail,
-          category,
-          is_starred: false,
-          views: 0,
+          thumbnail: thumbnail || "#027659",
+          category: category || "ai-generated",
+          is_starred: is_starred || false,
+          views: views || 0,
         },
       ])
       .select()
@@ -81,6 +83,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Failed to create presentation" }, { status: 500 })
     }
 
+    console.log("Presentation created successfully:", presentation.id)
     return NextResponse.json(presentation)
   } catch (error) {
     console.error("Presentation creation error:", error)

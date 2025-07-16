@@ -23,14 +23,26 @@ export class PresentationsAPI {
         "Content-Type": "application/json",
         ...(await this.getAuthHeaders()),
       },
-      body: JSON.stringify(data),
+      body: JSON.stringify({
+        name: data.name,
+        description: data.description || "",
+        slides: data.slides,
+        thumbnail: data.thumbnail || data.slides[0]?.background || "#027659",
+        category: data.category || "ai-generated",
+        is_starred: false,
+        views: 0,
+      }),
     })
 
     if (!response.ok) {
+      const errorText = await response.text()
+      console.error("Create presentation error:", errorText)
       throw new Error("Failed to create presentation")
     }
 
-    return response.json()
+    const result = await response.json()
+    console.log("Presentation created:", result)
+    return result
   }
 
   async updatePresentation(id: string, data: Partial<Presentation>): Promise<Presentation> {
