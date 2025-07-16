@@ -1,5 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { supabase } from "@/lib/supabase"
+import { generateSVGThumbnail } from "@/lib/thumbnail-generator"
 
 export async function GET(request: NextRequest, { params }: { params: { id: string } }) {
   try {
@@ -21,10 +22,10 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
       return NextResponse.json({ error: "Invalid session" }, { status: 401 })
     }
 
-    // Fetch the specific presentation - only use existing columns
+    // Fetch specific presentation
     const { data: presentation, error } = await supabase
       .from("presentations")
-      .select("id, user_id, name, slides, thumbnail, created_at, updated_at")
+      .select("*")
       .eq("id", id)
       .eq("user_id", user.id)
       .single()
@@ -44,7 +45,7 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
 export async function PUT(request: NextRequest, { params }: { params: { id: string } }) {
   try {
     const { id } = params
-    const updateData = await request.json()
+    const { name, slides } = await request.json()
 
     // Get the session from the request headers
     const authHeader = request.headers.get("authorization")
@@ -62,17 +63,23 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
       return NextResponse.json({ error: "Invalid session" }, { status: 401 })
     }
 
-    // Update the presentation - only use existing columns
+    // Generate new thumbnail if slides are provided
+    let thumbnail = undefined
+    if (slides && slides.length > 0) {
+      thumbnail = generateSVGThumbnail(slides[0])
+    }
+
+    // Update presentation
+    const updateData: any = { name }
+    if (slides) updateData.slides = slides
+    if (thumbnail) updateData.thumbnail = thumbnail
+
     const { data: presentation, error } = await supabase
       .from("presentations")
-      .update({
-        name: updateData.name,
-        slides: updateData.slides,
-        thumbnail: updateData.thumbnail,
-      })
+      .update(updateData)
       .eq("id", id)
       .eq("user_id", user.id)
-      .select("id, user_id, name, slides, thumbnail, created_at, updated_at")
+      .select()
       .single()
 
     if (error) {
@@ -107,7 +114,7 @@ export async function DELETE(request: NextRequest, { params }: { params: { id: s
       return NextResponse.json({ error: "Invalid session" }, { status: 401 })
     }
 
-    // Delete the presentation
+    // Delete presentation
     const { error } = await supabase.from("presentations").delete().eq("id", id).eq("user_id", user.id)
 
     if (error) {
@@ -117,7 +124,7 @@ export async function DELETE(request: NextRequest, { params }: { params: { id: s
 
     return NextResponse.json({ success: true })
   } catch (error) {
-    console.error("Presentation delete error:", error)
+    console.error("Presentation deletion error:", error)
     return NextResponse.json({ error: "Failed to delete presentation" }, { status: 500 })
   }
 }

@@ -14,16 +14,13 @@ CREATE TABLE IF NOT EXISTS users (
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- Create presentations table
+-- Create presentations table with correct schema
 CREATE TABLE IF NOT EXISTS presentations (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id UUID REFERENCES users(id) ON DELETE CASCADE,
   name VARCHAR(255) NOT NULL,
-  description TEXT,
   slides JSONB NOT NULL DEFAULT '[]',
   thumbnail TEXT,
-  is_starred BOOLEAN DEFAULT FALSE,
-  views INTEGER DEFAULT 0,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );

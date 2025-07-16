@@ -18,13 +18,16 @@ import { Footer } from "@/components/footer"
 import { PLATFORM_CONFIG } from "@/lib/constants"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { Edit2, Trash2 } from "lucide-react"
-import { presentationsAPI } from "@/lib/presentations-api"
 
 interface Presentation {
   id: string
   name: string
+  description?: string
   slides: any[]
   thumbnail?: string
+  is_starred: boolean
+  views: number
+  category?: string
   created_at: string
   updated_at: string
 }
@@ -93,47 +96,20 @@ export default function SlydPROHome() {
       return
     }
 
-    try {
-      console.log("Creating presentation with message:", inputMessage.substring(0, 50) + "...")
-
-      // Create presentation immediately with default name
-      const presentation = await presentationsAPI.createPresentation({
-        name: "Untitled Presentation",
-        slides: [], // Empty slides initially
-        thumbnail: "#027659",
-      })
-
-      console.log("Presentation created successfully:", presentation.id)
-
-      // Add message to chat context
-      const userMessage = {
-        id: Date.now().toString(),
-        type: "user" as const,
-        content: inputMessage,
-        timestamp: new Date(),
-      }
-
-      clearMessages()
-      addMessage(userMessage)
-
-      // Navigate to editor with presentation ID and slug from default name
-      const slugTitle = "untitled-presentation"
-      router.push(`/editor/${presentation.id}/${slugTitle}`)
-    } catch (error) {
-      console.error("Failed to create presentation:", error)
-
-      // Show more specific error message
-      const errorMessage = error instanceof Error ? error.message : "Unknown error occurred"
-
-      if (errorMessage.includes("No valid session")) {
-        setShowAuthDialog(true)
-      } else {
-        alert(`Failed to create presentation: ${errorMessage}. Please try signing out and back in.`)
-      }
+    // Add message to chat context
+    const userMessage = {
+      id: Date.now().toString(),
+      type: "user" as const,
+      content: inputMessage,
+      timestamp: new Date(),
     }
+
+    clearMessages()
+    addMessage(userMessage)
+    router.push("/editor")
   }
 
-  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
     if (file) {
       if (!isAuthenticated) {
@@ -141,42 +117,16 @@ export default function SlydPROHome() {
         return
       }
 
-      // Check if there's text in the input - file upload requires context
-      if (!inputMessage.trim()) {
-        // You could show an error message here or set a default message
-        setInputMessage(`Create a presentation from the uploaded file: ${file.name}`)
-        return
+      const userMessage = {
+        id: Date.now().toString(),
+        type: "user" as const,
+        content: `Uploaded: ${file.name}`,
+        timestamp: new Date(),
       }
 
-      try {
-        // Create presentation immediately with default name
-        const presentation = await presentationsAPI.createPresentation({
-          name: `${file.name.split(".")[0]} Presentation`,
-          slides: [], // Empty slides initially
-          thumbnail: "#027659",
-        })
-
-        // Add file upload message to chat context
-        const userMessage = {
-          id: Date.now().toString(),
-          type: "user" as const,
-          content: `${inputMessage}\n\n📎 Uploaded: ${file.name}`,
-          timestamp: new Date(),
-        }
-
-        clearMessages()
-        addMessage(userMessage)
-
-        // Navigate to editor with presentation ID and slug
-        const slugTitle = presentation.name
-          .toLowerCase()
-          .replace(/[^a-z0-9]+/g, "-")
-          .replace(/^-|-$/g, "")
-        router.push(`/editor/${presentation.id}/${slugTitle}`)
-      } catch (error) {
-        console.error("Failed to create presentation:", error)
-        alert("Failed to upload file. Please try again.")
-      }
+      clearMessages()
+      addMessage(userMessage)
+      router.push(`/editor?file=${encodeURIComponent(file.name)}`)
     }
   }
 
@@ -231,9 +181,8 @@ export default function SlydPROHome() {
           Authorization: `Bearer ${session.access_token}`,
         },
         body: JSON.stringify({
+          ...selectedPresentation,
           name: newName.trim(),
-          slides: selectedPresentation.slides,
-          thumbnail: selectedPresentation.thumbnail,
         }),
       })
 
@@ -311,19 +260,7 @@ export default function SlydPROHome() {
                   <Button
                     variant="ghost"
                     size="sm"
-                    onClick={() => {
-                      if (!inputMessage.trim()) {
-                        // Focus the textarea and show a hint
-                        const textarea = document.querySelector("textarea")
-                        if (textarea) {
-                          textarea.focus()
-                          textarea.placeholder =
-                            "Please describe what kind of presentation you want before uploading a file..."
-                        }
-                        return
-                      }
-                      fileInputRef.current?.click()
-                    }}
+                    onClick={() => fileInputRef.current?.click()}
                     className="text-muted-foreground hover:text-foreground hover:bg-muted rounded-lg px-2 sm:px-3 py-2"
                   >
                     <Upload className="h-4 w-4 mr-1 sm:mr-2" />
@@ -373,53 +310,35 @@ export default function SlydPROHome() {
                   <Card
                     key={presentation.id}
                     className="cursor-pointer hover:shadow-lg transition-all duration-200 border border-border hover:border-muted-foreground bg-card overflow-hidden"
-                    onClick={() => {
-                      const firstSlideTitle = presentation.slides[0]?.title || "untitled-slide"
-                      const slugTitle = firstSlideTitle
-                        .toLowerCase()
-                        .replace(/[^a-z0-9]+/g, "-")
-                        .replace(/^-|-$/g, "")
-                      router.push(`/editor/${presentation.id}/${slugTitle}`)
-                    }}
+                    onClick={() => router.push(`/editor?project=${presentation.id}`)}
                   >
-                    {/* Generated Slide Thumbnail */}
-                    <div className="w-full h-40 relative overflow-hidden">
-                      {presentation.thumbnail && presentation.thumbnail.startsWith("data:image/svg+xml") ? (
+                    {/* Actual Slide Thumbnail */}
+                    <div className="w-full h-40 flex flex-col justify-center p-4 text-white relative overflow-hidden">
+                      {presentation.thumbnail ? (
                         <img
                           src={presentation.thumbnail || "/placeholder.svg"}
-                          alt={`${presentation.name} thumbnail`}
-                          className="w-full h-full object-cover"
+                          alt={presentation.name}
+                          className="absolute inset-0 w-full h-full object-cover"
                         />
                       ) : firstSlide ? (
                         <div
-                          className="w-full h-full flex flex-col justify-center p-4 text-white"
                           style={{
-                            backgroundColor: firstSlide?.background || presentation.thumbnail || "#027659",
+                            backgroundColor: firstSlide?.background || "#027659",
                             color: firstSlide?.textColor || "#ffffff",
                           }}
+                          className="absolute inset-0 w-full h-full flex flex-col justify-center p-4"
                         >
-                          <h3 className="text-lg font-bold mb-2 line-clamp-2 leading-tight flex items-center">
-                            {firstSlide.designElements?.icons?.[0] && (
-                              <span className="mr-2">{firstSlide.designElements.icons[0]}</span>
-                            )}
-                            {firstSlide.title}
-                          </h3>
+                          <h3 className="text-lg font-bold mb-2 line-clamp-2 leading-tight">{firstSlide.title}</h3>
                           <p className="text-sm opacity-80 line-clamp-3 leading-relaxed">
                             {firstSlide.content.substring(0, 120)}...
                           </p>
-                          {firstSlide.layout === "chart" && (
-                            <div className="mt-2 flex items-center">
-                              <div className="w-4 h-4 border border-white/60 rounded mr-2"></div>
-                              <span className="text-xs opacity-60">Chart</span>
-                            </div>
-                          )}
                         </div>
                       ) : (
                         <div
-                          className="w-full h-full flex items-center justify-center text-white"
-                          style={{ backgroundColor: presentation.thumbnail || "#027659" }}
+                          className="absolute inset-0 w-full h-full flex items-center justify-center"
+                          style={{ backgroundColor: "#027659" }}
                         >
-                          <h3 className="text-lg font-bold">Empty Presentation</h3>
+                          <h3 className="text-lg font-bold text-white">Empty Presentation</h3>
                         </div>
                       )}
                     </div>
@@ -432,8 +351,6 @@ export default function SlydPROHome() {
                           <div className="flex items-center text-xs text-muted-foreground">
                             <Clock className="h-3 w-3 mr-1" />
                             <span>{new Date(presentation.created_at).toLocaleDateString()}</span>
-                            <span className="mx-2">•</span>
-                            <span>{presentation.slides.length} slides</span>
                           </div>
                         </div>
                         <DropdownMenu>
