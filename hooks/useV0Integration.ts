@@ -12,7 +12,7 @@ export function useV0Integration() {
 
   const checkCredits = (estimatedCost: number): boolean => {
     if (!user) return false
-    const totalCredits = user.monthlyCredits + user.purchasedCredits
+    const totalCredits = user.monthly_credits + user.purchased_credits
     return totalCredits >= estimatedCost
   }
 
@@ -45,24 +45,28 @@ export function useV0Integration() {
         return null
       }
 
-      // Rough estimation for credit check (will be refined after actual generation)
-      const estimatedCost = 0.1
-      if (!checkCredits(estimatedCost)) {
-        setError("Insufficient credits. Please purchase more credits to continue.")
-        return null
-      }
-
       setIsLoading(true)
       setError(null)
 
       try {
+        // Make the API call first, then handle credits based on actual usage
         const result = await v0SlideGenerator.generateSlides(prompt, uploadedFile)
 
-        // Deduct actual credits used
-        await deductCredits(result.tokenUsage)
+        if (result) {
+          // Check if user has enough credits for the actual cost
+          const totalCredits = user.monthly_credits + user.purchased_credits
+          if (totalCredits < result.tokenUsage.totalCost) {
+            setError("Insufficient credits for this generation. Please purchase more credits to continue.")
+            return null
+          }
 
-        setCurrentChatId(result.chatId)
-        return result
+          // Deduct actual credits used
+          await deductCredits(result.tokenUsage)
+          setCurrentChatId(result.chatId)
+          return result
+        }
+
+        return null
       } catch (err) {
         const errorMessage = err instanceof Error ? err.message : "Failed to generate slides"
         setError(errorMessage)
@@ -81,22 +85,26 @@ export function useV0Integration() {
         return null
       }
 
-      const estimatedCost = 0.05
-      if (!checkCredits(estimatedCost)) {
-        setError("Insufficient credits. Please purchase more credits to continue.")
-        return null
-      }
-
       setIsLoading(true)
       setError(null)
 
       try {
         const result = await v0SlideGenerator.editSlide(currentChatId, slideTitle, editPrompt)
 
-        // Deduct actual credits used
-        await deductCredits(result.tokenUsage)
+        if (result) {
+          // Check credits after getting actual usage
+          const totalCredits = user.monthly_credits + user.purchased_credits
+          if (totalCredits < result.tokenUsage.totalCost) {
+            setError("Insufficient credits for this edit. Please purchase more credits to continue.")
+            return null
+          }
 
-        return result
+          // Deduct actual credits used
+          await deductCredits(result.tokenUsage)
+          return result
+        }
+
+        return null
       } catch (err) {
         const errorMessage = err instanceof Error ? err.message : "Failed to edit slide"
         setError(errorMessage)
@@ -115,22 +123,26 @@ export function useV0Integration() {
         return null
       }
 
-      const estimatedCost = 0.08
-      if (!checkCredits(estimatedCost)) {
-        setError("Insufficient credits. Please purchase more credits to continue.")
-        return null
-      }
-
       setIsLoading(true)
       setError(null)
 
       try {
         const result = await v0SlideGenerator.regenerateAllSlides(currentChatId, prompt)
 
-        // Deduct actual credits used
-        await deductCredits(result.tokenUsage)
+        if (result) {
+          // Check credits after getting actual usage
+          const totalCredits = user.monthly_credits + user.purchased_credits
+          if (totalCredits < result.tokenUsage.totalCost) {
+            setError("Insufficient credits for this regeneration. Please purchase more credits to continue.")
+            return null
+          }
 
-        return result
+          // Deduct actual credits used
+          await deductCredits(result.tokenUsage)
+          return result
+        }
+
+        return null
       } catch (err) {
         const errorMessage = err instanceof Error ? err.message : "Failed to regenerate slides"
         setError(errorMessage)
@@ -142,7 +154,6 @@ export function useV0Integration() {
     [user, currentChatId, updateCredits],
   )
 
-  // Add this method to the useV0Integration hook
   const generateSlidesStreaming = useCallback(
     async (
       prompt: string,
@@ -156,13 +167,6 @@ export function useV0Integration() {
         return
       }
 
-      // Rough estimation for credit check
-      const estimatedCost = 0.1
-      if (!checkCredits(estimatedCost)) {
-        onError?.(new Error("Insufficient credits. Please purchase more credits to continue."))
-        return
-      }
-
       setIsLoading(true)
       setError(null)
 
@@ -172,6 +176,15 @@ export function useV0Integration() {
           uploadedFile,
           onChunk,
           async (result) => {
+            // Check credits after getting actual usage
+            const totalCredits = user.monthly_credits + user.purchased_credits
+            if (totalCredits < result.tokenUsage.totalCost) {
+              onError?.(
+                new Error("Insufficient credits for this generation. Please purchase more credits to continue."),
+              )
+              return
+            }
+
             // Deduct actual credits used
             await deductCredits(result.tokenUsage)
             setCurrentChatId(result.chatId)
@@ -190,7 +203,6 @@ export function useV0Integration() {
     [user, updateCredits],
   )
 
-  // Add this to the return object
   return {
     generateSlides,
     generateSlidesStreaming,

@@ -75,7 +75,7 @@ export function ModernHeader({ onAuthClick }: ModernHeaderProps) {
                     <Avatar className="h-8 w-8">
                       <AvatarImage src={user.avatar_url || "/placeholder.svg"} alt={user.name} />
                       <AvatarFallback className="bg-[#027659] text-white text-sm font-medium">
-                        {user.name.charAt(0).toUpperCase()}
+                        {user.name?.charAt(0)?.toUpperCase() || user.email?.charAt(0)?.toUpperCase() || "U"}
                       </AvatarFallback>
                     </Avatar>
                   </Button>
@@ -87,7 +87,7 @@ export function ModernHeader({ onAuthClick }: ModernHeaderProps) {
                       <Avatar className="h-10 w-10">
                         <AvatarImage src={user.avatar_url || "/placeholder.svg"} alt={user.name} />
                         <AvatarFallback className="bg-[#027659] text-white text-sm font-medium">
-                          {user.name.charAt(0).toUpperCase()}
+                          {user.name?.charAt(0)?.toUpperCase() || user.email?.charAt(0)?.toUpperCase() || "U"}
                         </AvatarFallback>
                       </Avatar>
                       <div className="flex-1 min-w-0">
@@ -266,7 +266,7 @@ export function ModernHeader({ onAuthClick }: ModernHeaderProps) {
                           <Avatar className="h-10 w-10">
                             <AvatarImage src={user.avatar_url || "/placeholder.svg"} alt={user.name} />
                             <AvatarFallback className="bg-[#027659] text-white text-sm font-medium">
-                              {user.name.charAt(0).toUpperCase()}
+                              {user.name?.charAt(0)?.toUpperCase() || user.email?.charAt(0)?.toUpperCase() || "U"}
                             </AvatarFallback>
                           </Avatar>
                           <div>

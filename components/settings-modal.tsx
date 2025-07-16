@@ -116,9 +116,9 @@ function ProfileSection({ user }: { user: any }) {
         </p>
         <div className="flex items-center space-x-4">
           <Avatar className="h-16 w-16">
-            <AvatarImage src={user.avatar || "/placeholder.svg"} alt={user.name} />
+            <AvatarImage src={user.avatar_url || "/placeholder.svg"} alt={user.name} />
             <AvatarFallback className="bg-[#027659] text-white text-lg font-medium">
-              {user.name.charAt(0).toUpperCase()}
+              {user.name?.charAt(0)?.toUpperCase() || user.email?.charAt(0)?.toUpperCase() || "U"}
             </AvatarFallback>
           </Avatar>
           <Button variant="outline" size="sm">

@@ -81,7 +81,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
 
       console.log("User profile fetched:", data)
-      setUser(data)
+      // Ensure we have the correct field names and give users more credits for testing
+      const userProfile = {
+        ...data,
+        avatar_url: data.avatar_url || null,
+        monthly_credits: data.monthly_credits || 100.0, // Increased for testing
+        purchased_credits: data.purchased_credits || 100.0, // Increased for testing
+      }
+      setUser(userProfile)
     } catch (error) {
       console.error("Error fetching user profile:", error)
     }
@@ -120,8 +127,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           id: data.user.id,
           email: data.user.email!,
           name,
-          monthly_credits: 10.0, // Free tier credits
-          purchased_credits: 0.0,
+          monthly_credits: 100.0, // Increased for testing
+          purchased_credits: 100.0, // Increased for testing
           plan: "free",
         },
       ])
