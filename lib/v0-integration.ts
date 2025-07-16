@@ -50,7 +50,7 @@ class V0SlideGenerator {
   }
 
   private async makeV0Request(endpoint: string, data: any): Promise<V0ChatResponse> {
-    console.log("Making V0 API request to:", endpoint, "with data:", data)
+    console.log("Making V0 API request to:", endpoint, "with data keys:", Object.keys(data))
 
     // Use server-side API route instead of direct API calls
     const response = await fetch(`/api/v0${endpoint}`, {
@@ -70,7 +70,7 @@ class V0SlideGenerator {
     }
 
     const result = await response.json()
-    console.log("V0 API response:", result)
+    console.log("V0 API response received:", { id: result.id, hasMessages: !!result.messages })
     return result
   }
 
@@ -108,7 +108,7 @@ class V0SlideGenerator {
       content = response.message
     }
 
-    console.log("Parsing content:", content.substring(0, 200) + "...")
+    console.log("Parsing content length:", content.length)
 
     // Parse slide markers like "## Slide 1: Title" or "### Problem Statement"
     const slideMatches = content.match(/(?:##|###)\s*(?:Slide\s*\d+:?\s*)?(.+?)(?=(?:##|###)|$)/gs)
@@ -187,40 +187,27 @@ class V0SlideGenerator {
       return this.getDefaultSlides()
     }
 
-    const paragraphs = content.split("\n\n").filter((p) => p.trim().length > 20)
-
-    if (paragraphs.length === 0) {
-      // Split by sentences if no paragraphs
-      const sentences = content.split(/[.!?]+/).filter((s) => s.trim().length > 10)
-      return sentences.slice(0, 5).map((sentence, index) => {
-        const colors = this.getSlideColors("content", index)
-        return {
-          id: `slide-${index + 1}`,
-          title: `Slide ${index + 1}`,
-          content: sentence.trim(),
-          background: colors.background,
-          textColor: colors.textColor,
-          layout: "content" as const,
-        }
-      })
-    }
-
-    return paragraphs.slice(0, 5).map((paragraph, index) => {
-      const sentences = paragraph.split(".").filter((s) => s.trim())
-      const title = sentences[0]?.trim() || `Slide ${index + 1}`
-      const content = sentences.slice(1).join(".").trim() || paragraph
-
-      const colors = this.getSlideColors("content", index)
-
-      return {
-        id: `slide-${index + 1}`,
-        title: title.length > 50 ? title.substring(0, 50) + "..." : title,
-        content,
-        background: colors.background,
-        textColor: colors.textColor,
+    // Create slides from the content we have
+    const slides = [
+      {
+        id: "slide-1",
+        title: "AI Generated Presentation",
+        content: "Based on your request, here's your presentation content.",
+        background: "#027659",
+        textColor: "#ffffff",
+        layout: "title" as const,
+      },
+      {
+        id: "slide-2",
+        title: "Content Overview",
+        content: content.substring(0, 500) + (content.length > 500 ? "..." : ""),
+        background: "#10b981",
+        textColor: "#ffffff",
         layout: "content" as const,
-      }
-    })
+      },
+    ]
+
+    return slides
   }
 
   private getDefaultSlides(): ParsedSlide[] {
@@ -228,7 +215,7 @@ class V0SlideGenerator {
       {
         id: "slide-1",
         title: "Welcome to Your Presentation",
-        content: "Start by describing your business idea or uploading a document.",
+        content: "Your AI-generated slides will appear here. Try describing what you want to create!",
         background: "#027659",
         textColor: "#ffffff",
         layout: "title",
@@ -263,7 +250,7 @@ Content for this slide...
 ## Slide 2: Next Title
 Content for next slide...`
 
-      console.log("Generating slides with prompt:", slidePrompt.substring(0, 200) + "...")
+      console.log("Generating slides with prompt length:", slidePrompt.length)
 
       // Use server-side API route
       const response = await this.makeV0Request("/chats", {
@@ -271,7 +258,11 @@ Content for next slide...`
       })
 
       // Calculate token usage
-      const responseContent = response.message || response.messages?.[0]?.content || ""
+      const responseContent =
+        (response.messages && response.messages.length > 0
+          ? response.messages.find((m: any) => m.role === "assistant")?.content
+          : response.message) || ""
+
       const tokenUsage = this.calculateTokenUsage(slidePrompt, responseContent)
 
       // Parse response to slides
@@ -385,7 +376,11 @@ Content for next slide...`
         slidePrompt,
         onChunk || (() => {}),
         (response) => {
-          const responseContent = response.message || response.messages?.[0]?.content || ""
+          const responseContent =
+            (response.messages && response.messages.length > 0
+              ? response.messages.find((m: any) => m.role === "assistant")?.content
+              : response.message) || ""
+
           const tokenUsage = this.calculateTokenUsage(slidePrompt, responseContent)
           const slides = this.parseResponseToSlides(response)
 
@@ -418,7 +413,11 @@ Please provide the updated slide content with the same structure using ## header
       })
 
       // Calculate token usage
-      const responseContent = response.message || response.messages?.[0]?.content || ""
+      const responseContent =
+        (response.messages && response.messages.length > 0
+          ? response.messages.find((m: any) => m.role === "assistant")?.content
+          : response.message) || ""
+
       const tokenUsage = this.calculateTokenUsage(message, responseContent)
 
       // Parse response to slides
@@ -449,7 +448,11 @@ Please provide a complete updated presentation with all slides using ## headers 
       })
 
       // Calculate token usage
-      const responseContent = response.message || response.messages?.[0]?.content || ""
+      const responseContent =
+        (response.messages && response.messages.length > 0
+          ? response.messages.find((m: any) => m.role === "assistant")?.content
+          : response.message) || ""
+
       const tokenUsage = this.calculateTokenUsage(message, responseContent)
 
       // Parse response to slides

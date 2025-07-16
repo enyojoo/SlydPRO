@@ -13,6 +13,25 @@ import { User, CreditCard, Check, Info } from "lucide-react"
 import { useAuth } from "@/lib/auth-context"
 import { useRouter } from "next/navigation"
 
+// Helper function to get user initials
+function getInitials(name: string): string {
+  if (!name) return "U"
+
+  // If it's an email, use the part before @
+  if (name.includes("@")) {
+    name = name.split("@")[0]
+  }
+
+  // Split by spaces and get first letter of each word
+  const words = name.trim().split(/\s+/)
+  if (words.length === 1) {
+    return words[0].charAt(0).toUpperCase()
+  }
+
+  // Return first letter of first and last word
+  return (words[0].charAt(0) + words[words.length - 1].charAt(0)).toUpperCase()
+}
+
 interface SettingsModalProps {
   open: boolean
   onOpenChange: (open: boolean) => void
@@ -116,9 +135,16 @@ function ProfileSection({ user }: { user: any }) {
         </p>
         <div className="flex items-center space-x-4">
           <Avatar className="h-16 w-16">
-            <AvatarImage src={user.avatar_url || "/placeholder.svg"} alt={user.name} />
+            <AvatarImage
+              src={user.avatar_url || undefined}
+              alt={user.name || user.email}
+              onError={(e) => {
+                // Hide broken images
+                e.currentTarget.style.display = "none"
+              }}
+            />
             <AvatarFallback className="bg-[#027659] text-white text-lg font-medium">
-              {user.name?.charAt(0)?.toUpperCase() || user.email?.charAt(0)?.toUpperCase() || "U"}
+              {getInitials(user.name || user.email || "User")}
             </AvatarFallback>
           </Avatar>
           <Button variant="outline" size="sm">

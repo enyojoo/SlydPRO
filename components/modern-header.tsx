@@ -16,6 +16,25 @@ import { Menu, Settings, Crown, HelpCircle, LogOut, Info, Sun, Moon, Monitor } f
 import { useAuth } from "@/lib/auth-context"
 import { SettingsModal } from "./settings-modal"
 
+// Helper function to get user initials
+function getInitials(name: string): string {
+  if (!name) return "U"
+
+  // If it's an email, use the part before @
+  if (name.includes("@")) {
+    name = name.split("@")[0]
+  }
+
+  // Split by spaces and get first letter of each word
+  const words = name.trim().split(/\s+/)
+  if (words.length === 1) {
+    return words[0].charAt(0).toUpperCase()
+  }
+
+  // Return first letter of first and last word
+  return (words[0].charAt(0) + words[words.length - 1].charAt(0)).toUpperCase()
+}
+
 interface ModernHeaderProps {
   onAuthClick?: () => void
 }
@@ -73,9 +92,16 @@ export function ModernHeader({ onAuthClick }: ModernHeaderProps) {
                 <DropdownMenuTrigger asChild>
                   <Button variant="ghost" className="relative h-8 w-8 rounded-full">
                     <Avatar className="h-8 w-8">
-                      <AvatarImage src={user.avatar_url || "/placeholder.svg"} alt={user.name} />
+                      <AvatarImage
+                        src={user.avatar_url || undefined}
+                        alt={user.name || user.email}
+                        onError={(e) => {
+                          // Hide broken images
+                          e.currentTarget.style.display = "none"
+                        }}
+                      />
                       <AvatarFallback className="bg-[#027659] text-white text-sm font-medium">
-                        {user.name?.charAt(0)?.toUpperCase() || user.email?.charAt(0)?.toUpperCase() || "U"}
+                        {getInitials(user.name || user.email || "User")}
                       </AvatarFallback>
                     </Avatar>
                   </Button>
@@ -85,9 +111,16 @@ export function ModernHeader({ onAuthClick }: ModernHeaderProps) {
                   <div className="p-4 border-b">
                     <div className="flex items-center space-x-3">
                       <Avatar className="h-10 w-10">
-                        <AvatarImage src={user.avatar_url || "/placeholder.svg"} alt={user.name} />
+                        <AvatarImage
+                          src={user.avatar_url || undefined}
+                          alt={user.name || user.email}
+                          onError={(e) => {
+                            // Hide broken images
+                            e.currentTarget.style.display = "none"
+                          }}
+                        />
                         <AvatarFallback className="bg-[#027659] text-white text-sm font-medium">
-                          {user.name?.charAt(0)?.toUpperCase() || user.email?.charAt(0)?.toUpperCase() || "U"}
+                          {getInitials(user.name || user.email || "User")}
                         </AvatarFallback>
                       </Avatar>
                       <div className="flex-1 min-w-0">
@@ -264,9 +297,16 @@ export function ModernHeader({ onAuthClick }: ModernHeaderProps) {
                       <div className="space-y-4">
                         <div className="flex items-center space-x-3 p-4 bg-gray-50 rounded-lg">
                           <Avatar className="h-10 w-10">
-                            <AvatarImage src={user.avatar_url || "/placeholder.svg"} alt={user.name} />
+                            <AvatarImage
+                              src={user.avatar_url || undefined}
+                              alt={user.name || user.email}
+                              onError={(e) => {
+                                // Hide broken images
+                                e.currentTarget.style.display = "none"
+                              }}
+                            />
                             <AvatarFallback className="bg-[#027659] text-white text-sm font-medium">
-                              {user.name?.charAt(0)?.toUpperCase() || user.email?.charAt(0)?.toUpperCase() || "U"}
+                              {getInitials(user.name || user.email || "User")}
                             </AvatarFallback>
                           </Avatar>
                           <div>

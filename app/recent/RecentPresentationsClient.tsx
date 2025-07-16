@@ -12,6 +12,25 @@ import { ModernHeader } from "@/components/modern-header"
 import { Footer } from "@/components/footer"
 import { slideTemplates } from "@/lib/slide-templates"
 
+// Helper function to get user initials
+function getInitials(name: string): string {
+  if (!name) return "U"
+
+  // If it's an email, use the part before @
+  if (name.includes("@")) {
+    name = name.split("@")[0]
+  }
+
+  // Split by spaces and get first letter of each word
+  const words = name.trim().split(/\s+/)
+  if (words.length === 1) {
+    return words[0].charAt(0).toUpperCase()
+  }
+
+  // Return first letter of first and last word
+  return (words[0].charAt(0) + words[words.length - 1].charAt(0)).toUpperCase()
+}
+
 interface Project {
   id: string
   name: string
