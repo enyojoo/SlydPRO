@@ -42,6 +42,7 @@ export default function SlydPROHome() {
   const [authError, setAuthError] = useState("")
   const [presentations, setPresentations] = useState<Presentation[]>([])
   const [presentationsLoading, setPresentationsLoading] = useState(false)
+  const [isCreatingPresentation, setIsCreatingPresentation] = useState(false)
   const [formData, setFormData] = useState({
     name: "",
     email: "",
@@ -92,13 +93,22 @@ export default function SlydPROHome() {
   const handleChatSubmit = async () => {
     if (!inputMessage.trim()) return
 
+    console.log("=== CHAT SUBMIT DEBUG ===")
+    console.log("Input message:", inputMessage.substring(0, 50) + "...")
+    console.log("Is authenticated:", isAuthenticated)
+    console.log("User:", user?.email)
+    console.log("Session exists:", !!session)
+
     if (!isAuthenticated) {
+      console.log("Not authenticated, showing auth dialog")
       setShowAuthDialog(true)
       return
     }
 
+    setIsCreatingPresentation(true)
+
     try {
-      console.log("Creating presentation with message:", inputMessage.substring(0, 50) + "...")
+      console.log("Creating presentation...")
 
       // Create presentation immediately with default name
       const presentation = await presentationsAPI.createPresentation({
@@ -109,7 +119,7 @@ export default function SlydPROHome() {
         category: "ai-generated",
       })
 
-      console.log("Presentation created successfully:", presentation.id)
+      console.log("Presentation created successfully:", presentation)
 
       // Add message to chat context
       const userMessage = {
@@ -119,23 +129,34 @@ export default function SlydPROHome() {
         timestamp: new Date(),
       }
 
+      console.log("Adding message to chat context:", userMessage)
       clearMessages()
       addMessage(userMessage)
 
       // Navigate to editor with presentation ID and slug from default name
       const slugTitle = "untitled-presentation"
-      router.push(`/editor/${presentation.id}/${slugTitle}`)
+      const editorPath = `/editor/${presentation.id}/${slugTitle}`
+
+      console.log("Navigating to:", editorPath)
+      router.push(editorPath)
     } catch (error) {
-      console.error("Failed to create presentation:", error)
+      console.error("=== PRESENTATION CREATION ERROR ===")
+      console.error("Error details:", error)
+      console.error("Error message:", error instanceof Error ? error.message : "Unknown error")
+      console.error("Error stack:", error instanceof Error ? error.stack : "No stack")
 
       // Show more specific error message
       const errorMessage = error instanceof Error ? error.message : "Unknown error occurred"
 
-      if (errorMessage.includes("No valid session")) {
+      if (errorMessage.includes("No valid session") || errorMessage.includes("Invalid session")) {
+        console.log("Session invalid, showing auth dialog")
         setShowAuthDialog(true)
       } else {
+        console.log("Showing error alert")
         alert(`Failed to create presentation: ${errorMessage}. Please try signing out and back in.`)
       }
+    } finally {
+      setIsCreatingPresentation(false)
     }
   }
 
@@ -153,6 +174,8 @@ export default function SlydPROHome() {
         setInputMessage(`Create a presentation from the uploaded file: ${file.name}`)
         return
       }
+
+      setIsCreatingPresentation(true)
 
       try {
         // Create presentation immediately with default name
@@ -184,6 +207,8 @@ export default function SlydPROHome() {
       } catch (error) {
         console.error("Failed to create presentation:", error)
         alert("Failed to upload file. Please try again.")
+      } finally {
+        setIsCreatingPresentation(false)
       }
     }
   }
@@ -279,6 +304,13 @@ export default function SlydPROHome() {
   // Show only first 6 presentations on home page
   const recentPresentations = presentations.slice(0, 6)
 
+  // Debug auth state
+  console.log("=== AUTH STATE DEBUG ===")
+  console.log("isLoading:", isLoading)
+  console.log("isAuthenticated:", isAuthenticated)
+  console.log("user:", user?.email)
+  console.log("session:", !!session)
+
   return (
     <div className="min-h-screen bg-background flex flex-col">
       {/* Modern Header */}
@@ -311,6 +343,7 @@ export default function SlydPROHome() {
                   onKeyPress={(e) => e.key === "Enter" && !e.shiftKey && handleChatSubmit()}
                   className="w-full bg-muted border-0 text-foreground placeholder:text-muted-foreground text-sm sm:text-base focus-visible:ring-0 focus-visible:ring-offset-0 resize-none min-h-[100px] sm:min-h-[120px] max-h-[200px] shadow-none outline-none focus:outline-none rounded-xl p-3 sm:p-4"
                   rows={4}
+                  disabled={isCreatingPresentation}
                 />
               </div>
               <div className="flex items-center justify-between mt-3 sm:mt-4">
@@ -332,6 +365,7 @@ export default function SlydPROHome() {
                       fileInputRef.current?.click()
                     }}
                     className="text-muted-foreground hover:text-foreground hover:bg-muted rounded-lg px-2 sm:px-3 py-2"
+                    disabled={isCreatingPresentation}
                   >
                     <Upload className="h-4 w-4 mr-1 sm:mr-2" />
                     <span className="hidden sm:inline">Upload</span>
@@ -340,10 +374,19 @@ export default function SlydPROHome() {
                 <Button
                   onClick={handleChatSubmit}
                   className="bg-[#027659] hover:bg-[#065f46] text-white rounded-lg px-4 sm:px-6 py-2 shadow-sm hover:shadow-md transition-all duration-200"
-                  disabled={!inputMessage.trim()}
+                  disabled={!inputMessage.trim() || isCreatingPresentation}
                 >
-                  <span className="mr-2">Create</span>
-                  <ArrowUp className="h-4 w-4" />
+                  {isCreatingPresentation ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Creating...
+                    </>
+                  ) : (
+                    <>
+                      <span className="mr-2">Create</span>
+                      <ArrowUp className="h-4 w-4" />
+                    </>
+                  )}
                 </Button>
               </div>
             </div>
@@ -357,6 +400,18 @@ export default function SlydPROHome() {
             className="hidden"
           />
         </div>
+
+        {/* Debug Info - Remove this in production */}
+        {process.env.NODE_ENV === "development" && (
+          <div className="max-w-2xl mx-auto mb-8 p-4 bg-gray-100 rounded-lg text-sm">
+            <h3 className="font-bold mb-2">Debug Info:</h3>
+            <p>Auth Loading: {isLoading.toString()}</p>
+            <p>Is Authenticated: {isAuthenticated.toString()}</p>
+            <p>User Email: {user?.email || "None"}</p>
+            <p>Session: {session ? "Present" : "None"}</p>
+            <p>Creating Presentation: {isCreatingPresentation.toString()}</p>
+          </div>
+        )}
 
         {/* Recent Presentations - Only show for authenticated users with presentations */}
         {isAuthenticated && !presentationsLoading && presentations.length > 0 && (
