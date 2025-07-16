@@ -47,18 +47,25 @@ export async function POST(request: NextRequest) {
     // Get the session from the request headers
     const authHeader = request.headers.get("authorization")
     if (!authHeader) {
+      console.error("No authorization header provided")
       return NextResponse.json({ error: "No authorization header" }, { status: 401 })
     }
+
+    const token = authHeader.replace("Bearer ", "")
+    console.log("Auth token received:", token.substring(0, 20) + "...")
 
     // Get current user session
     const {
       data: { user },
       error: authError,
-    } = await supabase.auth.getUser(authHeader.replace("Bearer ", ""))
+    } = await supabase.auth.getUser(token)
 
     if (authError || !user) {
+      console.error("Auth error:", authError)
       return NextResponse.json({ error: "Invalid session" }, { status: 401 })
     }
+
+    console.log("User authenticated:", user.id)
 
     // Create new presentation
     const { data: presentation, error } = await supabase
@@ -79,14 +86,19 @@ export async function POST(request: NextRequest) {
       .single()
 
     if (error) {
-      console.error("Error creating presentation:", error)
-      return NextResponse.json({ error: "Failed to create presentation" }, { status: 500 })
+      console.error("Database error creating presentation:", error)
+      return NextResponse.json({ error: "Database error: " + error.message }, { status: 500 })
     }
 
     console.log("Presentation created successfully:", presentation.id)
     return NextResponse.json(presentation)
   } catch (error) {
     console.error("Presentation creation error:", error)
-    return NextResponse.json({ error: "Failed to create presentation" }, { status: 500 })
+    return NextResponse.json(
+      {
+        error: "Failed to create presentation: " + (error instanceof Error ? error.message : "Unknown error"),
+      },
+      { status: 500 },
+    )
   }
 }

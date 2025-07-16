@@ -98,6 +98,8 @@ export default function SlydPROHome() {
     }
 
     try {
+      console.log("Creating presentation with message:", inputMessage.substring(0, 50) + "...")
+
       // Create presentation immediately with default name
       const presentation = await presentationsAPI.createPresentation({
         name: "Untitled Presentation",
@@ -106,6 +108,8 @@ export default function SlydPROHome() {
         thumbnail: "#027659",
         category: "ai-generated",
       })
+
+      console.log("Presentation created successfully:", presentation.id)
 
       // Add message to chat context
       const userMessage = {
@@ -123,8 +127,15 @@ export default function SlydPROHome() {
       router.push(`/editor/${presentation.id}/${slugTitle}`)
     } catch (error) {
       console.error("Failed to create presentation:", error)
-      // Show error to user
-      alert("Failed to create presentation. Please try again.")
+
+      // Show more specific error message
+      const errorMessage = error instanceof Error ? error.message : "Unknown error occurred"
+
+      if (errorMessage.includes("No valid session")) {
+        setShowAuthDialog(true)
+      } else {
+        alert(`Failed to create presentation: ${errorMessage}. Please try signing out and back in.`)
+      }
     }
   }
 
