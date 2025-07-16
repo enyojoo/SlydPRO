@@ -103,7 +103,7 @@ function EditorContent({ presentationId, slideSlug }: EditorContentProps) {
   const fileInputRef = useRef<HTMLInputElement>(null)
   const chatEndRef = useRef<HTMLDivElement>(null)
   const nameInputRef = useRef<HTMLInputElement>(null)
-  const { messages } = useChatContext()
+  const { messages, clearMessages } = useChatContext()
   const { user: authUser, isLoading: authLoading } = useAuth()
 
   const checkScreenSize = () => {
@@ -198,8 +198,8 @@ function EditorContent({ presentationId, slideSlug }: EditorContentProps) {
               setSelectedSlide(themedSlides[0]?.id || "")
               setCurrentSlideIndex(0)
 
-              // Create presentation and update URL
-              if (authUser) {
+              // Create presentation and update URL if we don't have one yet
+              if (authUser && !currentPresentationId) {
                 try {
                   const presentation = await presentationsAPI.createPresentation({
                     name: projectName,
@@ -280,7 +280,7 @@ Please try again or describe your presentation differently. I'm here to help!`,
         console.error("Generation error:", error)
       }
     },
-    [v0, uploadedFile, selectedTheme, projectName, authUser, router],
+    [v0, uploadedFile, selectedTheme, projectName, authUser, router, currentPresentationId],
   )
 
   const autoSave = useCallback(async () => {
@@ -889,6 +889,8 @@ What presentation would you like to create today?`,
         if (messages.length > 0) {
           const lastMessage = messages[messages.length - 1]
           if (lastMessage.type === "user") {
+            // Clear the messages from context since we're handling it here
+            clearMessages()
             setTimeout(() => {
               handleInitialGeneration(lastMessage.content)
             }, 100)
@@ -898,7 +900,10 @@ What presentation would you like to create today?`,
     }
 
     setIsInitialized(true)
-  }, [authUser, messages, presentationId, slideSlug, router, searchParams])
+  }, [authUser, messages, presentationId, slideSlug, router, searchParams, clearMessages])
+
+  // Rest of the component remains the same...
+  // [Previous implementation continues here with all the UI components]
 
   // Presentation Mode View
   if (isPresentationMode) {
