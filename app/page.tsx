@@ -23,12 +23,8 @@ import { presentationsAPI } from "@/lib/presentations-api"
 interface Presentation {
   id: string
   name: string
-  description?: string
   slides: any[]
   thumbnail?: string
-  is_starred: boolean
-  views: number
-  category?: string
   created_at: string
   updated_at: string
 }
@@ -103,7 +99,6 @@ export default function SlydPROHome() {
       // Create presentation immediately with default name
       const presentation = await presentationsAPI.createPresentation({
         name: "Untitled Presentation",
-        description: inputMessage,
         slides: [], // Empty slides initially
         thumbnail: "#027659",
       })
@@ -157,7 +152,6 @@ export default function SlydPROHome() {
         // Create presentation immediately with default name
         const presentation = await presentationsAPI.createPresentation({
           name: `${file.name.split(".")[0]} Presentation`,
-          description: `${inputMessage} (from uploaded file: ${file.name})`,
           slides: [], // Empty slides initially
           thumbnail: "#027659",
         })
@@ -387,23 +381,32 @@ export default function SlydPROHome() {
                       router.push(`/editor/${presentation.id}/${slugTitle}`)
                     }}
                   >
-                    {/* Actual Slide Thumbnail */}
-                    <div
-                      className="w-full h-40 flex flex-col justify-center p-4 text-white relative overflow-hidden"
-                      style={{
-                        backgroundColor: firstSlide?.background || presentation.thumbnail || "#027659",
-                        color: firstSlide?.textColor || "#ffffff",
-                      }}
-                    >
-                      {firstSlide ? (
-                        <>
+                    {/* Generated Slide Thumbnail */}
+                    <div className="w-full h-40 relative overflow-hidden">
+                      {presentation.thumbnail && presentation.thumbnail.startsWith("data:image/svg+xml") ? (
+                        <img
+                          src={presentation.thumbnail || "/placeholder.svg"}
+                          alt={`${presentation.name} thumbnail`}
+                          className="w-full h-full object-cover"
+                        />
+                      ) : firstSlide ? (
+                        <div
+                          className="w-full h-full flex flex-col justify-center p-4 text-white"
+                          style={{
+                            backgroundColor: firstSlide?.background || presentation.thumbnail || "#027659",
+                            color: firstSlide?.textColor || "#ffffff",
+                          }}
+                        >
                           <h3 className="text-lg font-bold mb-2 line-clamp-2 leading-tight">{firstSlide.title}</h3>
                           <p className="text-sm opacity-80 line-clamp-3 leading-relaxed">
                             {firstSlide.content.substring(0, 120)}...
                           </p>
-                        </>
+                        </div>
                       ) : (
-                        <div className="text-center">
+                        <div
+                          className="w-full h-full flex items-center justify-center text-white"
+                          style={{ backgroundColor: presentation.thumbnail || "#027659" }}
+                        >
                           <h3 className="text-lg font-bold">Empty Presentation</h3>
                         </div>
                       )}

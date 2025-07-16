@@ -21,7 +21,7 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
       return NextResponse.json({ error: "Invalid session" }, { status: 401 })
     }
 
-    // Fetch specific presentation
+    // Fetch the specific presentation
     const { data: presentation, error } = await supabase
       .from("presentations")
       .select("*")
@@ -44,7 +44,7 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
 export async function PUT(request: NextRequest, { params }: { params: { id: string } }) {
   try {
     const { id } = params
-    const { name, description, slides, thumbnail, category, is_starred } = await request.json()
+    const updateData = await request.json()
 
     // Get the session from the request headers
     const authHeader = request.headers.get("authorization")
@@ -62,16 +62,13 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
       return NextResponse.json({ error: "Invalid session" }, { status: 401 })
     }
 
-    // Update presentation
+    // Update the presentation
     const { data: presentation, error } = await supabase
       .from("presentations")
       .update({
-        name,
-        description,
-        slides,
-        thumbnail,
-        category,
-        is_starred,
+        name: updateData.name,
+        slides: updateData.slides,
+        thumbnail: updateData.thumbnail,
       })
       .eq("id", id)
       .eq("user_id", user.id)
@@ -110,7 +107,7 @@ export async function DELETE(request: NextRequest, { params }: { params: { id: s
       return NextResponse.json({ error: "Invalid session" }, { status: 401 })
     }
 
-    // Delete presentation
+    // Delete the presentation
     const { error } = await supabase.from("presentations").delete().eq("id", id).eq("user_id", user.id)
 
     if (error) {
@@ -120,7 +117,7 @@ export async function DELETE(request: NextRequest, { params }: { params: { id: s
 
     return NextResponse.json({ success: true })
   } catch (error) {
-    console.error("Presentation deletion error:", error)
+    console.error("Presentation delete error:", error)
     return NextResponse.json({ error: "Failed to delete presentation" }, { status: 500 })
   }
 }

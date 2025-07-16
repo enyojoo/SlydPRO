@@ -1,6 +1,7 @@
 "use client"
 
 import { supabase, type Presentation } from "./supabase"
+import { generatePresentationThumbnail } from "./thumbnail-generator"
 
 export class PresentationsAPI {
   private async getAuthHeaders() {
@@ -20,23 +21,23 @@ export class PresentationsAPI {
 
   async createPresentation(data: {
     name: string
-    description?: string
     slides: any[]
     thumbnail?: string
   }): Promise<Presentation> {
     try {
       const headers = await this.getAuthHeaders()
 
+      // Generate thumbnail from first slide if slides exist
+      const thumbnail =
+        data.slides.length > 0 ? generatePresentationThumbnail(data.slides) : data.thumbnail || "#027659"
+
       const response = await fetch("/api/presentations", {
         method: "POST",
         headers,
         body: JSON.stringify({
           name: data.name,
-          description: data.description || "",
           slides: data.slides,
-          thumbnail: data.thumbnail || data.slides[0]?.background || "#027659",
-          is_starred: false,
-          views: 0,
+          thumbnail: thumbnail,
         }),
       })
 
@@ -56,6 +57,11 @@ export class PresentationsAPI {
   }
 
   async updatePresentation(id: string, data: Partial<Presentation>): Promise<Presentation> {
+    // Generate thumbnail from first slide if slides are being updated
+    if (data.slides && data.slides.length > 0) {
+      data.thumbnail = generatePresentationThumbnail(data.slides)
+    }
+
     const response = await fetch(`/api/presentations/${id}`, {
       method: "PUT",
       headers: {

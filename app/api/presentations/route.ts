@@ -40,7 +40,7 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const { name, description, slides, thumbnail, is_starred, views } = await request.json()
+    const { name, slides, thumbnail } = await request.json()
 
     console.log("Creating presentation with data:", { name, slidesCount: slides?.length })
 
@@ -74,11 +74,8 @@ export async function POST(request: NextRequest) {
         {
           user_id: user.id,
           name: name || "Untitled Presentation",
-          description: description || "",
           slides: slides || [],
           thumbnail: thumbnail || "#027659",
-          is_starred: is_starred || false,
-          views: views || 0,
         },
       ])
       .select()

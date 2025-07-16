@@ -22,11 +22,8 @@ export interface Presentation {
   id: string
   user_id: string
   name: string
-  description?: string
   slides: any[]
   thumbnail?: string
-  is_starred: boolean
-  views: number
   created_at: string
   updated_at: string
 }
