@@ -19,18 +19,11 @@ import {
   SkipBack,
   SkipForward,
   Zap,
-  Target,
-  RefreshCw,
-  User,
   Play,
   Download,
   Minimize,
   Loader2,
-  Palette,
   BarChart3,
-  ImageIcon,
-  Lightbulb,
-  Layout,
 } from "lucide-react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { useV0Integration } from "@/hooks/useV0Integration"
@@ -77,7 +70,8 @@ interface GenerationProgress {
   designPhase?: "layout" | "colors" | "icons" | "charts" | "final"
 }
 
-const modernColorPalettes = [
+// Diverse color palettes for AI to choose from
+const diverseColorPalettes = [
   {
     name: "Corporate Blue",
     primary: "#1e40af",
@@ -126,6 +120,22 @@ const modernColorPalettes = [
     text: "#ffffff",
     gradient: "linear-gradient(135deg, #ec4899 0%, #f472b6 100%)",
   },
+  {
+    name: "Ocean Teal",
+    primary: "#0891b2",
+    secondary: "#06b6d4",
+    accent: "#67e8f9",
+    text: "#ffffff",
+    gradient: "linear-gradient(135deg, #0891b2 0%, #06b6d4 100%)",
+  },
+  {
+    name: "Sunset Red",
+    primary: "#dc2626",
+    secondary: "#ef4444",
+    accent: "#f87171",
+    text: "#ffffff",
+    gradient: "linear-gradient(135deg, #dc2626 0%, #ef4444 100%)",
+  },
 ]
 
 interface EditorContentProps {
@@ -142,7 +152,6 @@ function EditorContent({ presentationId, slideSlug }: EditorContentProps) {
   const [uploadedFile, setUploadedFile] = useState<File | null>(null)
   const [currentSlideIndex, setCurrentSlideIndex] = useState(0)
   const [editMode, setEditMode] = useState<"all" | "selected">("all")
-  const [selectedPalette, setSelectedPalette] = useState(modernColorPalettes[1]) // Default to Startup Green
   const [showExportDialog, setShowExportDialog] = useState(false)
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([])
   const [isPresentationMode, setIsPresentationMode] = useState(false)
@@ -165,6 +174,24 @@ function EditorContent({ presentationId, slideSlug }: EditorContentProps) {
     setIsSmallScreen(window.innerWidth < 1024)
   }
 
+  // Function to select diverse colors for slides
+  const selectDiverseColors = (slideCount: number, userColorRequest?: string) => {
+    if (userColorRequest) {
+      // If user requests specific colors, try to match them
+      const requestedPalette = diverseColorPalettes.find(
+        (p) =>
+          p.name.toLowerCase().includes(userColorRequest.toLowerCase()) ||
+          userColorRequest.toLowerCase().includes(p.name.toLowerCase().split(" ")[0].toLowerCase()),
+      )
+      if (requestedPalette) {
+        return Array(slideCount).fill(requestedPalette)
+      }
+    }
+
+    // Use diverse colors by cycling through palettes
+    return Array.from({ length: slideCount }, (_, index) => diverseColorPalettes[index % diverseColorPalettes.length])
+  }
+
   // Enhanced AI prompt for expert slide design
   const createExpertDesignPrompt = (userPrompt: string, slideContext?: string) => {
     return `You are SlydPRO AI, an expert presentation designer specializing in modern, high-quality pitch decks and business presentations. You create visually stunning slides with professional design elements.
@@ -176,7 +203,7 @@ ${slideContext ? `CURRENT SLIDE CONTEXT: ${slideContext}` : ""}
 DESIGN EXPERTISE:
 - Create modern, professional slide layouts with visual hierarchy
 - Use appropriate icons, charts, and design elements based on content
-- Apply color psychology and modern design principles
+- Apply diverse color schemes across slides for visual interest
 - Suggest charts/graphs when data is mentioned
 - Add relevant icons for key concepts
 - Use gradients, patterns, and visual elements strategically
@@ -192,7 +219,7 @@ CONTENT ANALYSIS:
 DESIGN ELEMENTS TO INCLUDE:
 - 📊 Charts for data/statistics
 - 🎯 Icons for key points
-- 🎨 Color gradients and modern styling
+- 🎨 Diverse color schemes across slides
 - 📈 Visual hierarchy with typography
 - 🖼️ Image placeholders where appropriate
 
@@ -203,7 +230,7 @@ Please create slides with this level of design thinking and visual sophisticatio
 **Design Elements**: [List icons, charts, colors to use]
 **Content**: [Well-formatted content with visual elements]
 
-Focus on creating presentation-ready slides that look professional and modern.`
+Focus on creating presentation-ready slides that look professional and modern with diverse, engaging colors.`
   }
 
   const handleInitialGeneration = useCallback(
@@ -301,14 +328,17 @@ Focus on creating presentation-ready slides that look professional and modern.`
             clearInterval(thinkingInterval)
 
             if (result) {
-              // Enhanced slide processing with design elements
+              // Enhanced slide processing with diverse design elements
+              const colorPalettes = selectDiverseColors(result.slides.length, prompt)
+
               const designedSlides = result.slides.map((slide, index) => {
                 const designElements = analyzeContentForDesign(slide.content, slide.title)
+                const palette = colorPalettes[index]
 
                 return {
                   ...slide,
-                  background: index === 0 ? selectedPalette.primary : selectedPalette.secondary,
-                  textColor: selectedPalette.text,
+                  background: index === 0 ? palette.primary : palette.secondary,
+                  textColor: palette.text,
                   layout: determineOptimalLayout(slide.content, slide.title),
                   designElements,
                 } as Slide
@@ -359,7 +389,7 @@ ${result.slides
   .join("\n")}
 
 **🎯 Design Features Applied:**
-• Modern color palette with gradients
+• Diverse color palettes with professional gradients
 • Strategic icon placement for key concepts
 • Professional typography hierarchy
 • Visual elements based on content analysis
@@ -367,7 +397,7 @@ ${result.slides
 
 **✨ What you can do next:**
 • **"Make slide 3 more visual"** - Add charts/icons
-• **"Change to corporate blue theme"** - Switch color palette
+• **"Use blue colors throughout"** - Apply specific color theme
 • **"Add a chart to the market slide"** - Include data visualization
 • **"Make the design more modern"** - Enhance visual elements
 
@@ -417,7 +447,7 @@ I'm ready to design your perfect presentation!`,
         console.error("Generation error:", error)
       }
     },
-    [v0, uploadedFile, selectedPalette, projectName, authUser, router, presentationId],
+    [v0, uploadedFile, projectName, authUser, router, presentationId],
   )
 
   // Enhanced content analysis for design elements
@@ -628,12 +658,16 @@ I'm ready to design your perfect presentation!`,
           clearInterval(thinkingInterval)
 
           if (result) {
+            const colorPalettes = selectDiverseColors(result.slides.length, currentInput)
+
             const designedSlides = result.slides.map((s, index) => {
               const designElements = analyzeContentForDesign(s.content, s.title)
+              const palette = colorPalettes[index]
+
               return {
                 ...s,
-                background: index === 0 ? selectedPalette.primary : selectedPalette.secondary,
-                textColor: selectedPalette.text,
+                background: index === 0 ? palette.primary : palette.secondary,
+                textColor: palette.text,
                 layout: determineOptimalLayout(s.content, s.title),
                 designElements,
               } as Slide
@@ -673,7 +707,7 @@ ${designedSlides[0]?.designElements?.icons?.slice(0, 3).join(" ") || "• Visual
 
 **Continue refining:**
 • **"Make it more visual"** - Add charts/graphics
-• **"Change the color scheme"** - Try different palette
+• **"Use different colors"** - Try new color scheme
 • **"Add more icons"** - Enhance visual elements
 • **"Make it corporate style"** - Adjust design tone
 
@@ -727,12 +761,16 @@ What other design improvements would you like?`,
         clearInterval(thinkingInterval)
 
         if (result) {
+          const colorPalettes = selectDiverseColors(result.slides.length, currentInput)
+
           const designedSlides = result.slides.map((slide, index) => {
             const designElements = analyzeContentForDesign(slide.content, slide.title)
+            const palette = colorPalettes[index]
+
             return {
               ...slide,
-              background: index === 0 ? selectedPalette.primary : selectedPalette.secondary,
-              textColor: selectedPalette.text,
+              background: index === 0 ? palette.primary : palette.secondary,
+              textColor: palette.text,
               layout: determineOptimalLayout(slide.content, slide.title),
               designElements,
             } as Slide
@@ -783,7 +821,7 @@ ${result.slides
   .join("\n")}
 
 **🚀 Professional Design Features:**
-• Modern color palette and gradients
+• Diverse color palettes and gradients
 • Content-aware icon placement
 • Optimized layouts for each slide type
 • Professional typography hierarchy
@@ -824,7 +862,7 @@ I encountered an error: ${error instanceof Error ? error.message : "Unknown erro
 
 Let me help you with specific design improvements:
 • **"Make slide 2 more visual"** - Add charts and icons
-• **"Change to blue color theme"** - Switch color palette
+• **"Use blue colors"** - Apply specific color theme
 • **"Add icons to key points"** - Enhance visual elements
 • **"Make it look more professional"** - Apply corporate styling
 
@@ -866,12 +904,16 @@ What design aspect would you like me to focus on?`,
       setChatMessages((prev) => prev.filter((msg) => !msg.isLoading))
 
       if (result) {
+        const colorPalettes = selectDiverseColors(result.slides.length)
+
         const designedSlides = result.slides.map((slide, index) => {
           const designElements = analyzeContentForDesign(slide.content, slide.title)
+          const palette = colorPalettes[index]
+
           return {
             ...slide,
-            background: index === 0 ? selectedPalette.primary : selectedPalette.secondary,
-            textColor: selectedPalette.text,
+            background: index === 0 ? palette.primary : palette.secondary,
+            textColor: palette.text,
             layout: determineOptimalLayout(slide.content, slide.title),
             designElements,
           } as Slide
@@ -889,7 +931,7 @@ What design aspect would you like me to focus on?`,
 I've analyzed your document and created ${result.slides.length} expertly designed slides with:
 
 • **Modern visual hierarchy** for better readability
-• **Strategic color application** using professional palette
+• **Diverse color application** using professional palettes
 • **Content-aware icons** for key concepts
 • **Optimized layouts** based on content type
 • **Professional styling** throughout
@@ -926,7 +968,6 @@ Your presentation is ready for refinement! Ask me to adjust colors, add charts, 
 ${designElements?.icons?.length ? `• Icons: ${designElements.icons.join(" ")}` : ""}
 ${designElements?.charts?.length ? `• Charts: ${designElements.charts.map((c) => c.type).join(", ")}` : ""}
 • Layout: ${slide.layout}
-• Color: ${selectedPalette.name}
 
 **🎨 Design Enhancement Options:**
 • **"Make this slide more visual"** - Add charts, icons, graphics
@@ -934,45 +975,13 @@ ${designElements?.charts?.length ? `• Charts: ${designElements.charts.map((c) 
 • **"Add a chart for the data"** - Include data visualization
 • **"Use more icons for key points"** - Enhance visual elements
 • **"Make it more professional"** - Apply corporate styling
-• **"Change colors to blue theme"** - Switch color palette
+• **"Use blue colors"** - Apply specific color theme
 
 What design improvements would you like for this slide?`,
         timestamp: new Date(),
       }
       setChatMessages((prev) => [...prev, contextMessage])
     }
-  }
-
-  const handlePaletteChange = (paletteName: string) => {
-    const palette = modernColorPalettes.find((p) => p.name === paletteName) || modernColorPalettes[0]
-    setSelectedPalette(palette)
-
-    const themedSlides = slides.map((slide, index) => ({
-      ...slide,
-      background: index === 0 ? palette.primary : palette.secondary,
-      textColor: palette.text,
-    }))
-    setSlides(themedSlides)
-
-    const paletteMessage: ChatMessage = {
-      id: Date.now().toString(),
-      type: "assistant",
-      content: `🎨 **${palette.name} Theme Applied!**
-
-I've updated your entire presentation with the ${palette.name} color palette. This modern color scheme enhances visual appeal and maintains professional consistency across all slides.
-
-**Color Psychology:**
-${palette.name === "Corporate Blue" ? "• Blue conveys trust, stability, and professionalism" : ""}
-${palette.name === "Startup Green" ? "• Green represents growth, innovation, and success" : ""}
-${palette.name === "Creative Purple" ? "• Purple suggests creativity, luxury, and innovation" : ""}
-${palette.name === "Energy Orange" ? "• Orange conveys enthusiasm, energy, and confidence" : ""}
-${palette.name === "Tech Dark" ? "• Dark themes suggest sophistication and modernity" : ""}
-${palette.name === "Modern Pink" ? "• Pink represents creativity, compassion, and modernity" : ""}
-
-The new theme works perfectly with your content structure and design elements!`,
-      timestamp: new Date(),
-    }
-    setChatMessages((prev) => [...prev, paletteMessage])
   }
 
   const handleNameSave = () => {
@@ -1081,7 +1090,7 @@ I'm your expert presentation designer, ready to help you create stunning slides 
 
 **🚀 Professional Design Capabilities:**
 • Modern layouts with visual hierarchy
-• Strategic color palettes and gradients
+• Diverse color palettes and gradients
 • Content-aware icons and graphics
 • Data visualization with charts
 • Professional typography and spacing
@@ -1093,7 +1102,7 @@ I'm your expert presentation designer, ready to help you create stunning slides 
 
 **🎯 What I can help you with:**
 • **"Make slide 3 more visual"** - Add charts, icons, graphics
-• **"Change to corporate blue theme"** - Switch color palette
+• **"Use blue colors throughout"** - Apply specific color theme
 • **"Add icons to key points"** - Enhance visual elements
 • **"Redesign the layout"** - Optimize slide structure
 • **"Make it more professional"** - Apply business styling
@@ -1380,26 +1389,6 @@ What design improvements would you like to make?`,
                 )}
               </div>
 
-              {/* Center Section - Color Palette Selector */}
-              <div className="flex items-center space-x-2">
-                <Palette className="h-4 w-4 text-gray-500" />
-                <div className="flex space-x-1">
-                  {modernColorPalettes.map((palette) => (
-                    <button
-                      key={palette.name}
-                      onClick={() => handlePaletteChange(palette.name)}
-                      className={`w-6 h-6 rounded-full border-2 transition-all ${
-                        selectedPalette.name === palette.name
-                          ? "border-gray-800 scale-110"
-                          : "border-gray-300 hover:border-gray-500"
-                      }`}
-                      style={{ background: palette.gradient }}
-                      title={palette.name}
-                    />
-                  ))}
-                </div>
-              </div>
-
               {/* Right Section - Play and Export */}
               <div className="flex items-center space-x-3">
                 <Button variant="outline" onClick={handlePresentationMode} className="flex items-center bg-transparent">
@@ -1422,29 +1411,15 @@ What design improvements would you like to make?`,
           <div className="flex-1 flex items-center justify-center bg-gray-100 p-8">
             {isStreaming ? (
               <div className="relative">
-                {/* Enhanced Skeleton Slide with Design Elements */}
-                <div className="w-[960px] h-[540px] shadow-2xl rounded-lg overflow-hidden border-4 border-white bg-gradient-to-br from-gray-200 to-gray-300 animate-pulse">
+                {/* Fixed Skeleton Slide */}
+                <div className="w-[960px] h-[540px] shadow-2xl rounded-lg overflow-hidden border-4 border-white bg-gradient-to-br from-gray-200 to-gray-300">
                   <div className="h-full p-12 flex flex-col justify-center items-center">
                     <div className="text-center space-y-6">
-                      <div className="w-20 h-20 bg-[#027659]/20 rounded-2xl flex items-center justify-center mx-auto animate-pulse">
-                        <Palette className="w-10 h-10 text-[#027659] animate-spin" />
+                      <div className="w-16 h-16 bg-[#027659]/20 rounded-2xl flex items-center justify-center mx-auto">
+                        <Loader2 className="w-8 h-8 text-[#027659] animate-spin" />
                       </div>
-                      <h2 className="text-4xl font-bold text-gray-600">🎨 SlydPRO Designing</h2>
-                      <p className="text-xl text-gray-500">
-                        Creating professional slides with modern design elements...
-                      </p>
-                      <div className="flex space-x-4 justify-center text-2xl">
-                        <span className="animate-bounce">🎯</span>
-                        <span className="animate-bounce" style={{ animationDelay: "0.1s" }}>
-                          📊
-                        </span>
-                        <span className="animate-bounce" style={{ animationDelay: "0.2s" }}>
-                          💡
-                        </span>
-                        <span className="animate-bounce" style={{ animationDelay: "0.3s" }}>
-                          🚀
-                        </span>
-                      </div>
+                      <h2 className="text-3xl font-bold text-gray-600">Creating Your Presentation</h2>
+                      <p className="text-lg text-gray-500">Designing professional slides with modern elements...</p>
                     </div>
                   </div>
                 </div>
@@ -1472,7 +1447,7 @@ What design improvements would you like to make?`,
                         {currentSlide.designElements?.icons && currentSlide.designElements.icons.length > 1 && (
                           <div className="text-5xl mt-8 space-x-4">
                             {currentSlide.designElements.icons.slice(1, 4).map((icon, i) => (
-                              <span key={i} className="inline-block animate-pulse">
+                              <span key={i} className="inline-block">
                                 {icon}
                               </span>
                             ))}
@@ -1606,358 +1581,162 @@ What design improvements would you like to make?`,
                   </div>
                 </div>
                 <h2 className="text-3xl font-bold text-gray-900 mb-4">Ready to Create</h2>
-                <p className="text-lg text-gray-600 leading-relaxed">
-                  Start a conversation with the AI assistant to create your presentation. Describe your topic, audience,
-                  or upload a document to get started.
-                </p>
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Right Sidebar - Enhanced AI Chat */}
-        <div className="w-96 bg-white border-l border-gray-200 flex flex-col shadow-lg">
-          {/* Chat Header */}
-          <div className="p-6 border-b border-gray-100 bg-gradient-to-r from-blue-50 to-indigo-50">
-            <div className="flex items-center space-x-3 mb-4">
-              <div className="w-10 h-10 bg-gradient-to-r from-[#027659] to-[#10b981] rounded-lg flex items-center justify-center">
-                <Palette className="h-5 w-5 text-white" />
-              </div>
-              <div>
-                <h3 className="font-semibold text-gray-900">SlydPRO Designer AI</h3>
-                <p className="text-xs text-gray-600">Expert Presentation Designer</p>
-              </div>
-            </div>
-
-            {/* Edit Mode Toggle */}
-            <div className="flex items-center space-x-2">
-              <Button
-                variant={editMode === "all" ? "default" : "outline"}
-                size="sm"
-                onClick={() => setEditMode("all")}
-                className="flex-1 text-xs"
-              >
-                <RefreshCw className="h-3 w-3 mr-1" />
-                All Slides
-              </Button>
-              <Button
-                variant={editMode === "selected" ? "default" : "outline"}
-                size="sm"
-                onClick={() => setEditMode("selected")}
-                className="flex-1 text-xs"
-                disabled={!selectedSlide}
-              >
-                <Target className="h-3 w-3 mr-1" />
-                Selected
-              </Button>
-            </div>
-
-            {selectedSlide && editMode === "selected" && (
-              <div className="bg-[#10b981]/10 border border-[#10b981]/20 rounded-lg p-3 mt-3">
-                <div className="flex items-center space-x-2">
-                  <div className="w-2 h-2 bg-[#027659] rounded-full animate-pulse"></div>
-                  <span className="text-xs font-medium text-[#027659]">Editing: Slide {currentSlideIndex + 1}</span>
-                </div>
-                <p className="text-xs text-[#027659]/80 mt-1 truncate">
-                  {slides.find((s) => s.id === selectedSlide)?.title}
-                </p>
+                <p className="text-lg text-gray-600 leading-relaxed">Start a</p>
               </div>
             )}
           </div>
 
-          {/* Chat Messages */}
-          <ScrollArea className="flex-1 p-4">
-            <div className="space-y-4">
-              {chatMessages.map((message) => (
-                <div key={message.id} className="flex items-start space-x-3">
-                  <Avatar className="w-8 h-8 mt-1">
-                    <AvatarFallback
-                      className={
-                        message.type === "user" ? "bg-[#027659]/10" : "bg-gradient-to-r from-blue-100 to-indigo-100"
-                      }
-                    >
-                      {message.type === "user" ? (
-                        <User className="w-4 h-4 text-[#027659]" />
-                      ) : (
-                        <Palette className="w-4 h-4 text-blue-600" />
-                      )}
-                    </AvatarFallback>
-                  </Avatar>
-                  <div className="flex-1 min-w-0">
+          {/* Bottom Chat Interface */}
+          <div className="border-t border-gray-200 bg-white">
+            <ScrollArea className="max-h-[300px]">
+              <div className="p-6 pb-24">
+                {chatMessages.map((message) => (
+                  <div
+                    key={message.id}
+                    className={`flex flex-col ${message.type === "user" ? "items-end" : "items-start"}`}
+                  >
                     <div
-                      className={`rounded-2xl px-4 py-3 max-w-full relative group ${
-                        message.type === "user" ? "bg-[#027659] text-white ml-4" : "bg-gray-100 text-gray-900 mr-4"
+                      className={`max-w-[80%] rounded-xl px-4 py-2 text-sm break-words ${
+                        message.type === "user" ? "bg-[#027659]/10 text-gray-800" : "bg-gray-100 text-gray-700"
                       }`}
                     >
-                      {message.isLoading || message.generationProgress ? (
-                        <div className="space-y-3">
-                          {message.isLoading && message.generationProgress?.stage === "analyzing" && (
+                      {message.isLoading ? (
+                        <>
+                          {message.generationProgress?.stage === "analyzing" && (
                             <div className="flex items-center space-x-2">
-                              <div className="flex space-x-1">
-                                <div className="w-2 h-2 bg-blue-400 rounded-full animate-bounce"></div>
-                                <div
-                                  className="w-2 h-2 bg-blue-400 rounded-full animate-bounce"
-                                  style={{ animationDelay: "0.1s" }}
-                                ></div>
-                                <div
-                                  className="w-2 h-2 bg-blue-400 rounded-full animate-bounce"
-                                  style={{ animationDelay: "0.2s" }}
-                                ></div>
-                              </div>
-                              <span className="text-sm">
-                                Analyzing content for {message.generationProgress.thinkingTime}s...
-                              </span>
+                              <Loader2 className="w-4 h-4 animate-spin" />
+                              <span>Analyzing your request...</span>
+                              {message.generationProgress.thinkingTime && (
+                                <span>({message.generationProgress.thinkingTime}s)</span>
+                              )}
                             </div>
                           )}
-
-                          {message.generationProgress?.designPhase && message.isLoading && (
-                            <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-3">
-                              <div className="flex items-center justify-between mb-2">
-                                <span className="text-sm font-medium text-blue-700">
-                                  Design Phase: {message.generationProgress.designPhase}
-                                </span>
-                                <div className="flex space-x-1">
-                                  {message.generationProgress.designPhase === "layout" && (
-                                    <Layout className="h-4 w-4 text-blue-600" />
-                                  )}
-                                  {message.generationProgress.designPhase === "colors" && (
-                                    <Palette className="h-4 w-4 text-blue-600" />
-                                  )}
-                                  {message.generationProgress.designPhase === "icons" && (
-                                    <Lightbulb className="h-4 w-4 text-blue-600" />
-                                  )}
-                                  {message.generationProgress.designPhase === "charts" && (
-                                    <BarChart3 className="h-4 w-4 text-blue-600" />
-                                  )}
-                                  {message.generationProgress.designPhase === "final" && (
-                                    <Zap className="h-4 w-4 text-blue-600" />
-                                  )}
-                                </div>
+                          {message.generationProgress?.stage === "designing" && (
+                            <div className="space-y-2">
+                              <div className="flex items-center space-x-2">
+                                <Loader2 className="w-4 h-4 animate-spin" />
+                                <span>Designing slides...</span>
+                                {message.generationProgress.thinkingTime && (
+                                  <span>({message.generationProgress.thinkingTime}s)</span>
+                                )}
                               </div>
-                              <div className="text-xs text-blue-600">
-                                {message.generationProgress.designPhase === "layout" && "Structuring slide layouts..."}
-                                {message.generationProgress.designPhase === "colors" && "Applying color psychology..."}
-                                {message.generationProgress.designPhase === "icons" && "Adding visual elements..."}
-                                {message.generationProgress.designPhase === "charts" &&
-                                  "Creating data visualizations..."}
-                                {message.generationProgress.designPhase === "final" && "Finalizing design elements..."}
+                              <div className="text-xs text-gray-500">
+                                {message.generationProgress.currentSlide} ({message.generationProgress.completedSlides}/
+                                {message.generationProgress.totalSlides})
+                              </div>
+                              <div className="text-xs text-gray-500">
+                                Design Phase: {message.generationProgress.designPhase}
                               </div>
                             </div>
                           )}
-
-                          {(message.isLoading && message.generationProgress?.stage === "designing") ||
-                          message.generationProgress?.stage === "styling" ||
-                          message.generationProgress?.stage === "complete" ? (
-                            <div className="border border-gray-200 rounded-lg p-3 bg-white mb-3">
-                              <div className="flex items-center justify-between mb-2">
-                                <span className="text-sm font-medium text-gray-700">
-                                  Design Version {message.generationProgress.version}
-                                </span>
-                                <span
-                                  className={`text-xs ${message.generationProgress.stage === "complete" ? "text-green-600" : "text-blue-500"}`}
-                                >
-                                  {message.generationProgress.stage === "complete" ? "Complete" : "Designing"}
-                                </span>
-                              </div>
-                              <div className="space-y-2">
-                                {Array.from({ length: message.generationProgress.totalSlides || 0 }, (_, i) => (
-                                  <div key={i} className="flex items-center space-x-2 text-xs">
-                                    <div className="w-4 h-4 flex items-center justify-center">
-                                      {i < (message.generationProgress?.completedSlides || 0) ? (
-                                        <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                                      ) : i === (message.generationProgress?.completedSlides || 0) &&
-                                        message.isLoading ? (
-                                        <Loader2 className="w-3 h-3 animate-spin text-blue-500" />
-                                      ) : (
-                                        <div className="w-2 h-2 bg-gray-300 rounded-full"></div>
-                                      )}
-                                    </div>
-                                    <span
-                                      className={`${i < (message.generationProgress?.completedSlides || 0) ? "text-green-600" : i === (message.generationProgress?.completedSlides || 0) && message.isLoading ? "text-blue-600" : "text-gray-400"}`}
-                                    >
-                                      Slide {i + 1}:{" "}
-                                      {i === (message.generationProgress?.completedSlides || 0) && message.isLoading
-                                        ? message.generationProgress?.currentSlide
-                                        : `Professional Design`}
-                                    </span>
-                                  </div>
-                                ))}
-                              </div>
+                          {message.generationProgress?.stage === "complete" && (
+                            <div className="flex items-center space-x-2">
+                              <Loader2 className="w-4 h-4 animate-spin" />
+                              <span>Finalizing design...</span>
                             </div>
-                          ) : null}
-
-                          {!message.isLoading && message.content && (
-                            <p className="text-sm whitespace-pre-wrap">{message.content}</p>
                           )}
-                        </div>
+                        </>
                       ) : (
-                        <p className="text-sm whitespace-pre-wrap">{message.content}</p>
-                      )}
-
-                      {/* Message Actions for User Messages */}
-                      {message.type === "user" && !message.isLoading && (
-                        <div className="absolute -right-2 top-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                          <div className="flex space-x-1">
-                            <Button
-                              size="icon"
-                              variant="ghost"
-                              className="h-6 w-6 bg-white/90 hover:bg-white shadow-sm"
-                              onClick={() => navigator.clipboard.writeText(message.content)}
-                            >
-                              <Copy className="h-3 w-3" />
-                            </Button>
-                            <Button
-                              size="icon"
-                              variant="ghost"
-                              className="h-6 w-6 bg-white/90 hover:bg-white shadow-sm text-red-500 hover:text-red-600"
-                              onClick={() => {
-                                setChatMessages((prev) => prev.filter((m) => m.id !== message.id))
-                              }}
-                            >
-                              <Trash2 className="h-3 w-3" />
-                            </Button>
-                          </div>
-                        </div>
+                        <div dangerouslySetInnerHTML={{ __html: message.content }} />
                       )}
                     </div>
-                    <span className="text-xs text-gray-500 mt-1 block">
-                      {message.timestamp.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
-                    </span>
+                    <div className="text-xs text-gray-500 mt-1">{new Date(message.timestamp).toLocaleTimeString()}</div>
                   </div>
-                </div>
-              ))}
-              <div ref={chatEndRef} />
-            </div>
-          </ScrollArea>
+                ))}
+                {isStreaming && (
+                  <div className="flex items-start">
+                    <Avatar className="w-8 h-8 mr-3">
+                      <AvatarFallback>AI</AvatarFallback>
+                    </Avatar>
+                    <div className="bg-gray-100 text-gray-700 rounded-xl px-4 py-2 text-sm break-words">
+                      {streamingContent}
+                    </div>
+                  </div>
+                )}
+                <div ref={chatEndRef} />
+              </div>
+            </ScrollArea>
 
-          {/* Enhanced Chat Input */}
-          <div className="p-4 border-t border-gray-100 bg-white">
-            <div className="space-y-3">
-              <div className="bg-gray-50 rounded-2xl border border-gray-200 overflow-hidden">
-                <Textarea
-                  value={inputMessage}
-                  onChange={(e) => setInputMessage(e.target.value)}
-                  placeholder={
-                    editMode === "selected"
-                      ? "How should I enhance this slide's design?"
-                      : slides.length > 0
-                        ? "Ask me to improve your presentation design..."
-                        : "Describe the presentation you want me to design..."
-                  }
-                  onKeyPress={(e) => e.key === "Enter" && !e.shiftKey && handleChatSubmit()}
-                  className="w-full bg-transparent border-0 text-gray-900 placeholder:text-gray-500 text-sm focus-visible:ring-0 focus-visible:ring-offset-0 resize-none min-h-[80px] max-h-[120px] shadow-none outline-none focus:outline-none p-4"
-                  rows={3}
-                  disabled={v0.isLoading}
+            <div className="absolute bottom-0 left-0 w-full border-t border-gray-200 bg-white px-6 py-4">
+              <div className="flex items-center space-x-4">
+                <Button variant="ghost" size="icon" onClick={() => fileInputRef.current?.click()}>
+                  <Upload className="h-4 w-4" />
+                </Button>
+                <input
+                  type="file"
+                  ref={fileInputRef}
+                  className="hidden"
+                  onChange={handleFileUpload}
+                  accept=".pdf,.doc,.docx,.txt"
                 />
-                <div className="flex items-center justify-between p-3 pt-0">
-                  <div className="flex items-center space-x-2">
-                    <input
-                      type="file"
-                      ref={fileInputRef}
-                      onChange={handleFileUpload}
-                      accept=".txt,.doc,.docx,.pdf"
-                      className="hidden"
-                    />
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => fileInputRef.current?.click()}
-                      className="text-gray-500 hover:text-gray-700 h-8 px-2"
-                      disabled={v0.isLoading}
-                    >
-                      <Upload className="h-4 w-4" />
-                    </Button>
 
-                    {/* Design Suggestion Buttons */}
-                    <div className="flex space-x-1">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => setInputMessage("Make this more visual with icons and charts")}
-                        className="text-xs text-gray-500 hover:text-gray-700 h-8 px-2"
-                        disabled={v0.isLoading}
-                      >
-                        <ImageIcon className="h-3 w-3 mr-1" />
-                        Visual
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => setInputMessage("Add charts and data visualization")}
-                        className="text-xs text-gray-500 hover:text-gray-700 h-8 px-2"
-                        disabled={v0.isLoading}
-                      >
-                        <BarChart3 className="h-3 w-3 mr-1" />
-                        Charts
-                      </Button>
-                    </div>
-                  </div>
-                  <Button
-                    onClick={
-                      isStreaming
-                        ? () => {
-                            setIsStreaming(false)
-                            setChatMessages((prev) => prev.filter((msg) => !msg.isLoading))
-                          }
-                        : handleChatSubmit
-                    }
-                    size="sm"
-                    disabled={!isStreaming && !inputMessage.trim()}
-                    className={`${isStreaming ? "bg-red-600 hover:bg-red-700" : "bg-[#027659] hover:bg-[#065f46]"} text-white rounded-lg px-4 py-2`}
-                  >
-                    {isStreaming ? (
-                      <>
-                        <div className="w-3 h-3 bg-white rounded-sm mr-2"></div>
-                        Stop
-                      </>
-                    ) : (
-                      <Send className="h-4 w-4" />
-                    )}
-                  </Button>
+                <div className="flex-1">
+                  <Textarea
+                    rows={1}
+                    value={inputMessage}
+                    onChange={(e) => setInputMessage(e.target.value)}
+                    placeholder="Describe your presentation..."
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" && !e.shiftKey) {
+                        e.preventDefault()
+                        handleChatSubmit()
+                      }
+                    }}
+                    className="resize-none border-0 shadow-none outline-none focus-visible:ring-0 focus-visible:ring-offset-0 placeholder:text-gray-500 text-sm"
+                  />
                 </div>
+
+                <Button onClick={handleChatSubmit} disabled={v0.isLoading || isStreaming}>
+                  {v0.isLoading || isStreaming ? (
+                    <>
+                      Generating...
+                      <Loader2 className="w-4 h-4 ml-2 animate-spin" />
+                    </>
+                  ) : (
+                    <Send className="h-4 w-4" />
+                  )}
+                </Button>
               </div>
 
-              {/* Design Quick Actions */}
-              <div className="flex flex-wrap gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setInputMessage("Make the design more professional and corporate")}
-                  className="text-xs bg-transparent"
-                  disabled={v0.isLoading}
-                >
-                  🏢 Corporate
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setInputMessage("Add more icons and visual elements")}
-                  className="text-xs bg-transparent"
-                  disabled={v0.isLoading}
-                >
-                  ✨ Visual
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setInputMessage("Make it more modern and creative")}
-                  className="text-xs bg-transparent"
-                  disabled={v0.isLoading}
-                >
-                  🎨 Modern
-                </Button>
+              {/* Edit Mode Toggle */}
+              <div className="mt-3 flex items-center space-x-2 text-sm text-gray-500">
+                <input
+                  type="radio"
+                  id="edit-all"
+                  name="edit-mode"
+                  value="all"
+                  checked={editMode === "all"}
+                  onChange={() => setEditMode("all")}
+                  className="h-4 w-4 text-[#027659] focus:ring-0 cursor-pointer"
+                />
+                <label htmlFor="edit-all" className="cursor-pointer">
+                  Edit All Slides
+                </label>
+
+                <input
+                  type="radio"
+                  id="edit-selected"
+                  name="edit-mode"
+                  value="selected"
+                  checked={editMode === "selected"}
+                  onChange={() => setEditMode("selected")}
+                  disabled={!selectedSlide}
+                  className="h-4 w-4 text-[#027659] focus:ring-0 cursor-pointer"
+                />
+                <label htmlFor="edit-selected" className="cursor-pointer">
+                  Edit Selected Slide
+                </label>
               </div>
             </div>
           </div>
         </div>
+        <ExportDialog
+          open={showExportDialog}
+          onOpenChange={setShowExportDialog}
+          slides={slides}
+          projectName={projectName}
+        />
       </div>
-
-      <ExportDialog
-        open={showExportDialog}
-        onOpenChange={setShowExportDialog}
-        projectName={projectName}
-        slideCount={slides.length}
-      />
     </TooltipProvider>
   )
 }
