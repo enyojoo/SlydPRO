@@ -28,6 +28,7 @@ import {
   Minimize,
   Loader2,
   Check,
+  Square,
 } from "lucide-react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { useV0Integration } from "@/hooks/useV0Integration"
@@ -73,6 +74,39 @@ const colorThemes = [
   { name: "Orange", primary: "#ea580c", secondary: "#f97316", text: "#ffffff" },
   { name: "Dark", primary: "#1f2937", secondary: "#374151", text: "#ffffff" },
 ]
+
+// Helper function to parse slides from raw markdown content
+function parseSlidesFromMarkdown(markdownContent: string): Slide[] {
+  const slides: Slide[] = []
+  const slideMatches = markdownContent.match(/(?:##|###)\s*(?:Slide\s*\d+:?\s*)?(.+?)(?=(?:##|###)|$)/gs)
+
+  if (slideMatches) {
+    slideMatches.forEach((match, index) => {
+      const lines = match.split("\n").filter((line) => line.trim())
+      const titleLine = lines[0].replace(/^#+\s*(?:Slide\s*\d+:?\s*)?/, "").trim()
+      const contentLines = lines
+        .slice(1)
+        .filter((line) => !line.startsWith("#"))
+        .join("\n")
+        .trim()
+
+      // Dummy logic for layout and colors for real-time preview
+      const layout: Slide["layout"] = titleLine.toLowerCase().includes("title") ? "title" : "content"
+      const background = colorThemes[0].primary // Use a default for real-time
+      const textColor = colorThemes[0].text // Use a default for real-time
+
+      slides.push({
+        id: `temp-slide-${index + 1}`, // Use temp IDs for streaming
+        title: titleLine,
+        content: contentLines || "Content will be generated...",
+        background,
+        textColor,
+        layout,
+      })
+    })
+  }
+  return slides
+}
 
 function EditorContent() {
   const [isSmallScreen, setIsSmallScreen] = useState(false)
@@ -130,13 +164,15 @@ function EditorContent() {
       const loadingMessage: ChatMessage = {
         id: (Date.now() + 1).toString(),
         type: "assistant",
-        content: "",
+        content: "", // Content will be streamed
         timestamp: new Date(),
         isLoading: true,
         generationProgress: {
           stage: "thinking",
           thinkingTime: 0,
-          version: 1,
+          version: chatMessages.filter((m) => m.generationProgress?.version).length + 1,
+          totalSlides: 7, // Initial estimate
+          completedSlides: 0,
         },
       }
 
@@ -150,7 +186,7 @@ function EditorContent() {
         thinkingTime += 1
         setChatMessages((prev) =>
           prev.map((msg) =>
-            msg.isLoading
+            msg.isLoading && msg.generationProgress?.stage === "thinking"
               ? {
                   ...msg,
                   generationProgress: {
@@ -169,59 +205,41 @@ function EditorContent() {
         uploadedFile,
         // onChunk - Real-time content streaming
         (chunk: string) => {
-          setStreamingContent((prev) => prev + chunk)
+          setStreamingContent((prev) => {
+            const newContent = prev + chunk
+            const parsedSlides = parseSlidesFromMarkdown(newContent)
+            const completedSlides = parsedSlides.length
 
-          // Transition to designing phase when we start getting content
-          if (chunk.includes("##") || chunk.includes("Slide")) {
-            clearInterval(thinkingInterval)
-            setChatMessages((prev) =>
-              prev.map((msg) =>
+            // Update slides preview in real-time
+            const themedSlides = parsedSlides.map((slide, index) => ({
+              ...slide,
+              background: index === 0 ? selectedTheme.primary : selectedTheme.secondary,
+              textColor: selectedTheme.text,
+            }))
+            setSlides(themedSlides)
+            if (themedSlides.length > 0 && !selectedSlide) {
+              setSelectedSlide(themedSlides[0].id)
+              setCurrentSlideIndex(0)
+            }
+
+            // Update chat message progress
+            setChatMessages((prevMsgs) =>
+              prevMsgs.map((msg) =>
                 msg.isLoading
                   ? {
                       ...msg,
                       generationProgress: {
                         ...msg.generationProgress!,
-                        stage: "designing",
-                        totalSlides: 7, // We'll update this as we detect slides
-                        completedSlides: 0,
+                        stage: "designing", // Always transition to designing once chunks start
+                        completedSlides,
+                        currentSlide: parsedSlides[completedSlides - 1]?.title || `Slide ${completedSlides}`,
                       },
                     }
                   : msg,
               ),
             )
-
-            // Count slides in real-time as they're generated
-            const slideMatches = (streamingContent + chunk).match(
-              /(?:##|###)\s*(?:Slide\s*\d+:?\s*)?(.+?)(?=(?:##|###)|$)/gs,
-            )
-            if (slideMatches) {
-              const completedSlides = slideMatches.length
-              const slideNames = [
-                "Title Slide",
-                "Problem Statement",
-                "Solution Overview",
-                "Market Analysis",
-                "Business Model",
-                "Financial Projections",
-                "Call to Action",
-              ]
-
-              setChatMessages((prev) =>
-                prev.map((msg) =>
-                  msg.isLoading
-                    ? {
-                        ...msg,
-                        generationProgress: {
-                          ...msg.generationProgress!,
-                          completedSlides,
-                          currentSlide: slideNames[completedSlides - 1] || `Slide ${completedSlides}`,
-                        },
-                      }
-                    : msg,
-                ),
-              )
-            }
-          }
+            return newContent
+          })
         },
         // onComplete
         async (result) => {
@@ -290,7 +308,7 @@ function EditorContent() {
         },
       )
     },
-    [v0, uploadedFile, selectedTheme, projectName, authUser],
+    [v0, uploadedFile, selectedTheme, projectName, authUser, selectedSlide, chatMessages.length],
   )
 
   const autoSave = useCallback(async () => {
@@ -340,6 +358,8 @@ function EditorContent() {
         stage: "thinking",
         thinkingTime: 0,
         version: chatMessages.filter((m) => m.generationProgress?.version).length + 1,
+        totalSlides: slides.length > 0 ? slides.length : 7, // Estimate total slides
+        completedSlides: 0,
       },
     }
 
@@ -353,7 +373,7 @@ function EditorContent() {
       thinkingTime += 1
       setChatMessages((prev) =>
         prev.map((msg) =>
-          msg.isLoading
+          msg.isLoading && msg.generationProgress?.stage === "thinking"
             ? {
                 ...msg,
                 generationProgress: {
@@ -461,6 +481,13 @@ function EditorContent() {
         content: "Analyzing your document and creating slides...",
         timestamp: new Date(),
         isLoading: true,
+        generationProgress: {
+          stage: "thinking",
+          thinkingTime: 0,
+          version: chatMessages.filter((m) => m.generationProgress?.version).length + 1,
+          totalSlides: 7, // Initial estimate
+          completedSlides: 0,
+        },
       }
 
       setChatMessages((prev) => [...prev, userMessage, loadingMessage])
@@ -496,7 +523,7 @@ function EditorContent() {
     setCurrentSlideIndex(index)
     setEditMode("selected")
 
-    // Remove the automatic chat message - only update the UI indicator
+    // Removed the automatic chat message here as per user request
   }
 
   const handleThemeChange = (themeName: string) => {
@@ -652,7 +679,7 @@ function EditorContent() {
     }
 
     setIsInitialized(true)
-  }, [authUser, messages]) // Add authUser and messages as dependencies
+  }, [authUser, messages, isInitialized, searchParams, handleInitialGeneration]) // Add isInitialized to dependencies
 
   // Show warning for small screens
   if (isSmallScreen) {
@@ -1094,7 +1121,9 @@ function EditorContent() {
                     // User message - right aligned
                     <div className="flex items-start justify-end space-x-3">
                       <div className="flex-1 min-w-0 flex flex-col items-end">
-                        <div className="bg-[#027659] text-white rounded-2xl px-4 py-3 max-w-[80%]">
+                        <div className="bg-[#027659] text-white rounded-2xl px-4 py-3 max-w-[calc(100%-40px)]">
+                          {" "}
+                          {/* Adjusted max-width */}
                           <p className="text-sm whitespace-pre-wrap">{message.content}</p>
                         </div>
 
@@ -1162,7 +1191,9 @@ function EditorContent() {
                         </AvatarFallback>
                       </Avatar>
                       <div className="flex-1 min-w-0">
-                        <div className="bg-gray-100 text-gray-900 rounded-2xl px-4 py-3 max-w-[80%]">
+                        <div className="bg-gray-100 text-gray-900 rounded-2xl px-4 py-3 max-w-[calc(100%-40px)]">
+                          {" "}
+                          {/* Adjusted max-width */}
                           {message.isLoading ? (
                             <div className="space-y-4">
                               {message.generationProgress?.stage === "thinking" && (
@@ -1216,7 +1247,7 @@ function EditorContent() {
 
                                         const isCompleted = i < (message.generationProgress?.completedSlides || 0)
                                         const isCurrent = i === (message.generationProgress?.completedSlides || 0)
-                                        const isUpcoming = i > (message.generationProgress?.completedSlides || 0)
+                                        // const isUpcoming = i > (message.generationProgress?.completedSlides || 0) // Not directly used for styling
 
                                         return (
                                           <div key={i} className="relative flex items-center">
@@ -1361,10 +1392,7 @@ function EditorContent() {
                     className={`${isStreaming ? "bg-red-600 hover:bg-red-700" : "bg-[#027659] hover:bg-[#065f46]"} text-white rounded-lg px-4 py-2`}
                   >
                     {isStreaming ? (
-                      <>
-                        <div className="w-3 h-3 bg-white rounded-sm mr-2"></div>
-                        Stop
-                      </>
+                      <Square className="h-4 w-4" /> // Stop icon
                     ) : (
                       <Send className="h-4 w-4" />
                     )}
