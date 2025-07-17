@@ -68,21 +68,53 @@ export function generatePresentationThumbnail(slides: any[]): string {
 
 // Server-side thumbnail generation using SVG (for API routes)
 export function generateSVGThumbnail(slide: any): string {
-  const titleText = slide.title.substring(0, 30) + (slide.title.length > 30 ? "..." : "")
-  const contentText = slide.content.substring(0, 80) + (slide.content.length > 80 ? "..." : "")
+  const titleText = slide.title.substring(0, 40) + (slide.title.length > 40 ? "..." : "")
+  const contentText = slide.content.substring(0, 100) + (slide.content.length > 100 ? "..." : "")
 
+  // Create a more detailed thumbnail
   const svg = `
     <svg width="320" height="180" xmlns="http://www.w3.org/2000/svg">
-      <rect width="100%" height="100%" fill="${slide.background || "#027659"}"/>
-      <text x="20" y="30" font-family="Arial, sans-serif" font-size="16" font-weight="bold" fill="${slide.textColor || "#ffffff"}" text-anchor="start">
-        ${titleText}
+      <defs>
+        <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" style="stop-color:${slide.background || "#027659"};stop-opacity:1" />
+          <stop offset="100%" style="stop-color:${slide.background || "#027659"};stop-opacity:0.8" />
+        </linearGradient>
+      </defs>
+      <rect width="100%" height="100%" fill="url(#bg)"/>
+      
+      <!-- Title -->
+      <text x="20" y="35" font-family="Arial, sans-serif" font-size="18" font-weight="bold" 
+            fill="${slide.textColor || "#ffffff"}" text-anchor="start">
+        ${titleText.split(" ").slice(0, 4).join(" ")}
       </text>
-      <text x="20" y="55" font-family="Arial, sans-serif" font-size="12" fill="${slide.textColor || "#ffffff"}" opacity="0.8" text-anchor="start">
+      ${
+        titleText.split(" ").length > 4
+          ? `
+      <text x="20" y="55" font-family="Arial, sans-serif" font-size="18" font-weight="bold" 
+            fill="${slide.textColor || "#ffffff"}" text-anchor="start">
+        ${titleText.split(" ").slice(4).join(" ")}
+      </text>`
+          : ""
+      }
+      
+      <!-- Content preview -->
+      <text x="20" y="85" font-family="Arial, sans-serif" font-size="12" 
+            fill="${slide.textColor || "#ffffff"}" opacity="0.9" text-anchor="start">
         ${contentText.split(" ").slice(0, 8).join(" ")}
       </text>
-      <text x="20" y="75" font-family="Arial, sans-serif" font-size="12" fill="${slide.textColor || "#ffffff"}" opacity="0.8" text-anchor="start">
+      <text x="20" y="105" font-family="Arial, sans-serif" font-size="12" 
+            fill="${slide.textColor || "#ffffff"}" opacity="0.9" text-anchor="start">
         ${contentText.split(" ").slice(8, 16).join(" ")}
       </text>
+      <text x="20" y="125" font-family="Arial, sans-serif" font-size="12" 
+            fill="${slide.textColor || "#ffffff"}" opacity="0.9" text-anchor="start">
+        ${contentText.split(" ").slice(16, 24).join(" ")}
+      </text>
+      
+      <!-- Slide indicator -->
+      <circle cx="290" cy="160" r="8" fill="${slide.textColor || "#ffffff"}" opacity="0.3"/>
+      <text x="290" y="165" font-family="Arial, sans-serif" font-size="10" font-weight="bold"
+            fill="${slide.background || "#027659"}" text-anchor="middle">1</text>
     </svg>
   `
 
