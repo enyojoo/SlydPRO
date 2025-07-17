@@ -7,7 +7,7 @@ import { useState, useRef, useEffect, useCallback } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import { TooltipProvider } from "@/components/ui/tooltip"
+import { TooltipProvider, Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { Textarea } from "@/components/ui/textarea"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import {
@@ -27,6 +27,7 @@ import {
   Download,
   Minimize,
   Loader2,
+  Check,
 } from "lucide-react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { useV0Integration } from "@/hooks/useV0Integration"
@@ -61,6 +62,7 @@ interface GenerationProgress {
   totalSlides?: number
   completedSlides?: number
   version?: number
+  isComplete?: boolean
 }
 
 const colorThemes = [
@@ -91,6 +93,7 @@ function EditorContent() {
   const [isSaving, setIsSaving] = useState(false)
   const [streamingContent, setStreamingContent] = useState("")
   const [isStreaming, setIsStreaming] = useState(false)
+  const [copiedMessageId, setCopiedMessageId] = useState<string | null>(null)
 
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -103,6 +106,16 @@ function EditorContent() {
 
   const checkScreenSize = () => {
     setIsSmallScreen(window.innerWidth < 1024)
+  }
+
+  const handleCopyMessage = async (messageId: string, content: string) => {
+    try {
+      await navigator.clipboard.writeText(content)
+      setCopiedMessageId(messageId)
+      setTimeout(() => setCopiedMessageId(null), 2000) // Reset after 2 seconds
+    } catch (error) {
+      console.error("Failed to copy message:", error)
+    }
   }
 
   const handleInitialGeneration = useCallback(
@@ -150,39 +163,17 @@ function EditorContent() {
         )
       }, 1000)
 
-      // Simulate design phase after thinking
-      setTimeout(() => {
-        clearInterval(thinkingInterval)
-        setChatMessages((prev) =>
-          prev.map((msg) =>
-            msg.isLoading
-              ? {
-                  ...msg,
-                  generationProgress: {
-                    ...msg.generationProgress!,
-                    stage: "designing",
-                    totalSlides: 7, // Estimated slides
-                    completedSlides: 0,
-                  },
-                }
-              : msg,
-          ),
-        )
+      // Use streaming generation with real-time progress
+      await v0.generateSlidesStreaming(
+        prompt,
+        uploadedFile,
+        // onChunk - Real-time content streaming
+        (chunk: string) => {
+          setStreamingContent((prev) => prev + chunk)
 
-        // Simulate slide generation progress
-        let completedSlides = 0
-        const slideNames = [
-          "Title Slide",
-          "Problem Statement",
-          "Solution Overview",
-          "Market Analysis",
-          "Business Model",
-          "Financial Projections",
-          "Call to Action",
-        ]
-
-        const slideInterval = setInterval(() => {
-          if (completedSlides < slideNames.length) {
+          // Transition to designing phase when we start getting content
+          if (chunk.includes("##") || chunk.includes("Slide")) {
+            clearInterval(thinkingInterval)
             setChatMessages((prev) =>
               prev.map((msg) =>
                 msg.isLoading
@@ -190,35 +181,52 @@ function EditorContent() {
                       ...msg,
                       generationProgress: {
                         ...msg.generationProgress!,
-                        currentSlide: slideNames[completedSlides],
-                        completedSlides: completedSlides + 1,
+                        stage: "designing",
+                        totalSlides: 7, // We'll update this as we detect slides
+                        completedSlides: 0,
                       },
                     }
                   : msg,
               ),
             )
-            completedSlides++
-          } else {
-            clearInterval(slideInterval)
-          }
-        }, 800)
-      }, 3000)
 
-      // Use streaming generation
-      await v0.generateSlidesStreaming(
-        prompt,
-        uploadedFile,
-        // onChunk
-        (chunk: string) => {
-          setStreamingContent((prev) => prev + chunk)
+            // Count slides in real-time as they're generated
+            const slideMatches = (streamingContent + chunk).match(
+              /(?:##|###)\s*(?:Slide\s*\d+:?\s*)?(.+?)(?=(?:##|###)|$)/gs,
+            )
+            if (slideMatches) {
+              const completedSlides = slideMatches.length
+              const slideNames = [
+                "Title Slide",
+                "Problem Statement",
+                "Solution Overview",
+                "Market Analysis",
+                "Business Model",
+                "Financial Projections",
+                "Call to Action",
+              ]
+
+              setChatMessages((prev) =>
+                prev.map((msg) =>
+                  msg.isLoading
+                    ? {
+                        ...msg,
+                        generationProgress: {
+                          ...msg.generationProgress!,
+                          completedSlides,
+                          currentSlide: slideNames[completedSlides - 1] || `Slide ${completedSlides}`,
+                        },
+                      }
+                    : msg,
+                ),
+              )
+            }
+          }
         },
         // onComplete
         async (result) => {
           setIsStreaming(false)
           clearInterval(thinkingInterval)
-
-          // Remove loading message and add completion
-          setChatMessages((prev) => prev.filter((msg) => !msg.isLoading))
 
           if (result) {
             const themedSlides = result.slides.map((slide, index) => ({
@@ -245,17 +253,25 @@ function EditorContent() {
               }
             }
 
-            const assistantMessage: ChatMessage = {
-              id: (Date.now() + 2).toString(),
-              type: "assistant",
-              content: `✅ Your slides have been designed! Check the preview.\n\nI've created ${result.slides.length} slides for your presentation:\n\n${result.slides.map((slide, i) => `${i + 1}. ${slide.title}`).join("\n")}\n\nYou can make further improvements - just tell me what to change!`,
-              timestamp: new Date(),
-              generationProgress: {
-                stage: "complete",
-                version: 1,
-              },
-            }
-            setChatMessages((prev) => [...prev, assistantMessage])
+            // Update the loading message to show completion
+            setChatMessages((prev) =>
+              prev.map((msg) =>
+                msg.isLoading
+                  ? {
+                      ...msg,
+                      isLoading: false,
+                      content: `✅ Slides have been generated! I've created ${result.slides.length} slides for your presentation.\n\nFeel free to ask me to change anything by selecting all slides or a specific slide.`,
+                      generationProgress: {
+                        ...msg.generationProgress!,
+                        stage: "complete",
+                        isComplete: true,
+                        completedSlides: result.slides.length,
+                        totalSlides: result.slides.length,
+                      },
+                    }
+                  : msg,
+              ),
+            )
           }
         },
         // onError
@@ -320,11 +336,35 @@ function EditorContent() {
       content: "Working on it...",
       timestamp: new Date(),
       isLoading: true,
+      generationProgress: {
+        stage: "thinking",
+        thinkingTime: 0,
+        version: chatMessages.filter((m) => m.generationProgress?.version).length + 1,
+      },
     }
 
     setChatMessages((prev) => [...prev, userMessage, loadingMessage])
     const currentInput = inputMessage
     setInputMessage("")
+
+    // Start thinking timer for follow-up requests
+    let thinkingTime = 0
+    const thinkingInterval = setInterval(() => {
+      thinkingTime += 1
+      setChatMessages((prev) =>
+        prev.map((msg) =>
+          msg.isLoading
+            ? {
+                ...msg,
+                generationProgress: {
+                  ...msg.generationProgress!,
+                  thinkingTime,
+                },
+              }
+            : msg,
+        ),
+      )
+    }, 1000)
 
     if (editMode === "selected" && selectedSlide) {
       // Edit only the selected slide
@@ -332,7 +372,7 @@ function EditorContent() {
       if (slide) {
         const result = await v0.editSlide(selectedSlide, slide.title, currentInput)
 
-        // Remove loading message
+        clearInterval(thinkingInterval)
         setChatMessages((prev) => prev.filter((msg) => !msg.isLoading))
 
         if (result) {
@@ -361,7 +401,7 @@ function EditorContent() {
         result = await v0.generateSlides(currentInput, uploadedFile)
       }
 
-      // Remove loading message
+      clearInterval(thinkingInterval)
       setChatMessages((prev) => prev.filter((msg) => !msg.isLoading))
 
       if (result) {
@@ -390,7 +430,7 @@ function EditorContent() {
     }
 
     if (v0.error) {
-      // Remove loading message
+      clearInterval(thinkingInterval)
       setChatMessages((prev) => prev.filter((msg) => !msg.isLoading))
 
       const errorMessage: ChatMessage = {
@@ -1158,7 +1198,27 @@ function EditorContent() {
                             )}
                           </div>
                         ) : (
-                          <p className="text-sm whitespace-pre-wrap">{message.content}</p>
+                          <div className="space-y-3">
+                            <p className="text-sm whitespace-pre-wrap">{message.content}</p>
+
+                            {/* Show generation progress for completed messages */}
+                            {message.generationProgress?.isComplete && (
+                              <div className="border border-green-200 rounded-lg p-3 bg-green-50 shadow-sm">
+                                <div className="flex items-center justify-between mb-2">
+                                  <div className="flex items-center space-x-2">
+                                    <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                                    <span className="text-sm font-semibold text-green-800">
+                                      Version {message.generationProgress.version}
+                                    </span>
+                                  </div>
+                                  <span className="text-xs text-green-600 font-medium">Complete</span>
+                                </div>
+                                <p className="text-xs text-green-700">
+                                  Generated {message.generationProgress.completedSlides} slides successfully
+                                </p>
+                              </div>
+                            )}
+                          </div>
                         )}
                       </div>
 
@@ -1172,26 +1232,43 @@ function EditorContent() {
                   {/* Action buttons for user messages - positioned under the message */}
                   {message.type === "user" && !message.isLoading && (
                     <div className="flex justify-end space-x-2 mr-4">
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        className="h-7 px-2 text-xs text-gray-500 hover:text-gray-700 hover:bg-gray-100"
-                        onClick={() => navigator.clipboard.writeText(message.content)}
-                      >
-                        <Copy className="h-3 w-3 mr-1" />
-                        Copy
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        className="h-7 px-2 text-xs text-red-500 hover:text-red-700 hover:bg-red-50"
-                        onClick={() => {
-                          setChatMessages((prev) => prev.filter((m) => m.id !== message.id))
-                        }}
-                      >
-                        <Trash2 className="h-3 w-3 mr-1" />
-                        Delete
-                      </Button>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="h-7 w-7 p-0 text-gray-500 hover:text-gray-700 hover:bg-gray-100"
+                            onClick={() => handleCopyMessage(message.id, message.content)}
+                          >
+                            {copiedMessageId === message.id ? (
+                              <Check className="h-3 w-3 text-green-600" />
+                            ) : (
+                              <Copy className="h-3 w-3" />
+                            )}
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p>{copiedMessageId === message.id ? "Copied!" : "Copy"}</p>
+                        </TooltipContent>
+                      </Tooltip>
+
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="h-7 w-7 p-0 text-red-500 hover:text-red-700 hover:bg-red-50"
+                            onClick={() => {
+                              setChatMessages((prev) => prev.filter((m) => m.id !== message.id))
+                            }}
+                          >
+                            <Trash2 className="h-3 w-3" />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p>Delete</p>
+                        </TooltipContent>
+                      </Tooltip>
                     </div>
                   )}
                 </div>
