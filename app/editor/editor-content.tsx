@@ -7,9 +7,8 @@ import { useState, useRef, useEffect, useCallback } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import { TooltipProvider, Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
+import { TooltipProvider } from "@/components/ui/tooltip"
 import { Textarea } from "@/components/ui/textarea"
-import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import {
   Send,
   Upload,
@@ -21,8 +20,6 @@ import {
   Zap,
   Target,
   RefreshCw,
-  Bot,
-  User,
   Play,
   Download,
   Minimize,
@@ -64,6 +61,7 @@ interface GenerationProgress {
   completedSlides?: number
   version?: number
   isComplete?: boolean
+  isMinimized?: boolean
 }
 
 const colorThemes = [
@@ -119,6 +117,7 @@ function EditorContent() {
     }
   }
 
+  // Update the handleInitialGeneration function to provide real-time streaming:
   const handleInitialGeneration = useCallback(
     async (prompt: string) => {
       const userMessage: ChatMessage = {
@@ -138,6 +137,8 @@ function EditorContent() {
           stage: "thinking",
           thinkingTime: 0,
           version: 1,
+          totalSlides: 7,
+          completedSlides: 0,
         },
       }
 
@@ -164,65 +165,68 @@ function EditorContent() {
         )
       }, 1000)
 
-      // Use streaming generation with real-time progress
+      // Simulate real-time slide generation progress
+      let currentSlideIndex = 0
+      const slideNames = [
+        "Title Slide",
+        "Problem Statement",
+        "Solution Overview",
+        "Market Analysis",
+        "Business Model",
+        "Financial Projections",
+        "Call to Action",
+      ]
+
+      // Transition to designing after thinking
+      setTimeout(() => {
+        clearInterval(thinkingInterval)
+        setChatMessages((prev) =>
+          prev.map((msg) =>
+            msg.isLoading
+              ? {
+                  ...msg,
+                  generationProgress: {
+                    ...msg.generationProgress!,
+                    stage: "designing",
+                    currentSlide: slideNames[0],
+                  },
+                }
+              : msg,
+          ),
+        )
+
+        // Simulate slide-by-slide generation
+        const slideInterval = setInterval(() => {
+          currentSlideIndex++
+
+          setChatMessages((prev) =>
+            prev.map((msg) =>
+              msg.isLoading
+                ? {
+                    ...msg,
+                    generationProgress: {
+                      ...msg.generationProgress!,
+                      completedSlides: currentSlideIndex,
+                      currentSlide: slideNames[currentSlideIndex] || `Slide ${currentSlideIndex + 1}`,
+                    },
+                  }
+                : msg,
+            ),
+          )
+
+          if (currentSlideIndex >= slideNames.length) {
+            clearInterval(slideInterval)
+          }
+        }, 800) // Each slide takes ~800ms to generate
+      }, 3000) // Think for 3 seconds
+
+      // Use streaming generation
       await v0.generateSlidesStreaming(
         prompt,
         uploadedFile,
-        // onChunk - Real-time content streaming
+        // onChunk
         (chunk: string) => {
           setStreamingContent((prev) => prev + chunk)
-
-          // Transition to designing phase when we start getting content
-          if (chunk.includes("##") || chunk.includes("Slide")) {
-            clearInterval(thinkingInterval)
-            setChatMessages((prev) =>
-              prev.map((msg) =>
-                msg.isLoading
-                  ? {
-                      ...msg,
-                      generationProgress: {
-                        ...msg.generationProgress!,
-                        stage: "designing",
-                        totalSlides: 7, // We'll update this as we detect slides
-                        completedSlides: 0,
-                      },
-                    }
-                  : msg,
-              ),
-            )
-
-            // Count slides in real-time as they're generated
-            const slideMatches = (streamingContent + chunk).match(
-              /(?:##|###)\s*(?:Slide\s*\d+:?\s*)?(.+?)(?=(?:##|###)|$)/gs,
-            )
-            if (slideMatches) {
-              const completedSlides = slideMatches.length
-              const slideNames = [
-                "Title Slide",
-                "Problem Statement",
-                "Solution Overview",
-                "Market Analysis",
-                "Business Model",
-                "Financial Projections",
-                "Call to Action",
-              ]
-
-              setChatMessages((prev) =>
-                prev.map((msg) =>
-                  msg.isLoading
-                    ? {
-                        ...msg,
-                        generationProgress: {
-                          ...msg.generationProgress!,
-                          completedSlides,
-                          currentSlide: slideNames[completedSlides - 1] || `Slide ${completedSlides}`,
-                        },
-                      }
-                    : msg,
-                ),
-              )
-            }
-          }
         },
         // onComplete
         async (result) => {
@@ -240,7 +244,7 @@ function EditorContent() {
             setSelectedSlide(themedSlides[0]?.id || "")
             setCurrentSlideIndex(0)
 
-            // Save to database only if user is authenticated
+            // Save to database
             if (authUser) {
               try {
                 const presentation = await presentationsAPI.createPresentation({
@@ -254,20 +258,21 @@ function EditorContent() {
               }
             }
 
-            // Update the loading message to show completion
+            // Update to completion state
             setChatMessages((prev) =>
               prev.map((msg) =>
                 msg.isLoading
                   ? {
                       ...msg,
                       isLoading: false,
-                      content: `✅ Slides have been generated! I've created ${result.slides.length} slides for your presentation.\n\nFeel free to ask me to change anything by selecting all slides or a specific slide.`,
+                      content: `I've successfully created your presentation with ${result.slides.length} slides. Each slide is designed to tell your story effectively. You can now edit individual slides or ask me to make changes to the entire presentation.`,
                       generationProgress: {
                         ...msg.generationProgress!,
                         stage: "complete",
                         isComplete: true,
                         completedSlides: result.slides.length,
                         totalSlides: result.slides.length,
+                        isMinimized: false,
                       },
                     }
                   : msg,
@@ -293,6 +298,23 @@ function EditorContent() {
     },
     [v0, uploadedFile, selectedTheme, projectName, authUser],
   )
+
+  // Add function to toggle progress minimization
+  const toggleProgressMinimization = (messageId: string) => {
+    setChatMessages((prev) =>
+      prev.map((msg) =>
+        msg.id === messageId && msg.generationProgress
+          ? {
+              ...msg,
+              generationProgress: {
+                ...msg.generationProgress,
+                isMinimized: !msg.generationProgress.isMinimized,
+              },
+            }
+          : msg,
+      ),
+    )
+  }
 
   const autoSave = useCallback(async () => {
     if (!currentPresentationId || !authUser || slides.length === 0) return
@@ -1038,8 +1060,7 @@ function EditorContent() {
                 </div>
                 <h2 className="text-3xl font-bold text-gray-900 mb-4">Ready to Design</h2>
                 <p className="text-lg text-gray-600 leading-relaxed">
-              Ask SlydPRO AI to design your presentation slides.
-
+                  Ask SlydPRO AI to design your presentation slides.
                 </p>
               </div>
             )}
@@ -1087,220 +1108,219 @@ function EditorContent() {
           </div>
 
           {/* Chat Messages */}
-          <ScrollArea className="flex-1 p-4">
+          <ScrollArea className="flex-1 p-3">
             <div className="space-y-4">
               {chatMessages.map((message) => (
-                <div key={message.id} className="space-y-3">
+                <div key={message.id} className="space-y-2">
                   {message.type === "user" ? (
-                    // User message - right aligned
-                    <div className="flex items-start justify-end space-x-3">
-                      <div className="flex-1 min-w-0 flex flex-col items-end">
-                        <div className="bg-[#027659] text-white rounded-2xl px-4 py-3 max-w-[calc(100%-48px)]">
-                          <p className="text-sm whitespace-pre-wrap">{message.content}</p>
+                    // User message - modern design, full width
+                    <div className="flex justify-end">
+                      <div className="bg-[#027659] text-white rounded-2xl px-4 py-3 max-w-[85%] shadow-sm">
+                        <p className="text-sm whitespace-pre-wrap leading-relaxed">{message.content}</p>
+                        <div className="flex items-center justify-between mt-2 pt-2 border-t border-white/20">
+                          <span className="text-xs opacity-70">
+                            {message.timestamp.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                          </span>
+                          <div className="flex space-x-1">
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="h-6 w-6 p-0 text-white/70 hover:text-white hover:bg-white/20"
+                              onClick={() => handleCopyMessage(message.id, message.content)}
+                            >
+                              {copiedMessageId === message.id ? (
+                                <Check className="h-3 w-3" />
+                              ) : (
+                                <Copy className="h-3 w-3" />
+                              )}
+                            </Button>
+                          </div>
                         </div>
+                      </div>
+                    </div>
+                  ) : (
+                    // Assistant message - modern design, full width
+                    <div className="flex justify-start">
+                      <div className="bg-gray-50 border border-gray-200 text-gray-900 rounded-2xl px-4 py-3 max-w-[85%] shadow-sm">
+                        {message.isLoading ? (
+                          <div className="space-y-4">
+                            {message.generationProgress?.stage === "thinking" && (
+                              <div className="space-y-3">
+                                <div className="flex items-center space-x-3">
+                                  <div className="flex space-x-1">
+                                    <div className="w-2 h-2 bg-blue-500 rounded-full animate-bounce"></div>
+                                    <div
+                                      className="w-2 h-2 bg-blue-500 rounded-full animate-bounce"
+                                      style={{ animationDelay: "0.1s" }}
+                                    ></div>
+                                    <div
+                                      className="w-2 h-2 bg-blue-500 rounded-full animate-bounce"
+                                      style={{ animationDelay: "0.2s" }}
+                                    ></div>
+                                  </div>
+                                  <span className="text-sm font-medium text-gray-700">Thinking...</span>
+                                </div>
+                                <p className="text-xs text-gray-500">
+                                  Analyzing your request ({message.generationProgress.thinkingTime}s)
+                                </p>
+                              </div>
+                            )}
 
-                        {/* Action buttons directly under user message */}
-                        {!message.isLoading && (
-                          <div className="flex space-x-2 mt-2">
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <Button
-                                  size="sm"
-                                  variant="ghost"
-                                  className="h-7 w-7 p-0 text-gray-500 hover:text-gray-700 hover:bg-gray-100"
-                                  onClick={() => handleCopyMessage(message.id, message.content)}
-                                >
-                                  {copiedMessageId === message.id ? (
-                                    <Check className="h-3 w-3 text-green-600" />
-                                  ) : (
-                                    <Copy className="h-3 w-3" />
-                                  )}
-                                </Button>
-                              </TooltipTrigger>
-                              <TooltipContent>
-                                <p>{copiedMessageId === message.id ? "Copied!" : "Copy"}</p>
-                              </TooltipContent>
-                            </Tooltip>
+                            {message.generationProgress?.stage === "designing" && (
+                              <div className="border border-blue-200 rounded-xl p-4 bg-blue-50/50">
+                                <div className="flex items-center justify-between mb-4">
+                                  <div className="flex items-center space-x-2">
+                                    <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse"></div>
+                                    <span className="text-sm font-semibold text-blue-900">
+                                      Version {message.generationProgress.version}
+                                    </span>
+                                  </div>
+                                  <span className="text-xs text-blue-600 font-medium px-2 py-1 bg-blue-100 rounded-full">
+                                    Designing
+                                  </span>
+                                </div>
 
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <Button
-                                  size="sm"
-                                  variant="ghost"
-                                  className="h-7 w-7 p-0 text-red-500 hover:text-red-700 hover:bg-red-50"
-                                  onClick={() => {
-                                    setChatMessages((prev) => prev.filter((m) => m.id !== message.id))
-                                  }}
-                                >
-                                  <Trash2 className="h-3 w-3" />
-                                </Button>
-                              </TooltipTrigger>
-                              <TooltipContent>
-                                <p>Delete</p>
-                              </TooltipContent>
-                            </Tooltip>
+                                {/* Real-time slide generation progress */}
+                                <div className="space-y-2">
+                                  <p className="text-xs text-blue-700 font-medium mb-3">Creating slides:</p>
+                                  <div className="space-y-2">
+                                    {Array.from({ length: message.generationProgress.totalSlides || 7 }, (_, i) => {
+                                      const slideNames = [
+                                        "Title Slide",
+                                        "Problem Statement",
+                                        "Solution Overview",
+                                        "Market Analysis",
+                                        "Business Model",
+                                        "Financial Projections",
+                                        "Call to Action",
+                                      ]
+
+                                      const isCompleted = i < (message.generationProgress?.completedSlides || 0)
+                                      const isCurrent = i === (message.generationProgress?.completedSlides || 0)
+                                      const isUpcoming = i > (message.generationProgress?.completedSlides || 0)
+
+                                      return (
+                                        <div key={i} className="flex items-center space-x-3 py-1">
+                                          {/* Status indicator */}
+                                          <div className="w-4 h-4 flex items-center justify-center">
+                                            {isCompleted ? (
+                                              <div className="w-4 h-4 bg-green-500 rounded-full flex items-center justify-center">
+                                                <Check className="w-2.5 h-2.5 text-white" />
+                                              </div>
+                                            ) : isCurrent ? (
+                                              <div className="w-4 h-4 bg-blue-500 rounded-full flex items-center justify-center">
+                                                <Loader2 className="w-2.5 h-2.5 text-white animate-spin" />
+                                              </div>
+                                            ) : (
+                                              <div className="w-4 h-4 bg-gray-300 rounded-full"></div>
+                                            )}
+                                          </div>
+
+                                          {/* Slide info */}
+                                          <div className="flex-1">
+                                            <span
+                                              className={`text-xs ${
+                                                isCompleted
+                                                  ? "text-green-700 font-medium"
+                                                  : isCurrent
+                                                    ? "text-blue-700 font-medium"
+                                                    : "text-gray-500"
+                                              }`}
+                                            >
+                                              {slideNames[i] || `Slide ${i + 1}`}
+                                            </span>
+                                          </div>
+
+                                          <span className="text-xs text-gray-400 font-mono">{i + 1}</span>
+                                        </div>
+                                      )
+                                    })}
+                                  </div>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        ) : (
+                          <div className="space-y-3">
+                            <p className="text-sm whitespace-pre-wrap leading-relaxed">{message.content}</p>
+
+                            {/* Completed generation progress */}
+                            {message.generationProgress?.isComplete && (
+                              <div
+                                className={`border rounded-xl p-4 transition-all duration-200 ${
+                                  message.generationProgress.isMinimized
+                                    ? "border-green-200 bg-green-50/30"
+                                    : "border-green-200 bg-green-50/50"
+                                }`}
+                              >
+                                <div className="flex items-center justify-between">
+                                  <div className="flex items-center space-x-2">
+                                    <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                                    <span className="text-sm font-semibold text-green-900">
+                                      Version {message.generationProgress.version}
+                                    </span>
+                                  </div>
+                                  <div className="flex items-center space-x-2">
+                                    <span className="text-xs text-green-600 font-medium px-2 py-1 bg-green-100 rounded-full">
+                                      Complete
+                                    </span>
+                                    <Button
+                                      size="sm"
+                                      variant="ghost"
+                                      className="h-6 w-6 p-0 text-green-600 hover:text-green-700 hover:bg-green-100"
+                                      onClick={() => toggleProgressMinimization(message.id)}
+                                    >
+                                      {message.generationProgress.isMinimized ? (
+                                        <Plus className="h-3 w-3" />
+                                      ) : (
+                                        <Minimize className="h-3 w-3" />
+                                      )}
+                                    </Button>
+                                  </div>
+                                </div>
+
+                                {!message.generationProgress.isMinimized && (
+                                  <div className="mt-3 pt-3 border-t border-green-200">
+                                    <p className="text-xs text-green-700">
+                                      Successfully generated {message.generationProgress.completedSlides} slides
+                                    </p>
+                                    <div className="flex flex-wrap gap-1 mt-2">
+                                      {Array.from(
+                                        { length: message.generationProgress.completedSlides || 0 },
+                                        (_, i) => (
+                                          <div key={i} className="w-2 h-2 bg-green-400 rounded-full"></div>
+                                        ),
+                                      )}
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
+                            )}
                           </div>
                         )}
 
-                        {/* Message timestamp */}
-                        <span className="text-xs text-gray-500 mt-1">
-                          {message.timestamp.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
-                        </span>
-                      </div>
-
-                      <Avatar className="w-8 h-8 mt-1">
-                        <AvatarFallback className="bg-[#027659]/10">
-                          <User className="w-4 h-4 text-[#027659]" />
-                        </AvatarFallback>
-                      </Avatar>
-                    </div>
-                  ) : (
-                    // Assistant message - left aligned
-                    <div className="flex items-start space-x-3">
-                      <Avatar className="w-8 h-8 mt-1">
-                        <AvatarFallback className="bg-gray-100">
-                          <Bot className="w-4 h-4 text-gray-600" />
-                        </AvatarFallback>
-                      </Avatar>
-                      <div className="flex-1 min-w-0">
-                        <div className="bg-gray-100 text-gray-900 rounded-2xl px-4 py-3 max-w-[calc(100%-48px)]">
-                          {message.isLoading ? (
-                            <div className="space-y-4">
-                              {message.generationProgress?.stage === "thinking" && (
-                                <div className="space-y-3">
-                                  <div className="flex items-center space-x-2">
-                                    <div className="flex space-x-1">
-                                      <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"></div>
-                                      <div
-                                        className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"
-                                        style={{ animationDelay: "0.1s" }}
-                                      ></div>
-                                      <div
-                                        className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"
-                                        style={{ animationDelay: "0.2s" }}
-                                      ></div>
-                                    </div>
-                                    <span className="text-sm font-medium">Thinking</span>
-                                  </div>
-                                  <p className="text-xs text-gray-600">
-                                    Thoughts for {message.generationProgress.thinkingTime} seconds
-                                  </p>
-                                </div>
-                              )}
-
-                              {message.generationProgress?.stage === "designing" && (
-                                <div className="border border-gray-200 rounded-lg p-4 bg-white shadow-sm">
-                                  <div className="flex items-center justify-between mb-4">
-                                    <div className="flex items-center space-x-2">
-                                      <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
-                                      <span className="text-sm font-semibold text-gray-800">
-                                        Version {message.generationProgress.version}
-                                      </span>
-                                    </div>
-                                    <span className="text-xs text-blue-600 font-medium">Designing</span>
-                                  </div>
-
-                                  {/* Threaded progress steps */}
-                                  <div className="space-y-3">
-                                    <p className="text-xs text-gray-600 mb-3">Creating slides:</p>
-                                    <div className="relative">
-                                      {Array.from({ length: message.generationProgress.totalSlides || 0 }, (_, i) => {
-                                        const slideNames = [
-                                          "Title Slide",
-                                          "Problem Statement",
-                                          "Solution Overview",
-                                          "Market Analysis",
-                                          "Business Model",
-                                          "Financial Projections",
-                                          "Call to Action",
-                                        ]
-
-                                        const isCompleted = i < (message.generationProgress?.completedSlides || 0)
-                                        const isCurrent = i === (message.generationProgress?.completedSlides || 0)
-                                        const isUpcoming = i > (message.generationProgress?.completedSlides || 0)
-
-                                        return (
-                                          <div key={i} className="relative flex items-center">
-                                            {/* Thread line */}
-                                            {i < (message.generationProgress.totalSlides || 0) - 1 && (
-                                              <div
-                                                className={`absolute left-2 top-6 w-0.5 h-6 ${
-                                                  isCompleted ? "bg-green-300" : "bg-gray-200"
-                                                }`}
-                                              />
-                                            )}
-
-                                            {/* Status indicator */}
-                                            <div className="w-4 h-4 flex items-center justify-center mr-3 relative z-10">
-                                              {isCompleted ? (
-                                                <div className="w-4 h-4 bg-green-500 rounded-full flex items-center justify-center">
-                                                  <Check className="w-2.5 h-2.5 text-white" />
-                                                </div>
-                                              ) : isCurrent ? (
-                                                <div className="w-4 h-4 bg-blue-500 rounded-full flex items-center justify-center">
-                                                  <Loader2 className="w-2.5 h-2.5 text-white animate-spin" />
-                                                </div>
-                                              ) : (
-                                                <div className="w-4 h-4 bg-gray-300 rounded-full"></div>
-                                              )}
-                                            </div>
-
-                                            {/* Slide info */}
-                                            <div className="flex-1 py-1">
-                                              <div className="flex items-center justify-between">
-                                                <span
-                                                  className={`text-xs ${
-                                                    isCompleted
-                                                      ? "text-green-600 font-medium"
-                                                      : isCurrent
-                                                        ? "text-blue-600 font-medium"
-                                                        : "text-gray-400"
-                                                  }`}
-                                                >
-                                                  {isCurrent && message.generationProgress?.currentSlide
-                                                    ? message.generationProgress.currentSlide
-                                                    : slideNames[i] || `Slide ${i + 1}`}
-                                                </span>
-                                                <span className="text-gray-400 text-xs ml-2">{i + 1}</span>
-                                              </div>
-                                            </div>
-                                          </div>
-                                        )
-                                      })}
-                                    </div>
-                                  </div>
-                                </div>
-                              )}
+                        {/* Message timestamp and actions */}
+                        {!message.isLoading && (
+                          <div className="flex items-center justify-between mt-3 pt-2 border-t border-gray-200">
+                            <span className="text-xs text-gray-500">
+                              {message.timestamp.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                            </span>
+                            <div className="flex space-x-1">
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                className="h-6 w-6 p-0 text-gray-500 hover:text-gray-700 hover:bg-gray-100"
+                                onClick={() => handleCopyMessage(message.id, message.content)}
+                              >
+                                {copiedMessageId === message.id ? (
+                                  <Check className="h-3 w-3 text-green-600" />
+                                ) : (
+                                  <Copy className="h-3 w-3" />
+                                )}
+                              </Button>
                             </div>
-                          ) : (
-                            <div className="space-y-3">
-                              <p className="text-sm whitespace-pre-wrap">{message.content}</p>
-
-                              {/* Show generation progress for completed messages */}
-                              {message.generationProgress?.isComplete && (
-                                <div className="border border-green-200 rounded-lg p-3 bg-green-50 shadow-sm">
-                                  <div className="flex items-center justify-between mb-2">
-                                    <div className="flex items-center space-x-2">
-                                      <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                                      <span className="text-sm font-semibold text-green-800">
-                                        Version {message.generationProgress.version}
-                                      </span>
-                                    </div>
-                                    <span className="text-xs text-green-600 font-medium">Complete</span>
-                                  </div>
-                                  <p className="text-xs text-green-700">
-                                    Generated {message.generationProgress.completedSlides} slides successfully
-                                  </p>
-                                </div>
-                              )}
-                            </div>
-                          )}
-                        </div>
-
-                        {/* Message timestamp */}
-                        <span className="text-xs text-gray-500 mt-1 block">
-                          {message.timestamp.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
-                        </span>
+                          </div>
+                        )}
                       </div>
                     </div>
                   )}
