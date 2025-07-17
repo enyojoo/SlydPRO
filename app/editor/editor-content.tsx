@@ -935,7 +935,7 @@ function EditorContent() {
             {isStreaming ? (
               <div className="relative">
                 {/* Skeleton Slide */}
-                <div className="lg:w-[624px] lg:h-[351px] xl:w-[720px] xl:h-[405px] 2xl:w-[800px] 2xl:h-[450px] 3xl:w-[960px] 3xl:h-[540px] shadow-2xl rounded-lg overflow-hidden border-4 border-white bg-gradient-to-br from-gray-200 to-gray-300 animate-pulse">
+                 <div className="lg:w-[632px] lg:h-[355px] xl:w-[732px] xl:h-[412px] 2xl:w-[816px] 2xl:h-[459px] 3xl:w-[980px] 3xl:h-[551px] shadow-2xl rounded-lg overflow-hidden border-4 border-white bg-gradient-to-br from-gray-200 to-gray-300 animate-pulse">
                   <div className="h-full p-12 flex flex-col justify-center items-center">
                     <div className="text-center space-y-6">
                       <div className="w-16 h-16 bg-[#027659]/20 rounded-2xl flex items-center justify-center mx-auto animate-pulse">
