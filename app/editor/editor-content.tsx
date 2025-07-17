@@ -653,7 +653,7 @@ function EditorContent() {
     }
 
     setIsInitialized(true)
-  }, [authUser, messages]) // Add authUser and messages as dependencies
+  }, [authUser, messages, handleInitialGeneration, searchParams]) // Add authUser and messages as dependencies
 
   // Show warning for small screens
   if (isSmallScreen) {
@@ -936,7 +936,7 @@ function EditorContent() {
             {isStreaming ? (
               <div className="relative">
                 {/* Skeleton Slide */}
-                <div className="lg:w-[624px] lg:h-[351px] xl:w-[720px] xl:h-[405px] 2xl:w-[800px] 2xl:h-[450px] 3xl:w-[960px] 3xl:h-[540px] shadow-2xl rounded-lg overflow-hidden border-4 border-white bg-gradient-to-br from-gray-200 to-gray-300 animate-pulse">
+                <div className="lg:w-[632px] lg:h-[355px] xl:w-[732px] xl:h-[412px] 2xl:w-[816px] 2xl:h-[459px] 3xl:w-[980px] 3xl:h-[551px] shadow-2xl rounded-lg overflow-hidden border-4 border-white bg-gradient-to-br from-gray-200 to-gray-300 animate-pulse">
                   <div className="h-full p-12 flex flex-col justify-center items-center">
                     <div className="text-center space-y-6">
                       <div className="w-16 h-16 bg-[#027659]/20 rounded-2xl flex items-center justify-center mx-auto animate-pulse">
@@ -963,7 +963,7 @@ function EditorContent() {
               <div className="relative">
                 {/* Main Slide */}
                 <div
-                  className="lg:w-[624px] lg:h-[351px] xl:w-[720px] xl:h-[405px] 2xl:w-[800px] 2xl:h-[450px] 3xl:w-[960px] 3xl:h-[540px] shadow-2xl rounded-lg overflow-hidden border-4 border-white"
+                  className="lg:w-[632px] lg:h-[355px] xl:w-[732px] xl:h-[412px] 2xl:w-[816px] 2xl:h-[459px] 3xl:w-[980px] 3xl:h-[551px] shadow-2xl rounded-lg overflow-hidden border-4 border-white"
                   style={{
                     backgroundColor: currentSlide.background,
                     color: currentSlide.textColor,
@@ -1036,10 +1036,10 @@ function EditorContent() {
                     <Zap className="h-12 w-12 text-blue-600" />
                   </div>
                 </div>
-                <h2 className="text-3xl font-bold text-gray-900 mb-4">Ready to Create</h2>
+                <h2 className="text-3xl font-bold text-gray-900 mb-4">Create Something Presentable</h2>
                 <p className="text-lg text-gray-600 leading-relaxed">
-                  Start a conversation with the AI assistant to create your presentation. Describe your topic, audience,
-                  or upload a document to get started.
+              Ask SlydPRO AI to design your presentation slide and pitch deck. Share for each slides, describe your topic, audience, or upload a document to get started.
+
                 </p>
               </div>
             )}
