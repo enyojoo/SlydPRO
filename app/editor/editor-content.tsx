@@ -852,7 +852,7 @@ function EditorContent() {
           </div>
 
           {/* Slide Preview Area */}
-          <div className="flex-1 flex items-center justify-center bg-gray-100">
+          <div className="flex-1 flex items-center justify-center bg-gray-100 px-12">
             {isPresentationMode && (
               <div className="fixed inset-0 bg-black z-50 flex items-center justify-center">
                 {currentSlide && (
