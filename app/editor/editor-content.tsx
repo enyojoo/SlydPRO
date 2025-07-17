@@ -635,15 +635,8 @@ function EditorContent() {
 
       loadProject()
     } else {
-      // New presentation - set welcome message
-      const welcomeMessage: ChatMessage = {
-        id: Date.now().toString(),
-        type: "assistant",
-        content:
-          "Hi! Ask SlydPRO AI to design your presentation slides. \n\nFor example:\n• 'Create a startup pitch deck for a food delivery app'\n• 'Make a quarterly business review presentation'\n• 'Build a product launch presentation'",
-        timestamp: new Date(),
-      }
-      setChatMessages([welcomeMessage])
+      // New presentation - no initial welcome message, start clean
+      setChatMessages([])
 
       // Check if there's an initial message from home page
       if (messages.length > 0) {
@@ -727,28 +720,110 @@ function EditorContent() {
           {/* Slide Thumbnails - Scrollable */}
           <ScrollArea className="flex-1">
             <div className="p-2 space-y-2">
-              {isStreaming
-                ? // Skeleton thumbnails while loading
-                  Array.from({ length: 7 }, (_, index) => (
-                    <div
-                      key={`skeleton-${index}`}
-                      className="relative group rounded-lg border-2 border-gray-200 bg-white"
-                    >
-                      <div className="absolute -left-2 top-2 z-10">
-                        <div className="w-6 h-6 rounded-full bg-gray-200 animate-pulse"></div>
-                      </div>
-                      <div className="p-3 pt-4">
-                        <div className="w-full aspect-video rounded border overflow-hidden bg-gray-200 animate-pulse">
-                          <div className="p-2 h-full flex flex-col space-y-2">
-                            <div className="h-2 bg-gray-300 rounded animate-pulse"></div>
-                            <div className="h-1 bg-gray-300 rounded animate-pulse w-3/4"></div>
-                            <div className="h-1 bg-gray-300 rounded animate-pulse w-1/2"></div>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  ))
-                : slides.map((slide, index) => (
+              {isStreaming ? (
+  <div className="relative">
+    {/* Skeleton Slide - Creative designing animation */}
+    <div className="lg:w-[632px] lg:h-[355px] xl:w-[732px] xl:h-[412px] 2xl:w-[816px] 2xl:h-[459px] 3xl:w-[980px] 3xl:h-[551px] shadow-2xl rounded-lg overflow-hidden border-4 border-white bg-gradient-to-br from-gray-200 to-gray-300 animate-pulse">
+      <div className="h-full p-12 flex flex-col justify-center items-center">
+        <div className="text-center space-y-6">
+          {/* Creative designing animation */}
+          <div className="relative w-20 h-20 mx-auto">
+            {/* Paint brush stroke animation */}
+            <div className="absolute inset-0">
+              <svg className="w-20 h-20" viewBox="0 0 80 80" fill="none">
+                {/* Animated paint strokes */}
+                <path
+                  d="M10 40 Q40 20 70 40"
+                  stroke="#027659"
+                  strokeWidth="3"
+                  fill="none"
+                  strokeLinecap="round"
+                  className="animate-pulse"
+                  style={{
+                    strokeDasharray: "60",
+                    strokeDashoffset: "60",
+                    animation: "drawStroke 2s ease-in-out infinite"
+                  }}
+                />
+                <path
+                  d="M15 50 Q45 30 75 50"
+                  stroke="#10b981"
+                  strokeWidth="2"
+                  fill="none"
+                  strokeLinecap="round"
+                  className="animate-pulse"
+                  style={{
+                    strokeDasharray: "60",
+                    strokeDashoffset: "60",
+                    animation: "drawStroke 2s ease-in-out infinite 0.5s"
+                  }}
+                />
+                <path
+                  d="M20 60 Q50 40 80 60"
+                  stroke="#34d399"
+                  strokeWidth="1.5"
+                  fill="none"
+                  strokeLinecap="round"
+                  className="animate-pulse"
+                  style={{
+                    strokeDasharray: "60",
+                    strokeDashoffset: "60",
+                    animation: "drawStroke 2s ease-in-out infinite 1s"
+                  }}
+                />
+              </svg>
+              
+              {/* Floating design elements */}
+              <div className="absolute top-2 right-2 w-2 h-2 bg-[#027659] rounded-full animate-ping"></div>
+              <div className="absolute bottom-4 left-4 w-1.5 h-1.5 bg-[#10b981] rounded-full animate-ping" style={{ animationDelay: "0.5s" }}></div>
+              <div className="absolute top-6 left-6 w-1 h-1 bg-[#34d399] rounded-full animate-ping" style={{ animationDelay: "1s" }}></div>
+            </div>
+            
+            {/* Central design icon */}
+            <div className="absolute inset-0 flex items-center justify-center">
+              <div className="w-8 h-8 bg-[#027659]/20 rounded-lg flex items-center justify-center animate-pulse">
+                <svg className="w-5 h-5 text-[#027659]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                </svg>
+              </div>
+            </div>
+          </div>
+          
+          <h2 className="text-4xl font-bold text-gray-600">SlydPRO Designing</h2>
+          
+          {/* Creative progress indicators */}
+          <div className="flex items-center justify-center space-x-3">
+            <div className="flex space-x-1">
+              <div className="w-2 h-2 bg-[#027659] rounded-full animate-bounce"></div>
+              <div className="w-2 h-2 bg-[#10b981] rounded-full animate-bounce" style={{ animationDelay: "0.2s" }}></div>
+              <div className="w-2 h-2 bg-[#34d399] rounded-full animate-bounce" style={{ animationDelay: "0.4s" }}></div>
+            </div>
+            <span className="text-sm text-gray-500 animate-pulse">crafting your slides</span>
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    {/* Add CSS for stroke animation */}
+    <style jsx>{`
+      @keyframes drawStroke {
+        0% {
+          stroke-dashoffset: 60;
+          opacity: 0;
+        }
+        50% {
+          stroke-dashoffset: 0;
+          opacity: 1;
+        }
+        100% {
+          stroke-dashoffset: -60;
+          opacity: 0;
+        }
+      }
+    `}</style>
+  </div>
+) : slides.length > 0 && currentSlide ? (
+                    slides.map((slide, index) => (
                     <div
                       key={slide.id}
                       className={`relative group cursor-pointer rounded-lg border-2 transition-all ${
@@ -807,7 +882,7 @@ function EditorContent() {
                         </div>
                       </div>
                     </div>
-                  ))}
+                  ))) : null}
             </div>
           </ScrollArea>
         </div>
@@ -938,34 +1013,7 @@ function EditorContent() {
                     <Minimize className="h-5 w-5" />
                   </Button>
                 </div>
-              </div>
-            )}
-            {isStreaming ? (
-              <div className="relative">
-                {/* Skeleton Slide */}
-                <div className="lg:w-[632px] lg:h-[355px] xl:w-[732px] xl:h-[412px] 2xl:w-[816px] 2xl:h-[459px] 3xl:w-[980px] 3xl:h-[551px] shadow-2xl rounded-lg overflow-hidden border-4 border-white bg-gradient-to-br from-gray-200 to-gray-300 animate-pulse">
-                  <div className="h-full p-12 flex flex-col justify-center items-center">
-                    <div className="text-center space-y-6">
-                      <div className="w-16 h-16 bg-[#027659]/20 rounded-2xl flex items-center justify-center mx-auto animate-pulse">
-                        <Loader2 className="w-8 h-8 text-[#027659] animate-spin" />
-                      </div>
-                      <h2 className="text-4xl font-bold text-gray-600">SlydPRO Designing</h2>
-                      <p className="text-xl text-gray-500">Creating your presentation slides...</p>
-                      <div className="flex space-x-2 justify-center">
-                        <div className="w-3 h-3 bg-[#027659] rounded-full animate-bounce"></div>
-                        <div
-                          className="w-3 h-3 bg-[#027659] rounded-full animate-bounce"
-                          style={{ animationDelay: "0.1s" }}
-                        ></div>
-                        <div
-                          className="w-3 h-3 bg-[#027659] rounded-full animate-bounce"
-                          style={{ animationDelay: "0.2s" }}
-                        ></div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
+              </div>\
             ) : currentSlide ? (
               <div className="relative">
                 {/* Main Slide */}
