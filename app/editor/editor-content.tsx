@@ -28,6 +28,7 @@ import {
   Minimize,
   Loader2,
   Check,
+  Square,
 } from "lucide-react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { useV0Integration } from "@/hooks/useV0Integration"
@@ -852,7 +853,7 @@ function EditorContent() {
           </div>
 
           {/* Slide Preview Area */}
-          <div className="flex-1 flex items-center justify-center bg-gray-100 p-8">
+          <div className="flex-1 flex items-center justify-center bg-gray-100">
             {isPresentationMode && (
               <div className="fixed inset-0 bg-black z-50 flex items-center justify-center">
                 {currentSlide && (
@@ -935,7 +936,7 @@ function EditorContent() {
             {isStreaming ? (
               <div className="relative">
                 {/* Skeleton Slide */}
-                 <div className="lg:w-[632px] lg:h-[355px] xl:w-[732px] xl:h-[412px] 2xl:w-[816px] 2xl:h-[459px] 3xl:w-[980px] 3xl:h-[551px] shadow-2xl rounded-lg overflow-hidden border-4 border-white bg-gradient-to-br from-gray-200 to-gray-300 animate-pulse">
+                <div className="lg:w-[624px] lg:h-[351px] xl:w-[720px] xl:h-[405px] 2xl:w-[800px] 2xl:h-[450px] 3xl:w-[960px] 3xl:h-[540px] shadow-2xl rounded-lg overflow-hidden border-4 border-white bg-gradient-to-br from-gray-200 to-gray-300 animate-pulse">
                   <div className="h-full p-12 flex flex-col justify-center items-center">
                     <div className="text-center space-y-6">
                       <div className="w-16 h-16 bg-[#027659]/20 rounded-2xl flex items-center justify-center mx-auto animate-pulse">
@@ -962,7 +963,7 @@ function EditorContent() {
               <div className="relative">
                 {/* Main Slide */}
                 <div
-                  className="lg:w-[632px] lg:h-[355px] xl:w-[732px] xl:h-[412px] 2xl:w-[816px] 2xl:h-[459px] 3xl:w-[980px] 3xl:h-[551px] shadow-2xl rounded-lg overflow-hidden border-4 border-white"
+                  className="lg:w-[624px] lg:h-[351px] xl:w-[720px] xl:h-[405px] 2xl:w-[800px] 2xl:h-[450px] 3xl:w-[960px] 3xl:h-[540px] shadow-2xl rounded-lg overflow-hidden border-4 border-white"
                   style={{
                     backgroundColor: currentSlide.background,
                     color: currentSlide.textColor,
@@ -1094,7 +1095,7 @@ function EditorContent() {
                     // User message - right aligned
                     <div className="flex items-start justify-end space-x-3">
                       <div className="flex-1 min-w-0 flex flex-col items-end">
-                        <div className="bg-[#027659] text-white rounded-2xl px-4 py-3 max-w-[80%]">
+                        <div className="bg-[#027659] text-white rounded-2xl px-4 py-3 max-w-[calc(100%-48px)]">
                           <p className="text-sm whitespace-pre-wrap">{message.content}</p>
                         </div>
 
@@ -1162,7 +1163,7 @@ function EditorContent() {
                         </AvatarFallback>
                       </Avatar>
                       <div className="flex-1 min-w-0">
-                        <div className="bg-gray-100 text-gray-900 rounded-2xl px-4 py-3 max-w-[80%]">
+                        <div className="bg-gray-100 text-gray-900 rounded-2xl px-4 py-3 max-w-[calc(100%-48px)]">
                           {message.isLoading ? (
                             <div className="space-y-4">
                               {message.generationProgress?.stage === "thinking" && (
@@ -1360,14 +1361,7 @@ function EditorContent() {
                     disabled={!isStreaming && !inputMessage.trim()}
                     className={`${isStreaming ? "bg-red-600 hover:bg-red-700" : "bg-[#027659] hover:bg-[#065f46]"} text-white rounded-lg px-4 py-2`}
                   >
-                    {isStreaming ? (
-                      <>
-                        <div className="w-3 h-3 bg-white rounded-sm mr-2"></div>
-                        Stop
-                      </>
-                    ) : (
-                      <Send className="h-4 w-4" />
-                    )}
+                    {isStreaming ? <Square className="h-4 w-4" /> : <Send className="h-4 w-4" />}
                   </Button>
                 </div>
               </div>
