@@ -136,7 +136,9 @@ function EditorContent() {
         generationProgress: {
           stage: "thinking",
           thinkingTime: 0,
-          version: 1,
+          version: chatMessages.filter((m) => m.generationProgress?.version).length + 1,
+          totalSlides: 7, // Initial estimate
+          completedSlides: 0,
         },
       }
 
@@ -175,52 +177,34 @@ function EditorContent() {
           if (chunk.includes("##") || chunk.includes("Slide")) {
             clearInterval(thinkingInterval)
             setChatMessages((prev) =>
-              prev.map((msg) =>
-                msg.isLoading
-                  ? {
-                      ...msg,
-                      generationProgress: {
-                        ...msg.generationProgress!,
-                        stage: "designing",
-                        totalSlides: 7, // We'll update this as we detect slides
-                        completedSlides: 0,
-                      },
-                    }
-                  : msg,
-              ),
-            )
+              prev.map((msg) => {
+                if (msg.isLoading) {
+                  const currentContent = streamingContent + chunk
+                  const slideMatches = currentContent.match(/(?:##|###)\s*(?:Slide\s*\d+:?\s*)?(.+?)(?=(?:##|###)|$)/gs)
+                  const completedSlides = slideMatches ? slideMatches.length : 0
+                  const slideNames = [
+                    "Title Slide",
+                    "Problem Statement",
+                    "Solution Overview",
+                    "Market Analysis",
+                    "Business Model",
+                    "Financial Projections",
+                    "Call to Action",
+                  ]
 
-            // Count slides in real-time as they're generated
-            const slideMatches = (streamingContent + chunk).match(
-              /(?:##|###)\s*(?:Slide\s*\d+:?\s*)?(.+?)(?=(?:##|###)|$)/gs,
+                  return {
+                    ...msg,
+                    generationProgress: {
+                      ...msg.generationProgress!,
+                      stage: "designing",
+                      completedSlides,
+                      currentSlide: slideNames[completedSlides - 1] || `Slide ${completedSlides}`,
+                    },
+                  }
+                }
+                return msg
+              }),
             )
-            if (slideMatches) {
-              const completedSlides = slideMatches.length
-              const slideNames = [
-                "Title Slide",
-                "Problem Statement",
-                "Solution Overview",
-                "Market Analysis",
-                "Business Model",
-                "Financial Projections",
-                "Call to Action",
-              ]
-
-              setChatMessages((prev) =>
-                prev.map((msg) =>
-                  msg.isLoading
-                    ? {
-                        ...msg,
-                        generationProgress: {
-                          ...msg.generationProgress!,
-                          completedSlides,
-                          currentSlide: slideNames[completedSlides - 1] || `Slide ${completedSlides}`,
-                        },
-                      }
-                    : msg,
-                ),
-              )
-            }
           }
         },
         // onComplete
@@ -290,7 +274,7 @@ function EditorContent() {
         },
       )
     },
-    [v0, uploadedFile, selectedTheme, projectName, authUser],
+    [v0, uploadedFile, selectedTheme, projectName, authUser, chatMessages],
   )
 
   const autoSave = useCallback(async () => {
@@ -340,6 +324,8 @@ function EditorContent() {
         stage: "thinking",
         thinkingTime: 0,
         version: chatMessages.filter((m) => m.generationProgress?.version).length + 1,
+        totalSlides: slides.length > 0 ? slides.length : 7, // Estimate based on existing or default
+        completedSlides: 0,
       },
     }
 
@@ -366,39 +352,21 @@ function EditorContent() {
       )
     }, 1000)
 
-    if (editMode === "selected" && selectedSlide) {
-      // Edit only the selected slide
-      const slide = slides.find((s) => s.id === selectedSlide)
-      if (slide) {
-        const result = await v0.editSlide(selectedSlide, slide.title, currentInput)
-
-        clearInterval(thinkingInterval)
-        setChatMessages((prev) => prev.filter((msg) => !msg.isLoading))
-
-        if (result) {
-          setSlides(
-            result.slides.map((s, index) => ({
-              ...s,
-              background: index === 0 ? selectedTheme.primary : selectedTheme.secondary,
-              textColor: selectedTheme.text,
-            })),
-          )
-          const assistantMessage: ChatMessage = {
-            id: (Date.now() + 2).toString(),
-            type: "assistant",
-            content: `Great! I've updated the "${slide.title}" slide based on your request. The changes should now be visible in the preview.`,
-            timestamp: new Date(),
-          }
-          setChatMessages((prev) => [...prev, assistantMessage])
-        }
-      }
-    } else {
-      // Regenerate all slides or create new ones
+    try {
       let result
-      if (slides.length > 0) {
-        result = await v0.regenerateAllSlides(currentInput)
+      if (editMode === "selected" && selectedSlide) {
+        // Edit only the selected slide
+        const slide = slides.find((s) => s.id === selectedSlide)
+        if (slide) {
+          result = await v0.editSlide(v0.currentChatId!, slide.title, currentInput)
+        }
       } else {
-        result = await v0.generateSlides(currentInput, uploadedFile)
+        // Regenerate all slides or create new ones
+        if (slides.length > 0 && v0.currentChatId) {
+          result = await v0.regenerateAllSlides(v0.currentChatId, currentInput)
+        } else {
+          result = await v0.generateSlides(currentInput, uploadedFile)
+        }
       }
 
       clearInterval(thinkingInterval)
@@ -408,7 +376,7 @@ function EditorContent() {
         const themedSlides = result.slides.map((slide, index) => ({
           ...slide,
           background: index === 0 ? selectedTheme.primary : selectedTheme.secondary,
-          textColor: selectedTheme.text,
+          textColor: theme.text,
         }))
         setSlides(themedSlides)
         if (themedSlides.length > 0 && !selectedSlide) {
@@ -424,19 +392,24 @@ function EditorContent() {
               ? "Perfect! I've updated all slides based on your feedback. Take a look at the changes in the preview."
               : `Excellent! I've created ${result.slides.length} slides for your presentation. You can now review them, make edits, or ask for specific changes.`,
           timestamp: new Date(),
+          generationProgress: {
+            stage: "complete",
+            isComplete: true,
+            completedSlides: result.slides.length,
+            totalSlides: result.slides.length,
+            version: chatMessages.filter((m) => m.generationProgress?.version).length + 1,
+          },
         }
         setChatMessages((prev) => [...prev, assistantMessage])
       }
-    }
-
-    if (v0.error) {
+    } catch (error: any) {
       clearInterval(thinkingInterval)
       setChatMessages((prev) => prev.filter((msg) => !msg.isLoading))
 
       const errorMessage: ChatMessage = {
         id: (Date.now() + 3).toString(),
         type: "assistant",
-        content: `I encountered an error: ${v0.error}\n\nPlease try rephrasing your request or try again.`,
+        content: `I encountered an error: ${error.message}\n\nPlease try rephrasing your request or try again.`,
         timestamp: new Date(),
       }
       setChatMessages((prev) => [...prev, errorMessage])
@@ -461,12 +434,39 @@ function EditorContent() {
         content: "Analyzing your document and creating slides...",
         timestamp: new Date(),
         isLoading: true,
+        generationProgress: {
+          stage: "thinking",
+          thinkingTime: 0,
+          version: chatMessages.filter((m) => m.generationProgress?.version).length + 1,
+          totalSlides: 7, // Initial estimate
+          completedSlides: 0,
+        },
       }
 
       setChatMessages((prev) => [...prev, userMessage, loadingMessage])
 
+      // Start thinking timer
+      let thinkingTime = 0
+      const thinkingInterval = setInterval(() => {
+        thinkingTime += 1
+        setChatMessages((prev) =>
+          prev.map((msg) =>
+            msg.isLoading
+              ? {
+                  ...msg,
+                  generationProgress: {
+                    ...msg.generationProgress!,
+                    thinkingTime,
+                  },
+                }
+              : msg,
+          ),
+        )
+      }, 1000)
+
       const result = await v0.generateSlides("Create a presentation from this document", file)
 
+      clearInterval(thinkingInterval)
       // Remove loading message
       setChatMessages((prev) => prev.filter((msg) => !msg.isLoading))
 
@@ -474,7 +474,7 @@ function EditorContent() {
         const themedSlides = result.slides.map((slide, index) => ({
           ...slide,
           background: index === 0 ? selectedTheme.primary : selectedTheme.secondary,
-          textColor: selectedTheme.text,
+          textColor: theme.text,
         }))
         setSlides(themedSlides)
         setSelectedSlide(themedSlides[0]?.id || "")
@@ -485,6 +485,13 @@ function EditorContent() {
           type: "assistant",
           content: `Great! I've analyzed your document and created ${result.slides.length} slides. The presentation covers the key points from your file. Feel free to ask me to adjust any content or styling.`,
           timestamp: new Date(),
+          generationProgress: {
+            stage: "complete",
+            isComplete: true,
+            completedSlides: result.slides.length,
+            totalSlides: result.slides.length,
+            version: chatMessages.filter((m) => m.generationProgress?.version).length + 1,
+          },
         }
         setChatMessages((prev) => [...prev, assistantMessage])
       }
@@ -652,7 +659,7 @@ function EditorContent() {
     }
 
     setIsInitialized(true)
-  }, [authUser, messages]) // Add authUser and messages as dependencies
+  }, [authUser, messages, isInitialized, searchParams, handleInitialGeneration]) // Add authUser and messages as dependencies
 
   // Show warning for small screens
   if (isSmallScreen) {
@@ -805,74 +812,186 @@ function EditorContent() {
         </div>
 
         {/* Main Content Area */}
-        <div className="flex-1 flex flex-col">
-          {/* Top Toolbar */}
-          <div className="bg-white border-b border-gray-200 px-6 py-3">
-            <div className="flex items-center justify-between">
-              {/* Left Section - Project Title */}
-              <div className="flex-1">
-                <Input
-                  ref={nameInputRef}
-                  value={projectName}
-                  onChange={(e) => setProjectName(e.target.value)}
-                  onFocus={handleNameInputFocus}
-                  onBlur={handleNameInputBlur}
-                  onKeyPress={handleNameInputKeyPress}
-                  className="w-auto min-w-[200px] max-w-md bg-transparent border-0 text-base font-normal text-gray-900 placeholder:text-gray-500 focus-visible:ring-0 focus-visible:ring-offset-0 shadow-none outline-none focus:outline-none px-3 py-2 h-auto hover:bg-gray-50 focus:bg-gray-50 rounded-lg transition-colors"
-                  placeholder="Enter presentation title..."
-                  style={{ width: `${Math.max(200, projectName.length * 8 + 24)}px` }}
-                />
-                {isSaving && (
-                  <div className="flex items-center space-x-2 text-sm text-muted-foreground">
-                    <Loader2 className="h-3 w-3 animate-spin" />
-                    <span>Saving...</span>
-                  </div>
-                )}
-              </div>
+        <div className="flex-1 flex flex-col items-center justify-center">
+          <div className="w-[960px] h-full flex flex-col">
+            {/* Top Toolbar */}
+            <div className="bg-white border-b border-gray-200 px-6 py-3">
+              <div className="flex items-center justify-between">
+                {/* Left Section - Project Title */}
+                <div className="flex-1">
+                  <Input
+                    ref={nameInputRef}
+                    value={projectName}
+                    onChange={(e) => setProjectName(e.target.value)}
+                    onFocus={handleNameInputFocus}
+                    onBlur={handleNameInputBlur}
+                    onKeyPress={handleNameInputKeyPress}
+                    className="w-auto min-w-[200px] max-w-md bg-transparent border-0 text-base font-normal text-gray-900 placeholder:text-gray-500 focus-visible:ring-0 focus-visible:ring-offset-0 shadow-none outline-none focus:outline-none px-3 py-2 h-auto hover:bg-gray-50 focus:bg-gray-50 rounded-lg transition-colors"
+                    placeholder="Enter presentation title..."
+                    style={{ width: `${Math.max(200, projectName.length * 8 + 24)}px` }}
+                  />
+                  {isSaving && (
+                    <div className="flex items-center space-x-2 text-sm text-muted-foreground">
+                      <Loader2 className="h-3 w-3 animate-spin" />
+                      <span>Saving...</span>
+                    </div>
+                  )}
+                </div>
 
-              {/* Center Section - Empty for clean look */}
-              <div></div>
+                {/* Center Section - Empty for clean look */}
+                <div></div>
 
-              {/* Right Section - Play and Share */}
-              <div className="flex items-center space-x-3">
-                <Button variant="outline" onClick={handlePresentationMode} className="flex items-center bg-transparent">
-                  <Play className="h-4 w-4 mr-2" />
-                  Play
-                </Button>
+                {/* Right Section - Play and Share */}
+                <div className="flex items-center space-x-3">
+                  <Button
+                    variant="outline"
+                    onClick={handlePresentationMode}
+                    className="flex items-center bg-transparent"
+                  >
+                    <Play className="h-4 w-4 mr-2" />
+                    Play
+                  </Button>
 
-                <Button
-                  onClick={() => setShowExportDialog(true)}
-                  className="bg-[#027659] hover:bg-[#065f46] text-white"
-                >
-                  <Download className="h-4 w-4 mr-2" />
-                  Export
-                </Button>
+                  <Button
+                    onClick={() => setShowExportDialog(true)}
+                    className="bg-[#027659] hover:bg-[#065f46] text-white"
+                  >
+                    <Download className="h-4 w-4 mr-2" />
+                    Export
+                  </Button>
+                </div>
               </div>
             </div>
-          </div>
 
-          {/* Slide Preview Area */}
-          <div className="flex-1 flex items-center justify-center bg-gray-100 p-8">
-            {isPresentationMode && (
-              <div className="fixed inset-0 bg-black z-50 flex items-center justify-center">
-                {currentSlide && (
+            {/* Slide Preview Area */}
+            <div className="flex-1 flex items-center justify-center bg-gray-100 p-8">
+              {isPresentationMode && (
+                <div className="fixed inset-0 bg-black z-50 flex items-center justify-center">
+                  {currentSlide && (
+                    <div
+                      className="w-full h-full flex items-center justify-center"
+                      style={{
+                        backgroundColor: currentSlide.background,
+                        color: currentSlide.textColor,
+                      }}
+                    >
+                      <div className="max-w-6xl mx-auto p-16">
+                        {currentSlide.layout === "title" ? (
+                          <div className="text-center">
+                            <h1 className="text-8xl font-bold mb-12 leading-tight">{currentSlide.title}</h1>
+                            <p className="text-4xl opacity-90 leading-relaxed">{currentSlide.content}</p>
+                          </div>
+                        ) : (
+                          <>
+                            <h1 className="text-7xl font-bold mb-16 leading-tight">{currentSlide.title}</h1>
+                            <div className="text-4xl leading-relaxed opacity-90 space-y-8">
+                              {currentSlide.content.split("\n").map((line, index) => (
+                                <p key={index}>{line}</p>
+                              ))}
+                            </div>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Presentation Controls */}
+                  <div className="absolute bottom-8 left-1/2 transform -translate-x-1/2 flex items-center space-x-4 bg-black/50 backdrop-blur-sm rounded-full px-6 py-3">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => {
+                        if (currentSlideIndex > 0) {
+                          const newIndex = currentSlideIndex - 1
+                          setCurrentSlideIndex(newIndex)
+                          setSelectedSlide(slides[newIndex].id)
+                        }
+                      }}
+                      disabled={currentSlideIndex === 0}
+                      className="text-white hover:bg-white/20"
+                    >
+                      <SkipBack className="h-5 w-5" />
+                    </Button>
+
+                    <span className="text-white font-medium px-4">
+                      {currentSlideIndex + 1} / {slides.length}
+                    </span>
+
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => {
+                        if (currentSlideIndex < slides.length - 1) {
+                          const newIndex = currentSlideIndex + 1
+                          setCurrentSlideIndex(newIndex)
+                          setSelectedSlide(slides[newIndex].id)
+                        }
+                      }}
+                      disabled={currentSlideIndex === slides.length - 1}
+                      className="text-white hover:bg-white/20"
+                    >
+                      <SkipForward className="h-5 w-5" />
+                    </Button>
+
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={exitPresentationMode}
+                      className="text-white hover:bg-white/20 ml-4"
+                    >
+                      <Minimize className="h-5 w-5" />
+                    </Button>
+                  </div>
+                </div>
+              )}
+              {isStreaming ? (
+                <div className="relative">
+                  {/* Skeleton Slide */}
+                  <div className="w-[960px] h-[540px] shadow-2xl rounded-lg overflow-hidden border-4 border-white bg-gradient-to-br from-gray-200 to-gray-300 animate-pulse">
+                    <div className="h-full p-12 flex flex-col justify-center items-center">
+                      <div className="text-center space-y-6">
+                        <div className="w-16 h-16 bg-[#027659]/20 rounded-2xl flex items-center justify-center mx-auto animate-pulse">
+                          <Loader2 className="w-8 h-8 text-[#027659] animate-spin" />
+                        </div>
+                        <h2 className="text-4xl font-bold text-gray-600">SlydPRO Designing</h2>
+                        <p className="text-xl text-gray-500">Creating your presentation slides...</p>
+                        <div className="flex space-x-2 justify-center">
+                          <div className="w-3 h-3 bg-[#027659] rounded-full animate-bounce"></div>
+                          <div
+                            className="w-3 h-3 bg-[#027659] rounded-full animate-bounce"
+                            style={{ animationDelay: "0.1s" }}
+                          ></div>
+                          <div
+                            className="w-3 h-3 bg-[#027659] rounded-full animate-bounce"
+                            style={{ animationDelay: "0.2s" }}
+                          ></div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ) : currentSlide ? (
+                <div className="relative">
+                  {/* Main Slide */}
                   <div
-                    className="w-full h-full flex items-center justify-center"
+                    className="w-[960px] h-[540px] shadow-2xl rounded-lg overflow-hidden border-4 border-white"
                     style={{
                       backgroundColor: currentSlide.background,
                       color: currentSlide.textColor,
                     }}
                   >
-                    <div className="max-w-6xl mx-auto p-16">
+                    <div className="h-full p-12 flex flex-col justify-center relative">
                       {currentSlide.layout === "title" ? (
                         <div className="text-center">
-                          <h1 className="text-8xl font-bold mb-12 leading-tight">{currentSlide.title}</h1>
-                          <p className="text-4xl opacity-90 leading-relaxed">{currentSlide.content}</p>
+                          <h1 className="text-7xl font-bold mb-8 leading-tight">{currentSlide.title}</h1>
+                          <p className="text-3xl opacity-90 leading-relaxed max-w-4xl mx-auto">
+                            {currentSlide.content}
+                          </p>
                         </div>
                       ) : (
                         <>
-                          <h1 className="text-7xl font-bold mb-16 leading-tight">{currentSlide.title}</h1>
-                          <div className="text-4xl leading-relaxed opacity-90 space-y-8">
+                          <h1 className="text-6xl font-bold mb-12 leading-tight">{currentSlide.title}</h1>
+                          <div className="text-3xl leading-relaxed opacity-90 space-y-6">
                             {currentSlide.content.split("\n").map((line, index) => (
                               <p key={index}>{line}</p>
                             ))}
@@ -881,167 +1000,63 @@ function EditorContent() {
                       )}
                     </div>
                   </div>
-                )}
 
-                {/* Presentation Controls */}
-                <div className="absolute bottom-8 left-1/2 transform -translate-x-1/2 flex items-center space-x-4 bg-black/50 backdrop-blur-sm rounded-full px-6 py-3">
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => {
-                      if (currentSlideIndex > 0) {
-                        const newIndex = currentSlideIndex - 1
-                        setCurrentSlideIndex(newIndex)
-                        setSelectedSlide(slides[newIndex].id)
-                      }
-                    }}
-                    disabled={currentSlideIndex === 0}
-                    className="text-white hover:bg-white/20"
-                  >
-                    <SkipBack className="h-5 w-5" />
-                  </Button>
+                  {/* Navigation Controls */}
+                  <div className="absolute -bottom-16 left-1/2 transform -translate-x-1/2 flex items-center space-x-4">
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      onClick={() => {
+                        if (currentSlideIndex > 0) {
+                          const newIndex = currentSlideIndex - 1
+                          setCurrentSlideIndex(newIndex)
+                          setSelectedSlide(slides[newIndex].id)
+                        }
+                      }}
+                      disabled={currentSlideIndex === 0}
+                      className="bg-white shadow-lg hover:shadow-xl"
+                    >
+                      <SkipBack className="h-4 w-4" />
+                    </Button>
 
-                  <span className="text-white font-medium px-4">
-                    {currentSlideIndex + 1} / {slides.length}
-                  </span>
+                    <div className="flex items-center space-x-2 bg-white rounded-full px-6 py-3 shadow-lg border">
+                      <span className="text-sm font-medium text-gray-700">
+                        {currentSlideIndex + 1} / {slides.length}
+                      </span>
+                    </div>
 
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => {
-                      if (currentSlideIndex < slides.length - 1) {
-                        const newIndex = currentSlideIndex + 1
-                        setCurrentSlideIndex(newIndex)
-                        setSelectedSlide(slides[newIndex].id)
-                      }
-                    }}
-                    disabled={currentSlideIndex === slides.length - 1}
-                    className="text-white hover:bg-white/20"
-                  >
-                    <SkipForward className="h-5 w-5" />
-                  </Button>
-
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={exitPresentationMode}
-                    className="text-white hover:bg-white/20 ml-4"
-                  >
-                    <Minimize className="h-5 w-5" />
-                  </Button>
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      onClick={() => {
+                        if (currentSlideIndex < slides.length - 1) {
+                          const newIndex = currentSlideIndex + 1
+                          setCurrentSlideIndex(newIndex)
+                          setSelectedSlide(slides[newIndex].id)
+                        }
+                      }}
+                      disabled={currentSlideIndex === slides.length - 1}
+                      className="bg-white shadow-lg hover:shadow-xl"
+                    >
+                      <SkipForward className="h-4 w-4" />
+                    </Button>
+                  </div>
                 </div>
-              </div>
-            )}
-            {isStreaming ? (
-              <div className="relative">
-                {/* Skeleton Slide */}
-                <div className="w-[960px] h-[540px] shadow-2xl rounded-lg overflow-hidden border-4 border-white bg-gradient-to-br from-gray-200 to-gray-300 animate-pulse">
-                  <div className="h-full p-12 flex flex-col justify-center items-center">
-                    <div className="text-center space-y-6">
-                      <div className="w-16 h-16 bg-[#027659]/20 rounded-2xl flex items-center justify-center mx-auto animate-pulse">
-                        <Loader2 className="w-8 h-8 text-[#027659] animate-spin" />
-                      </div>
-                      <h2 className="text-4xl font-bold text-gray-600">SlydPRO Designing</h2>
-                      <p className="text-xl text-gray-500">Creating your presentation slides...</p>
-                      <div className="flex space-x-2 justify-center">
-                        <div className="w-3 h-3 bg-[#027659] rounded-full animate-bounce"></div>
-                        <div
-                          className="w-3 h-3 bg-[#027659] rounded-full animate-bounce"
-                          style={{ animationDelay: "0.1s" }}
-                        ></div>
-                        <div
-                          className="w-3 h-3 bg-[#027659] rounded-full animate-bounce"
-                          style={{ animationDelay: "0.2s" }}
-                        ></div>
-                      </div>
+              ) : (
+                <div className="text-center text-gray-500 max-w-md">
+                  <div className="mb-6">
+                    <div className="w-24 h-24 bg-gradient-to-r from-blue-100 to-indigo-100 rounded-2xl flex items-center justify-center mx-auto mb-6">
+                      <Zap className="h-12 w-12 text-blue-600" />
                     </div>
                   </div>
+                  <h2 className="text-3xl font-bold text-gray-900 mb-4">Ready to Create</h2>
+                  <p className="text-lg text-gray-600 leading-relaxed">
+                    Start a conversation with the AI assistant to create your presentation. Describe your topic,
+                    audience, or upload a document to get started.
+                  </p>
                 </div>
-              </div>
-            ) : currentSlide ? (
-              <div className="relative">
-                {/* Main Slide */}
-                <div
-                  className="w-[960px] h-[540px] shadow-2xl rounded-lg overflow-hidden border-4 border-white"
-                  style={{
-                    backgroundColor: currentSlide.background,
-                    color: currentSlide.textColor,
-                  }}
-                >
-                  <div className="h-full p-12 flex flex-col justify-center relative">
-                    {currentSlide.layout === "title" ? (
-                      <div className="text-center">
-                        <h1 className="text-7xl font-bold mb-8 leading-tight">{currentSlide.title}</h1>
-                        <p className="text-3xl opacity-90 leading-relaxed max-w-4xl mx-auto">{currentSlide.content}</p>
-                      </div>
-                    ) : (
-                      <>
-                        <h1 className="text-6xl font-bold mb-12 leading-tight">{currentSlide.title}</h1>
-                        <div className="text-3xl leading-relaxed opacity-90 space-y-6">
-                          {currentSlide.content.split("\n").map((line, index) => (
-                            <p key={index}>{line}</p>
-                          ))}
-                        </div>
-                      </>
-                    )}
-                  </div>
-                </div>
-
-                {/* Navigation Controls */}
-                <div className="absolute -bottom-16 left-1/2 transform -translate-x-1/2 flex items-center space-x-4">
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    onClick={() => {
-                      if (currentSlideIndex > 0) {
-                        const newIndex = currentSlideIndex - 1
-                        setCurrentSlideIndex(newIndex)
-                        setSelectedSlide(slides[newIndex].id)
-                      }
-                    }}
-                    disabled={currentSlideIndex === 0}
-                    className="bg-white shadow-lg hover:shadow-xl"
-                  >
-                    <SkipBack className="h-4 w-4" />
-                  </Button>
-
-                  <div className="flex items-center space-x-2 bg-white rounded-full px-6 py-3 shadow-lg border">
-                    <span className="text-sm font-medium text-gray-700">
-                      {currentSlideIndex + 1} / {slides.length}
-                    </span>
-                  </div>
-
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    onClick={() => {
-                      if (currentSlideIndex < slides.length - 1) {
-                        const newIndex = currentSlideIndex + 1
-                        setCurrentSlideIndex(newIndex)
-                        setSelectedSlide(slides[newIndex].id)
-                      }
-                    }}
-                    disabled={currentSlideIndex === slides.length - 1}
-                    className="bg-white shadow-lg hover:shadow-xl"
-                  >
-                    <SkipForward className="h-4 w-4" />
-                  </Button>
-                </div>
-              </div>
-            ) : (
-              <div className="text-center text-gray-500 max-w-md">
-                <div className="mb-6">
-                  <div className="w-24 h-24 bg-gradient-to-r from-blue-100 to-indigo-100 rounded-2xl flex items-center justify-center mx-auto mb-6">
-                    <Zap className="h-12 w-12 text-blue-600" />
-                  </div>
-                </div>
-                <h2 className="text-3xl font-bold text-gray-900 mb-4">Ready to Create</h2>
-                <p className="text-lg text-gray-600 leading-relaxed">
-                  Start a conversation with the AI assistant to create your presentation. Describe your topic, audience,
-                  or upload a document to get started.
-                </p>
-              </div>
-            )}
+              )}
+            </div>
           </div>
         </div>
 
@@ -1094,7 +1109,7 @@ function EditorContent() {
                     // User message - right aligned
                     <div className="flex items-start justify-end space-x-3">
                       <div className="flex-1 min-w-0 flex flex-col items-end">
-                        <div className="bg-[#027659] text-white rounded-2xl px-4 py-3 max-w-[80%]">
+                        <div className="bg-[#027659] text-white rounded-2xl px-4 py-3 max-w-[calc(100%-60px)]">
                           <p className="text-sm whitespace-pre-wrap">{message.content}</p>
                         </div>
 
@@ -1162,7 +1177,7 @@ function EditorContent() {
                         </AvatarFallback>
                       </Avatar>
                       <div className="flex-1 min-w-0">
-                        <div className="bg-gray-100 text-gray-900 rounded-2xl px-4 py-3 max-w-[80%]">
+                        <div className="bg-gray-100 text-gray-900 rounded-2xl px-4 py-3 max-w-[calc(100%-60px)]">
                           {message.isLoading ? (
                             <div className="space-y-4">
                               {message.generationProgress?.stage === "thinking" && (
@@ -1362,8 +1377,7 @@ function EditorContent() {
                   >
                     {isStreaming ? (
                       <>
-                        <div className="w-3 h-3 bg-white rounded-sm mr-2"></div>
-                        Stop
+                        <div className="w-3 h-3 bg-white rounded-sm"></div>
                       </>
                     ) : (
                       <Send className="h-4 w-4" />
