@@ -690,301 +690,189 @@ function EditorContent() {
 
   return (
     <TooltipProvider>
-      <div className="flex h-screen justify-center bg-gradient-to-br from-gray-50 to-green-50/30">
-        <div className="flex h-full">
-          {/* Left Sidebar - Slide Thumbnails */}
-          <div className="w-[180px] lg:w-[200px] xl:w-[220px] 2xl:w-[240px] bg-white border-r border-gray-200 flex flex-col shadow-sm">
-            {/* Header */}
-            <div className="p-4 h-[61px] flex items-center justify-between">
-              <div className="flex items-center space-x-3">
-                <Button variant="ghost" size="icon" onClick={() => router.push("/")} className="hover:bg-gray-100">
-                  <Home className="h-4 w-4" />
-                </Button>
-                <img src="https://cldup.com/dAXA3nE5xd.svg" alt="SlydPRO" className="h-16 w-24" />
-              </div>
-            </div>
-
-            {/* Add Slide Button - Fixed */}
-            <div className="p-4 border-b border-gray-100">
-              <Button
-                variant="outline"
-                size="sm"
-                className="w-full justify-start text-gray-700 hover:bg-gray-50 bg-transparent"
-                onClick={() => {
-                  // Add new slide logic here
-                }}
-              >
-                <Plus className="h-4 w-4 mr-2" />
-                Add slide
+      <div className="flex h-screen bg-gradient-to-br from-gray-50 to-green-50/30">
+        {/* Left Sidebar - Slide Thumbnails */}
+        <div className="lg:w-[180px] xl:w-[200px] 2xl:w-[220px] 3xl:w-[240px] bg-white border-r border-gray-200 flex flex-col shadow-sm">
+          {/* Header */}
+          <div className="p-4 h-[61px] flex items-center justify-between">
+            <div className="flex items-center space-x-3">
+              <Button variant="ghost" size="icon" onClick={() => router.push("/")} className="hover:bg-gray-100">
+                <Home className="h-4 w-4" />
               </Button>
+              <img src="https://cldup.com/dAXA3nE5xd.svg" alt="SlydPRO" className="h-16 w-24" />
             </div>
-
-            {/* Slide Thumbnails - Scrollable */}
-            <ScrollArea className="flex-1">
-              <div className="p-2 space-y-2">
-                {isStreaming
-                  ? // Skeleton thumbnails while loading
-                    Array.from({ length: 7 }, (_, index) => (
-                      <div
-                        key={`skeleton-${index}`}
-                        className="relative group rounded-lg border-2 border-gray-200 bg-white"
-                      >
-                        <div className="absolute -left-2 top-2 z-10">
-                          <div className="w-6 h-6 rounded-full bg-gray-200 animate-pulse"></div>
-                        </div>
-                        <div className="p-3 pt-4">
-                          <div className="w-full aspect-video rounded border overflow-hidden bg-gray-200 animate-pulse">
-                            <div className="p-2 h-full flex flex-col space-y-2">
-                              <div className="h-2 bg-gray-300 rounded animate-pulse"></div>
-                              <div className="h-1 bg-gray-300 rounded animate-pulse w-3/4"></div>
-                              <div className="h-1 bg-gray-300 rounded animate-pulse w-1/2"></div>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    ))
-                  : slides.map((slide, index) => (
-                      <div
-                        key={slide.id}
-                        className={`relative group cursor-pointer rounded-lg border-2 transition-all ${
-                          selectedSlide === slide.id
-                            ? "border-[#027659] bg-[#027659]/5"
-                            : "border-gray-200 hover:border-gray-300 bg-white"
-                        }`}
-                        onClick={() => handleSlideSelect(slide.id, index)}
-                      >
-                        {/* Slide Number */}
-                        <div className="absolute -left-2 top-2 z-10">
-                          <div
-                            className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-medium ${
-                              selectedSlide === slide.id
-                                ? "bg-[#027659] text-white"
-                                : "bg-gray-100 text-gray-600 group-hover:bg-gray-200"
-                            }`}
-                          >
-                            {index + 1}
-                          </div>
-                        </div>
-
-                        {/* Slide Preview */}
-                        <div className="p-3 pt-4">
-                          <div
-                            className="w-full aspect-video rounded border overflow-hidden text-xs"
-                            style={{
-                              backgroundColor: slide.background,
-                              color: slide.textColor,
-                            }}
-                          >
-                            <div className="p-2 h-full flex flex-col">
-                              <div className="font-bold text-[8px] mb-1 truncate">{slide.title}</div>
-                              <div className="text-[7px] opacity-80 line-clamp-3">
-                                {slide.content.substring(0, 60)}...
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-
-                        {/* Hover Actions */}
-                        <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                          <div className="flex space-x-1">
-                            <Button size="icon" variant="ghost" className="h-6 w-6 bg-white/80 hover:bg-white">
-                              <Copy className="h-3 w-3" />
-                            </Button>
-                            <Button
-                              size="icon"
-                              variant="ghost"
-                              className="h-6 w-6 bg-white/80 hover:bg-white text-red-500 hover:text-red-600"
-                            >
-                              <Trash2 className="h-3 w-3" />
-                            </Button>
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-              </div>
-            </ScrollArea>
           </div>
 
-          {/* Main Content Area */}
-          <div className="flex-1 flex flex-col">
-            {/* Top Toolbar */}
-            <div className="bg-white border-b border-gray-200 px-6 py-3">
-              <div className="flex items-center justify-between">
-                {/* Left Section - Project Title */}
-                <div className="flex-1">
-                  <Input
-                    ref={nameInputRef}
-                    value={projectName}
-                    onChange={(e) => setProjectName(e.target.value)}
-                    onFocus={handleNameInputFocus}
-                    onBlur={handleNameInputBlur}
-                    onKeyPress={handleNameInputKeyPress}
-                    className="w-auto min-w-[200px] max-w-md bg-transparent border-0 text-base font-normal text-gray-900 placeholder:text-gray-500 focus-visible:ring-0 focus-visible:ring-offset-0 shadow-none outline-none focus:outline-none px-3 py-2 h-auto hover:bg-gray-50 focus:bg-gray-50 rounded-lg transition-colors"
-                    placeholder="Enter presentation title..."
-                    style={{ width: `${Math.max(200, projectName.length * 8 + 24)}px` }}
-                  />
-                  {isSaving && (
-                    <div className="flex items-center space-x-2 text-sm text-muted-foreground">
-                      <Loader2 className="h-3 w-3 animate-spin" />
-                      <span>Saving...</span>
+          {/* Add Slide Button - Fixed */}
+          <div className="p-4 border-b border-gray-100">
+            <Button
+              variant="outline"
+              size="sm"
+              className="w-full justify-start text-gray-700 hover:bg-gray-50 bg-transparent"
+              onClick={() => {
+                // Add new slide logic here
+              }}
+            >
+              <Plus className="h-4 w-4 mr-2" />
+              Add slide
+            </Button>
+          </div>
+
+          {/* Slide Thumbnails - Scrollable */}
+          <ScrollArea className="flex-1">
+            <div className="p-2 space-y-2">
+              {isStreaming
+                ? // Skeleton thumbnails while loading
+                  Array.from({ length: 7 }, (_, index) => (
+                    <div
+                      key={`skeleton-${index}`}
+                      className="relative group rounded-lg border-2 border-gray-200 bg-white"
+                    >
+                      <div className="absolute -left-2 top-2 z-10">
+                        <div className="w-6 h-6 rounded-full bg-gray-200 animate-pulse"></div>
+                      </div>
+                      <div className="p-3 pt-4">
+                        <div className="w-full aspect-video rounded border overflow-hidden bg-gray-200 animate-pulse">
+                          <div className="p-2 h-full flex flex-col space-y-2">
+                            <div className="h-2 bg-gray-300 rounded animate-pulse"></div>
+                            <div className="h-1 bg-gray-300 rounded animate-pulse w-3/4"></div>
+                            <div className="h-1 bg-gray-300 rounded animate-pulse w-1/2"></div>
+                          </div>
+                        </div>
+                      </div>
                     </div>
-                  )}
-                </div>
+                  ))
+                : slides.map((slide, index) => (
+                    <div
+                      key={slide.id}
+                      className={`relative group cursor-pointer rounded-lg border-2 transition-all ${
+                        selectedSlide === slide.id
+                          ? "border-[#027659] bg-[#027659]/5"
+                          : "border-gray-200 hover:border-gray-300 bg-white"
+                      }`}
+                      onClick={() => handleSlideSelect(slide.id, index)}
+                    >
+                      {/* Slide Number */}
+                      <div className="absolute -left-2 top-2 z-10">
+                        <div
+                          className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-medium ${
+                            selectedSlide === slide.id
+                              ? "bg-[#027659] text-white"
+                              : "bg-gray-100 text-gray-600 group-hover:bg-gray-200"
+                          }`}
+                        >
+                          {index + 1}
+                        </div>
+                      </div>
 
-                {/* Center Section - Empty for clean look */}
-                <div></div>
+                      {/* Slide Preview */}
+                      <div className="p-3 pt-4">
+                        <div
+                          className="w-full aspect-video rounded border overflow-hidden text-xs"
+                          style={{
+                            backgroundColor: slide.background,
+                            color: slide.textColor,
+                          }}
+                        >
+                          <div className="p-2 h-full flex flex-col">
+                            <div className="font-bold text-[8px] mb-1 truncate">{slide.title}</div>
+                            <div className="text-[7px] opacity-80 line-clamp-3">
+                              {slide.content.substring(0, 60)}...
+                            </div>
+                          </div>
+                        </div>
+                      </div>
 
-                {/* Right Section - Play and Share */}
-                <div className="flex items-center space-x-3">
-                  <Button
-                    variant="outline"
-                    onClick={handlePresentationMode}
-                    className="flex items-center bg-transparent"
-                  >
-                    <Play className="h-4 w-4 mr-2" />
-                    Play
-                  </Button>
+                      {/* Hover Actions */}
+                      <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <div className="flex space-x-1">
+                          <Button size="icon" variant="ghost" className="h-6 w-6 bg-white/80 hover:bg-white">
+                            <Copy className="h-3 w-3" />
+                          </Button>
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            className="h-6 w-6 bg-white/80 hover:bg-white text-red-500 hover:text-red-600"
+                          >
+                            <Trash2 className="h-3 w-3" />
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+            </div>
+          </ScrollArea>
+        </div>
 
-                  <Button
-                    onClick={() => setShowExportDialog(true)}
-                    className="bg-[#027659] hover:bg-[#065f46] text-white"
-                  >
-                    <Download className="h-4 w-4 mr-2" />
-                    Export
-                  </Button>
-                </div>
+        {/* Main Content Area */}
+        <div className="flex-1 flex flex-col">
+          {/* Top Toolbar */}
+          <div className="bg-white border-b border-gray-200 px-6 py-3">
+            <div className="flex items-center justify-between">
+              {/* Left Section - Project Title */}
+              <div className="flex-1">
+                <Input
+                  ref={nameInputRef}
+                  value={projectName}
+                  onChange={(e) => setProjectName(e.target.value)}
+                  onFocus={handleNameInputFocus}
+                  onBlur={handleNameInputBlur}
+                  onKeyPress={handleNameInputKeyPress}
+                  className="w-auto min-w-[200px] max-w-md bg-transparent border-0 text-base font-normal text-gray-900 placeholder:text-gray-500 focus-visible:ring-0 focus-visible:ring-offset-0 shadow-none outline-none focus:outline-none px-3 py-2 h-auto hover:bg-gray-50 focus:bg-gray-50 rounded-lg transition-colors"
+                  placeholder="Enter presentation title..."
+                  style={{ width: `${Math.max(200, projectName.length * 8 + 24)}px` }}
+                />
+                {isSaving && (
+                  <div className="flex items-center space-x-2 text-sm text-muted-foreground">
+                    <Loader2 className="h-3 w-3 animate-spin" />
+                    <span>Saving...</span>
+                  </div>
+                )}
+              </div>
+
+              {/* Center Section - Empty for clean look */}
+              <div></div>
+
+              {/* Right Section - Play and Share */}
+              <div className="flex items-center space-x-3">
+                <Button variant="outline" onClick={handlePresentationMode} className="flex items-center bg-transparent">
+                  <Play className="h-4 w-4 mr-2" />
+                  Play
+                </Button>
+
+                <Button
+                  onClick={() => setShowExportDialog(true)}
+                  className="bg-[#027659] hover:bg-[#065f46] text-white"
+                >
+                  <Download className="h-4 w-4 mr-2" />
+                  Export
+                </Button>
               </div>
             </div>
+          </div>
 
-            {/* Slide Preview Area */}
-            <div className="flex-1 flex items-center justify-center bg-gray-100 p-8">
-              {isPresentationMode && (
-                <div className="fixed inset-0 bg-black z-50 flex items-center justify-center">
-                  {currentSlide && (
-                    <div
-                      className="w-full h-full flex items-center justify-center"
-                      style={{
-                        backgroundColor: currentSlide.background,
-                        color: currentSlide.textColor,
-                      }}
-                    >
-                      <div className="max-w-6xl mx-auto p-16">
-                        {currentSlide.layout === "title" ? (
-                          <div className="text-center">
-                            <h1 className="text-8xl font-bold mb-12 leading-tight">{currentSlide.title}</h1>
-                            <p className="text-4xl opacity-90 leading-relaxed">{currentSlide.content}</p>
-                          </div>
-                        ) : (
-                          <>
-                            <h1 className="text-7xl font-bold mb-16 leading-tight">{currentSlide.title}</h1>
-                            <div className="text-4xl leading-relaxed opacity-90 space-y-8">
-                              {currentSlide.content.split("\n").map((line, index) => (
-                                <p key={index}>{line}</p>
-                              ))}
-                            </div>
-                          </>
-                        )}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Presentation Controls */}
-                  <div className="absolute bottom-8 left-1/2 transform -translate-x-1/2 flex items-center space-x-4 bg-black/50 backdrop-blur-sm rounded-full px-6 py-3">
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => {
-                        if (currentSlideIndex > 0) {
-                          const newIndex = currentSlideIndex - 1
-                          setCurrentSlideIndex(newIndex)
-                          setSelectedSlide(slides[newIndex].id)
-                        }
-                      }}
-                      disabled={currentSlideIndex === 0}
-                      className="text-white hover:bg-white/20"
-                    >
-                      <SkipBack className="h-5 w-5" />
-                    </Button>
-
-                    <span className="text-white font-medium px-4">
-                      {currentSlideIndex + 1} / {slides.length}
-                    </span>
-
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => {
-                        if (currentSlideIndex < slides.length - 1) {
-                          const newIndex = currentSlideIndex + 1
-                          setCurrentSlideIndex(newIndex)
-                          setSelectedSlide(slides[newIndex].id)
-                        }
-                      }}
-                      disabled={currentSlideIndex === slides.length - 1}
-                      className="text-white hover:bg-white/20"
-                    >
-                      <SkipForward className="h-5 w-5" />
-                    </Button>
-
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={exitPresentationMode}
-                      className="text-white hover:bg-white/20 ml-4"
-                    >
-                      <Minimize className="h-5 w-5" />
-                    </Button>
-                  </div>
-                </div>
-              )}
-              {isStreaming ? (
-                <div className="relative">
-                  {/* Skeleton Slide */}
-                  <div className="w-[624px] h-[351px] lg:w-[720px] lg:h-[405px] xl:w-[800px] xl:h-[450px] 2xl:w-[960px] 2xl:h-[540px] shadow-2xl rounded-lg overflow-hidden border-4 border-white bg-gradient-to-br from-gray-200 to-gray-300 animate-pulse">
-                    <div className="h-full p-12 flex flex-col justify-center items-center">
-                      <div className="text-center space-y-6">
-                        <div className="w-16 h-16 bg-[#027659]/20 rounded-2xl flex items-center justify-center mx-auto animate-pulse">
-                          <Loader2 className="w-8 h-8 text-[#027659] animate-spin" />
-                        </div>
-                        <h2 className="text-4xl font-bold text-gray-600">SlydPRO Designing</h2>
-                        <p className="text-xl text-gray-500">Creating your presentation slides...</p>
-                        <div className="flex space-x-2 justify-center">
-                          <div className="w-3 h-3 bg-[#027659] rounded-full animate-bounce"></div>
-                          <div
-                            className="w-3 h-3 bg-[#027659] rounded-full animate-bounce"
-                            style={{ animationDelay: "0.1s" }}
-                          ></div>
-                          <div
-                            className="w-3 h-3 bg-[#027659] rounded-full animate-bounce"
-                            style={{ animationDelay: "0.2s" }}
-                          ></div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              ) : currentSlide ? (
-                <div className="relative">
-                  {/* Main Slide */}
+          {/* Slide Preview Area */}
+          <div className="flex-1 flex items-center justify-center bg-gray-100 p-8">
+            {isPresentationMode && (
+              <div className="fixed inset-0 bg-black z-50 flex items-center justify-center">
+                {currentSlide && (
                   <div
-                    className="w-[624px] h-[351px] lg:w-[720px] lg:h-[405px] xl:w-[800px] xl:h-[450px] 2xl:w-[960px] 2xl:h-[540px] shadow-2xl rounded-lg overflow-hidden border-4 border-white"
+                    className="w-full h-full flex items-center justify-center"
                     style={{
                       backgroundColor: currentSlide.background,
                       color: currentSlide.textColor,
                     }}
                   >
-                    <div className="h-full p-12 flex flex-col justify-center relative">
+                    <div className="max-w-6xl mx-auto p-16">
                       {currentSlide.layout === "title" ? (
                         <div className="text-center">
-                          <h1 className="text-7xl font-bold mb-8 leading-tight">{currentSlide.title}</h1>
-                          <p className="text-3xl opacity-90 leading-relaxed max-w-4xl mx-auto">
-                            {currentSlide.content}
-                          </p>
+                          <h1 className="text-8xl font-bold mb-12 leading-tight">{currentSlide.title}</h1>
+                          <p className="text-4xl opacity-90 leading-relaxed">{currentSlide.content}</p>
                         </div>
                       ) : (
                         <>
-                          <h1 className="text-6xl font-bold mb-12 leading-tight">{currentSlide.title}</h1>
-                          <div className="text-3xl leading-relaxed opacity-90 space-y-6">
+                          <h1 className="text-7xl font-bold mb-16 leading-tight">{currentSlide.title}</h1>
+                          <div className="text-4xl leading-relaxed opacity-90 space-y-8">
                             {currentSlide.content.split("\n").map((line, index) => (
                               <p key={index}>{line}</p>
                             ))}
@@ -993,390 +881,494 @@ function EditorContent() {
                       )}
                     </div>
                   </div>
+                )}
 
-                  {/* Navigation Controls */}
-                  <div className="absolute -bottom-16 left-1/2 transform -translate-x-1/2 flex items-center space-x-4">
-                    <Button
-                      variant="outline"
-                      size="icon"
-                      onClick={() => {
-                        if (currentSlideIndex > 0) {
-                          const newIndex = currentSlideIndex - 1
-                          setCurrentSlideIndex(newIndex)
-                          setSelectedSlide(slides[newIndex].id)
-                        }
-                      }}
-                      disabled={currentSlideIndex === 0}
-                      className="bg-white shadow-lg hover:shadow-xl"
-                    >
-                      <SkipBack className="h-4 w-4" />
-                    </Button>
+                {/* Presentation Controls */}
+                <div className="absolute bottom-8 left-1/2 transform -translate-x-1/2 flex items-center space-x-4 bg-black/50 backdrop-blur-sm rounded-full px-6 py-3">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => {
+                      if (currentSlideIndex > 0) {
+                        const newIndex = currentSlideIndex - 1
+                        setCurrentSlideIndex(newIndex)
+                        setSelectedSlide(slides[newIndex].id)
+                      }
+                    }}
+                    disabled={currentSlideIndex === 0}
+                    className="text-white hover:bg-white/20"
+                  >
+                    <SkipBack className="h-5 w-5" />
+                  </Button>
 
-                    <div className="flex items-center space-x-2 bg-white rounded-full px-6 py-3 shadow-lg border">
-                      <span className="text-sm font-medium text-gray-700">
-                        {currentSlideIndex + 1} / {slides.length}
-                      </span>
-                    </div>
+                  <span className="text-white font-medium px-4">
+                    {currentSlideIndex + 1} / {slides.length}
+                  </span>
 
-                    <Button
-                      variant="outline"
-                      size="icon"
-                      onClick={() => {
-                        if (currentSlideIndex < slides.length - 1) {
-                          const newIndex = currentSlideIndex + 1
-                          setCurrentSlideIndex(newIndex)
-                          setSelectedSlide(slides[newIndex].id)
-                        }
-                      }}
-                      disabled={currentSlideIndex === slides.length - 1}
-                      className="bg-white shadow-lg hover:shadow-xl"
-                    >
-                      <SkipForward className="h-4 w-4" />
-                    </Button>
-                  </div>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => {
+                      if (currentSlideIndex < slides.length - 1) {
+                        const newIndex = currentSlideIndex + 1
+                        setCurrentSlideIndex(newIndex)
+                        setSelectedSlide(slides[newIndex].id)
+                      }
+                    }}
+                    disabled={currentSlideIndex === slides.length - 1}
+                    className="text-white hover:bg-white/20"
+                  >
+                    <SkipForward className="h-5 w-5" />
+                  </Button>
+
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={exitPresentationMode}
+                    className="text-white hover:bg-white/20 ml-4"
+                  >
+                    <Minimize className="h-5 w-5" />
+                  </Button>
                 </div>
-              ) : (
-                <div className="text-center text-gray-500 max-w-md">
-                  <div className="mb-6">
-                    <div className="w-24 h-24 bg-gradient-to-r from-blue-100 to-indigo-100 rounded-2xl flex items-center justify-center mx-auto mb-6">
-                      <Zap className="h-12 w-12 text-blue-600" />
-                    </div>
-                  </div>
-                  <h2 className="text-3xl font-bold text-gray-900 mb-4">Ready to Create</h2>
-                  <p className="text-lg text-gray-600 leading-relaxed">
-                    Start a conversation with the AI assistant to create your presentation. Describe your topic,
-                    audience, or upload a document to get started.
-                  </p>
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Right Sidebar - AI Chat */}
-          <div className="w-[220px] lg:w-[260px] xl:w-[300px] 2xl:w-[360px] bg-white border-l border-gray-200 flex flex-col shadow-lg">
-            {/* Chat Header */}
-            <div className="p-6 border-b border-gray-100 bg-gradient-to-r from-blue-50 to-indigo-50">
-              {/* Edit Mode Toggle */}
-              <div className="flex items-center space-x-2">
-                <Button
-                  variant={editMode === "all" ? "default" : "outline"}
-                  size="sm"
-                  onClick={() => setEditMode("all")}
-                  className="flex-1 text-xs"
-                >
-                  <RefreshCw className="h-3 w-3 mr-1" />
-                  All Slides
-                </Button>
-                <Button
-                  variant={editMode === "selected" ? "default" : "outline"}
-                  size="sm"
-                  onClick={() => setEditMode("selected")}
-                  className="flex-1 text-xs"
-                  disabled={!selectedSlide}
-                >
-                  <Target className="h-3 w-3 mr-1" />
-                  Selected
-                </Button>
               </div>
-
-              {selectedSlide && editMode === "selected" && (
-                <div className="bg-[#10b981]/10 border border-[#10b981]/20 rounded-lg p-3 mt-3">
-                  <div className="flex items-center space-x-2">
-                    <div className="w-2 h-2 bg-[#027659] rounded-full animate-pulse"></div>
-                    <span className="text-xs font-medium text-[#027659]">Editing: Slide {currentSlideIndex + 1}</span>
+            )}
+            {isStreaming ? (
+              <div className="relative">
+                {/* Skeleton Slide */}
+                <div className="lg:w-[624px] lg:h-[351px] xl:w-[720px] xl:h-[405px] 2xl:w-[800px] 2xl:h-[450px] 3xl:w-[960px] 3xl:h-[540px] shadow-2xl rounded-lg overflow-hidden border-4 border-white bg-gradient-to-br from-gray-200 to-gray-300 animate-pulse">
+                  <div className="h-full p-12 flex flex-col justify-center items-center">
+                    <div className="text-center space-y-6">
+                      <div className="w-16 h-16 bg-[#027659]/20 rounded-2xl flex items-center justify-center mx-auto animate-pulse">
+                        <Loader2 className="w-8 h-8 text-[#027659] animate-spin" />
+                      </div>
+                      <h2 className="text-4xl font-bold text-gray-600">SlydPRO Designing</h2>
+                      <p className="text-xl text-gray-500">Creating your presentation slides...</p>
+                      <div className="flex space-x-2 justify-center">
+                        <div className="w-3 h-3 bg-[#027659] rounded-full animate-bounce"></div>
+                        <div
+                          className="w-3 h-3 bg-[#027659] rounded-full animate-bounce"
+                          style={{ animationDelay: "0.1s" }}
+                        ></div>
+                        <div
+                          className="w-3 h-3 bg-[#027659] rounded-full animate-bounce"
+                          style={{ animationDelay: "0.2s" }}
+                        ></div>
+                      </div>
+                    </div>
                   </div>
-                  <p className="text-xs text-[#027659]/80 mt-1 truncate">
-                    {slides.find((s) => s.id === selectedSlide)?.title}
-                  </p>
                 </div>
-              )}
-            </div>
-
-            {/* Chat Messages */}
-            <ScrollArea className="flex-1 p-4">
-              <div className="space-y-4">
-                {chatMessages.map((message) => (
-                  <div key={message.id} className="space-y-3">
-                    {message.type === "user" ? (
-                      // User message - right aligned
-                      <div className="flex items-start justify-end space-x-3">
-                        <div className="flex-1 min-w-0 flex flex-col items-end">
-                          <div className="bg-[#027659] text-white rounded-2xl px-4 py-3 max-w-[80%]">
-                            <p className="text-sm whitespace-pre-wrap">{message.content}</p>
-                          </div>
-
-                          {/* Action buttons directly under user message */}
-                          {!message.isLoading && (
-                            <div className="flex space-x-2 mt-2">
-                              <Tooltip>
-                                <TooltipTrigger asChild>
-                                  <Button
-                                    size="sm"
-                                    variant="ghost"
-                                    className="h-7 w-7 p-0 text-gray-500 hover:text-gray-700 hover:bg-gray-100"
-                                    onClick={() => handleCopyMessage(message.id, message.content)}
-                                  >
-                                    {copiedMessageId === message.id ? (
-                                      <Check className="h-3 w-3 text-green-600" />
-                                    ) : (
-                                      <Copy className="h-3 w-3" />
-                                    )}
-                                  </Button>
-                                </TooltipTrigger>
-                                <TooltipContent>
-                                  <p>{copiedMessageId === message.id ? "Copied!" : "Copy"}</p>
-                                </TooltipContent>
-                              </Tooltip>
-
-                              <Tooltip>
-                                <TooltipTrigger asChild>
-                                  <Button
-                                    size="sm"
-                                    variant="ghost"
-                                    className="h-7 w-7 p-0 text-red-500 hover:text-red-700 hover:bg-red-50"
-                                    onClick={() => {
-                                      setChatMessages((prev) => prev.filter((m) => m.id !== message.id))
-                                    }}
-                                  >
-                                    <Trash2 className="h-3 w-3" />
-                                  </Button>
-                                </TooltipTrigger>
-                                <TooltipContent>
-                                  <p>Delete</p>
-                                </TooltipContent>
-                              </Tooltip>
-                            </div>
-                          )}
-
-                          {/* Message timestamp */}
-                          <span className="text-xs text-gray-500 mt-1">
-                            {message.timestamp.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
-                          </span>
-                        </div>
-
-                        <Avatar className="w-8 h-8 mt-1">
-                          <AvatarFallback className="bg-[#027659]/10">
-                            <User className="w-4 h-4 text-[#027659]" />
-                          </AvatarFallback>
-                        </Avatar>
+              </div>
+            ) : currentSlide ? (
+              <div className="relative">
+                {/* Main Slide */}
+                <div
+                  className="lg:w-[624px] lg:h-[351px] xl:w-[720px] xl:h-[405px] 2xl:w-[800px] 2xl:h-[450px] 3xl:w-[960px] 3xl:h-[540px] shadow-2xl rounded-lg overflow-hidden border-4 border-white"
+                  style={{
+                    backgroundColor: currentSlide.background,
+                    color: currentSlide.textColor,
+                  }}
+                >
+                  <div className="h-full p-12 flex flex-col justify-center relative">
+                    {currentSlide.layout === "title" ? (
+                      <div className="text-center">
+                        <h1 className="text-7xl font-bold mb-8 leading-tight">{currentSlide.title}</h1>
+                        <p className="text-3xl opacity-90 leading-relaxed max-w-4xl mx-auto">{currentSlide.content}</p>
                       </div>
                     ) : (
-                      // Assistant message - left aligned
-                      <div className="flex items-start space-x-3">
-                        <Avatar className="w-8 h-8 mt-1">
-                          <AvatarFallback className="bg-gray-100">
-                            <Bot className="w-4 h-4 text-gray-600" />
-                          </AvatarFallback>
-                        </Avatar>
-                        <div className="flex-1 min-w-0">
-                          <div className="bg-gray-100 text-gray-900 rounded-2xl px-4 py-3 max-w-[80%]">
-                            {message.isLoading ? (
-                              <div className="space-y-4">
-                                {message.generationProgress?.stage === "thinking" && (
-                                  <div className="space-y-3">
-                                    <div className="flex items-center space-x-2">
-                                      <div className="flex space-x-1">
-                                        <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"></div>
-                                        <div
-                                          className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"
-                                          style={{ animationDelay: "0.1s" }}
-                                        ></div>
-                                        <div
-                                          className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"
-                                          style={{ animationDelay: "0.2s" }}
-                                        ></div>
-                                      </div>
-                                      <span className="text-sm font-medium">Thinking</span>
-                                    </div>
-                                    <p className="text-xs text-gray-600">
-                                      Thoughts for {message.generationProgress.thinkingTime} seconds
-                                    </p>
-                                  </div>
-                                )}
-
-                                {message.generationProgress?.stage === "designing" && (
-                                  <div className="border border-gray-200 rounded-lg p-4 bg-white shadow-sm">
-                                    <div className="flex items-center justify-between mb-4">
-                                      <div className="flex items-center space-x-2">
-                                        <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
-                                        <span className="text-sm font-semibold text-gray-800">
-                                          Version {message.generationProgress.version}
-                                        </span>
-                                      </div>
-                                      <span className="text-xs text-blue-600 font-medium">Designing</span>
-                                    </div>
-
-                                    {/* Threaded progress steps */}
-                                    <div className="space-y-3">
-                                      <p className="text-xs text-gray-600 mb-3">Creating slides:</p>
-                                      <div className="relative">
-                                        {Array.from({ length: message.generationProgress.totalSlides || 0 }, (_, i) => {
-                                          const slideNames = [
-                                            "Title Slide",
-                                            "Problem Statement",
-                                            "Solution Overview",
-                                            "Market Analysis",
-                                            "Business Model",
-                                            "Financial Projections",
-                                            "Call to Action",
-                                          ]
-
-                                          const isCompleted = i < (message.generationProgress?.completedSlides || 0)
-                                          const isCurrent = i === (message.generationProgress?.completedSlides || 0)
-                                          const isUpcoming = i > (message.generationProgress?.completedSlides || 0)
-
-                                          return (
-                                            <div key={i} className="relative flex items-center">
-                                              {/* Thread line */}
-                                              {i < (message.generationProgress.totalSlides || 0) - 1 && (
-                                                <div
-                                                  className={`absolute left-2 top-6 w-0.5 h-6 ${
-                                                    isCompleted ? "bg-green-300" : "bg-gray-200"
-                                                  }`}
-                                                />
-                                              )}
-
-                                              {/* Status indicator */}
-                                              <div className="w-4 h-4 flex items-center justify-center mr-3 relative z-10">
-                                                {isCompleted ? (
-                                                  <div className="w-4 h-4 bg-green-500 rounded-full flex items-center justify-center">
-                                                    <Check className="w-2.5 h-2.5 text-white" />
-                                                  </div>
-                                                ) : isCurrent ? (
-                                                  <div className="w-4 h-4 bg-blue-500 rounded-full flex items-center justify-center">
-                                                    <Loader2 className="w-2.5 h-2.5 text-white animate-spin" />
-                                                  </div>
-                                                ) : (
-                                                  <div className="w-4 h-4 bg-gray-300 rounded-full"></div>
-                                                )}
-                                              </div>
-
-                                              {/* Slide info */}
-                                              <div className="flex-1 py-1">
-                                                <div className="flex items-center justify-between">
-                                                  <span
-                                                    className={`text-xs ${
-                                                      isCompleted
-                                                        ? "text-green-600 font-medium"
-                                                        : isCurrent
-                                                          ? "text-blue-600 font-medium"
-                                                          : "text-gray-400"
-                                                    }`}
-                                                  >
-                                                    {isCurrent && message.generationProgress?.currentSlide
-                                                      ? message.generationProgress.currentSlide
-                                                      : slideNames[i] || `Slide ${i + 1}`}
-                                                  </span>
-                                                  <span className="text-gray-400 text-xs ml-2">{i + 1}</span>
-                                                </div>
-                                              </div>
-                                            </div>
-                                          )
-                                        })}
-                                      </div>
-                                    </div>
-                                  </div>
-                                )}
-                              </div>
-                            ) : (
-                              <div className="space-y-3">
-                                <p className="text-sm whitespace-pre-wrap">{message.content}</p>
-
-                                {/* Show generation progress for completed messages */}
-                                {message.generationProgress?.isComplete && (
-                                  <div className="border border-green-200 rounded-lg p-3 bg-green-50 shadow-sm">
-                                    <div className="flex items-center justify-between mb-2">
-                                      <div className="flex items-center space-x-2">
-                                        <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                                        <span className="text-sm font-semibold text-green-800">
-                                          Version {message.generationProgress.version}
-                                        </span>
-                                      </div>
-                                      <span className="text-xs text-green-600 font-medium">Complete</span>
-                                    </div>
-                                    <p className="text-xs text-green-700">
-                                      Generated {message.generationProgress.completedSlides} slides successfully
-                                    </p>
-                                  </div>
-                                )}
-                              </div>
-                            )}
-                          </div>
-
-                          {/* Message timestamp */}
-                          <span className="text-xs text-gray-500 mt-1 block">
-                            {message.timestamp.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
-                          </span>
+                      <>
+                        <h1 className="text-6xl font-bold mb-12 leading-tight">{currentSlide.title}</h1>
+                        <div className="text-3xl leading-relaxed opacity-90 space-y-6">
+                          {currentSlide.content.split("\n").map((line, index) => (
+                            <p key={index}>{line}</p>
+                          ))}
                         </div>
-                      </div>
+                      </>
                     )}
                   </div>
-                ))}
-                <div ref={chatEndRef} />
-              </div>
-            </ScrollArea>
+                </div>
 
-            {/* Chat Input */}
-            <div className="p-4 border-t border-gray-100 bg-white">
-              <div className="space-y-3">
-                <div className="bg-gray-50 rounded-2xl border border-gray-200 overflow-hidden">
-                  <Textarea
-                    value={inputMessage}
-                    onChange={(e) => setInputMessage(e.target.value)}
-                    placeholder={
-                      editMode === "selected"
-                        ? "How should I modify this slide?"
-                        : slides.length > 0
-                          ? "Ask me to modify your presentation..."
-                          : "Describe the presentation you want to create..."
-                    }
-                    onKeyPress={(e) => e.key === "Enter" && !e.shiftKey && handleChatSubmit()}
-                    className="w-full bg-transparent border-0 text-gray-900 placeholder:text-gray-500 text-sm focus-visible:ring-0 focus-visible:ring-offset-0 resize-none min-h-[80px] max-h-[120px] shadow-none outline-none focus:outline-none p-4"
-                    rows={3}
-                    disabled={v0.isLoading}
-                  />
-                  <div className="flex items-center justify-between p-3 pt-0">
-                    <div className="flex items-center space-x-2">
-                      <input
-                        type="file"
-                        ref={fileInputRef}
-                        onChange={handleFileUpload}
-                        accept=".txt,.doc,.docx,.pdf"
-                        className="hidden"
-                      />
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => fileInputRef.current?.click()}
-                        className="text-gray-500 hover:text-gray-700 h-8 px-2"
-                        disabled={v0.isLoading}
-                      >
-                        <Upload className="h-4 w-4" />
-                      </Button>
-                    </div>
-                    <Button
-                      onClick={
-                        isStreaming
-                          ? () => {
-                              setIsStreaming(false)
-                              setChatMessages((prev) => prev.filter((msg) => !msg.isLoading))
-                            }
-                          : handleChatSubmit
+                {/* Navigation Controls */}
+                <div className="absolute -bottom-16 left-1/2 transform -translate-x-1/2 flex items-center space-x-4">
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    onClick={() => {
+                      if (currentSlideIndex > 0) {
+                        const newIndex = currentSlideIndex - 1
+                        setCurrentSlideIndex(newIndex)
+                        setSelectedSlide(slides[newIndex].id)
                       }
+                    }}
+                    disabled={currentSlideIndex === 0}
+                    className="bg-white shadow-lg hover:shadow-xl"
+                  >
+                    <SkipBack className="h-4 w-4" />
+                  </Button>
+
+                  <div className="flex items-center space-x-2 bg-white rounded-full px-6 py-3 shadow-lg border">
+                    <span className="text-sm font-medium text-gray-700">
+                      {currentSlideIndex + 1} / {slides.length}
+                    </span>
+                  </div>
+
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    onClick={() => {
+                      if (currentSlideIndex < slides.length - 1) {
+                        const newIndex = currentSlideIndex + 1
+                        setCurrentSlideIndex(newIndex)
+                        setSelectedSlide(slides[newIndex].id)
+                      }
+                    }}
+                    disabled={currentSlideIndex === slides.length - 1}
+                    className="bg-white shadow-lg hover:shadow-xl"
+                  >
+                    <SkipForward className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <div className="text-center text-gray-500 max-w-md">
+                <div className="mb-6">
+                  <div className="w-24 h-24 bg-gradient-to-r from-blue-100 to-indigo-100 rounded-2xl flex items-center justify-center mx-auto mb-6">
+                    <Zap className="h-12 w-12 text-blue-600" />
+                  </div>
+                </div>
+                <h2 className="text-3xl font-bold text-gray-900 mb-4">Ready to Create</h2>
+                <p className="text-lg text-gray-600 leading-relaxed">
+                  Start a conversation with the AI assistant to create your presentation. Describe your topic, audience,
+                  or upload a document to get started.
+                </p>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Right Sidebar - AI Chat */}
+        <div className="lg:w-[220px] xl:w-[260px] 2xl:w-[300px] 3xl:w-[360px] bg-white border-l border-gray-200 flex flex-col shadow-lg">
+          {/* Chat Header */}
+          <div className="p-6 border-b border-gray-100 bg-gradient-to-r from-blue-50 to-indigo-50">
+            {/* Edit Mode Toggle */}
+            <div className="flex items-center space-x-2">
+              <Button
+                variant={editMode === "all" ? "default" : "outline"}
+                size="sm"
+                onClick={() => setEditMode("all")}
+                className="flex-1 text-xs"
+              >
+                <RefreshCw className="h-3 w-3 mr-1" />
+                All Slides
+              </Button>
+              <Button
+                variant={editMode === "selected" ? "default" : "outline"}
+                size="sm"
+                onClick={() => setEditMode("selected")}
+                className="flex-1 text-xs"
+                disabled={!selectedSlide}
+              >
+                <Target className="h-3 w-3 mr-1" />
+                Selected
+              </Button>
+            </div>
+
+            {selectedSlide && editMode === "selected" && (
+              <div className="bg-[#10b981]/10 border border-[#10b981]/20 rounded-lg p-3 mt-3">
+                <div className="flex items-center space-x-2">
+                  <div className="w-2 h-2 bg-[#027659] rounded-full animate-pulse"></div>
+                  <span className="text-xs font-medium text-[#027659]">Editing: Slide {currentSlideIndex + 1}</span>
+                </div>
+                <p className="text-xs text-[#027659]/80 mt-1 truncate">
+                  {slides.find((s) => s.id === selectedSlide)?.title}
+                </p>
+              </div>
+            )}
+          </div>
+
+          {/* Chat Messages */}
+          <ScrollArea className="flex-1 p-4">
+            <div className="space-y-4">
+              {chatMessages.map((message) => (
+                <div key={message.id} className="space-y-3">
+                  {message.type === "user" ? (
+                    // User message - right aligned
+                    <div className="flex items-start justify-end space-x-3">
+                      <div className="flex-1 min-w-0 flex flex-col items-end">
+                        <div className="bg-[#027659] text-white rounded-2xl px-4 py-3 max-w-[80%]">
+                          <p className="text-sm whitespace-pre-wrap">{message.content}</p>
+                        </div>
+
+                        {/* Action buttons directly under user message */}
+                        {!message.isLoading && (
+                          <div className="flex space-x-2 mt-2">
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  className="h-7 w-7 p-0 text-gray-500 hover:text-gray-700 hover:bg-gray-100"
+                                  onClick={() => handleCopyMessage(message.id, message.content)}
+                                >
+                                  {copiedMessageId === message.id ? (
+                                    <Check className="h-3 w-3 text-green-600" />
+                                  ) : (
+                                    <Copy className="h-3 w-3" />
+                                  )}
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                <p>{copiedMessageId === message.id ? "Copied!" : "Copy"}</p>
+                              </TooltipContent>
+                            </Tooltip>
+
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  className="h-7 w-7 p-0 text-red-500 hover:text-red-700 hover:bg-red-50"
+                                  onClick={() => {
+                                    setChatMessages((prev) => prev.filter((m) => m.id !== message.id))
+                                  }}
+                                >
+                                  <Trash2 className="h-3 w-3" />
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                <p>Delete</p>
+                              </TooltipContent>
+                            </Tooltip>
+                          </div>
+                        )}
+
+                        {/* Message timestamp */}
+                        <span className="text-xs text-gray-500 mt-1">
+                          {message.timestamp.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                        </span>
+                      </div>
+
+                      <Avatar className="w-8 h-8 mt-1">
+                        <AvatarFallback className="bg-[#027659]/10">
+                          <User className="w-4 h-4 text-[#027659]" />
+                        </AvatarFallback>
+                      </Avatar>
+                    </div>
+                  ) : (
+                    // Assistant message - left aligned
+                    <div className="flex items-start space-x-3">
+                      <Avatar className="w-8 h-8 mt-1">
+                        <AvatarFallback className="bg-gray-100">
+                          <Bot className="w-4 h-4 text-gray-600" />
+                        </AvatarFallback>
+                      </Avatar>
+                      <div className="flex-1 min-w-0">
+                        <div className="bg-gray-100 text-gray-900 rounded-2xl px-4 py-3 max-w-[80%]">
+                          {message.isLoading ? (
+                            <div className="space-y-4">
+                              {message.generationProgress?.stage === "thinking" && (
+                                <div className="space-y-3">
+                                  <div className="flex items-center space-x-2">
+                                    <div className="flex space-x-1">
+                                      <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"></div>
+                                      <div
+                                        className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"
+                                        style={{ animationDelay: "0.1s" }}
+                                      ></div>
+                                      <div
+                                        className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"
+                                        style={{ animationDelay: "0.2s" }}
+                                      ></div>
+                                    </div>
+                                    <span className="text-sm font-medium">Thinking</span>
+                                  </div>
+                                  <p className="text-xs text-gray-600">
+                                    Thoughts for {message.generationProgress.thinkingTime} seconds
+                                  </p>
+                                </div>
+                              )}
+
+                              {message.generationProgress?.stage === "designing" && (
+                                <div className="border border-gray-200 rounded-lg p-4 bg-white shadow-sm">
+                                  <div className="flex items-center justify-between mb-4">
+                                    <div className="flex items-center space-x-2">
+                                      <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                                      <span className="text-sm font-semibold text-gray-800">
+                                        Version {message.generationProgress.version}
+                                      </span>
+                                    </div>
+                                    <span className="text-xs text-blue-600 font-medium">Designing</span>
+                                  </div>
+
+                                  {/* Threaded progress steps */}
+                                  <div className="space-y-3">
+                                    <p className="text-xs text-gray-600 mb-3">Creating slides:</p>
+                                    <div className="relative">
+                                      {Array.from({ length: message.generationProgress.totalSlides || 0 }, (_, i) => {
+                                        const slideNames = [
+                                          "Title Slide",
+                                          "Problem Statement",
+                                          "Solution Overview",
+                                          "Market Analysis",
+                                          "Business Model",
+                                          "Financial Projections",
+                                          "Call to Action",
+                                        ]
+
+                                        const isCompleted = i < (message.generationProgress?.completedSlides || 0)
+                                        const isCurrent = i === (message.generationProgress?.completedSlides || 0)
+                                        const isUpcoming = i > (message.generationProgress?.completedSlides || 0)
+
+                                        return (
+                                          <div key={i} className="relative flex items-center">
+                                            {/* Thread line */}
+                                            {i < (message.generationProgress.totalSlides || 0) - 1 && (
+                                              <div
+                                                className={`absolute left-2 top-6 w-0.5 h-6 ${
+                                                  isCompleted ? "bg-green-300" : "bg-gray-200"
+                                                }`}
+                                              />
+                                            )}
+
+                                            {/* Status indicator */}
+                                            <div className="w-4 h-4 flex items-center justify-center mr-3 relative z-10">
+                                              {isCompleted ? (
+                                                <div className="w-4 h-4 bg-green-500 rounded-full flex items-center justify-center">
+                                                  <Check className="w-2.5 h-2.5 text-white" />
+                                                </div>
+                                              ) : isCurrent ? (
+                                                <div className="w-4 h-4 bg-blue-500 rounded-full flex items-center justify-center">
+                                                  <Loader2 className="w-2.5 h-2.5 text-white animate-spin" />
+                                                </div>
+                                              ) : (
+                                                <div className="w-4 h-4 bg-gray-300 rounded-full"></div>
+                                              )}
+                                            </div>
+
+                                            {/* Slide info */}
+                                            <div className="flex-1 py-1">
+                                              <div className="flex items-center justify-between">
+                                                <span
+                                                  className={`text-xs ${
+                                                    isCompleted
+                                                      ? "text-green-600 font-medium"
+                                                      : isCurrent
+                                                        ? "text-blue-600 font-medium"
+                                                        : "text-gray-400"
+                                                  }`}
+                                                >
+                                                  {isCurrent && message.generationProgress?.currentSlide
+                                                    ? message.generationProgress.currentSlide
+                                                    : slideNames[i] || `Slide ${i + 1}`}
+                                                </span>
+                                                <span className="text-gray-400 text-xs ml-2">{i + 1}</span>
+                                              </div>
+                                            </div>
+                                          </div>
+                                        )
+                                      })}
+                                    </div>
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          ) : (
+                            <div className="space-y-3">
+                              <p className="text-sm whitespace-pre-wrap">{message.content}</p>
+
+                              {/* Show generation progress for completed messages */}
+                              {message.generationProgress?.isComplete && (
+                                <div className="border border-green-200 rounded-lg p-3 bg-green-50 shadow-sm">
+                                  <div className="flex items-center justify-between mb-2">
+                                    <div className="flex items-center space-x-2">
+                                      <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                                      <span className="text-sm font-semibold text-green-800">
+                                        Version {message.generationProgress.version}
+                                      </span>
+                                    </div>
+                                    <span className="text-xs text-green-600 font-medium">Complete</span>
+                                  </div>
+                                  <p className="text-xs text-green-700">
+                                    Generated {message.generationProgress.completedSlides} slides successfully
+                                  </p>
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Message timestamp */}
+                        <span className="text-xs text-gray-500 mt-1 block">
+                          {message.timestamp.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                        </span>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ))}
+              <div ref={chatEndRef} />
+            </div>
+          </ScrollArea>
+
+          {/* Chat Input */}
+          <div className="p-4 border-t border-gray-100 bg-white">
+            <div className="space-y-3">
+              <div className="bg-gray-50 rounded-2xl border border-gray-200 overflow-hidden">
+                <Textarea
+                  value={inputMessage}
+                  onChange={(e) => setInputMessage(e.target.value)}
+                  placeholder={
+                    editMode === "selected"
+                      ? "How should I modify this slide?"
+                      : slides.length > 0
+                        ? "Ask me to modify your presentation..."
+                        : "Describe the presentation you want to create..."
+                  }
+                  onKeyPress={(e) => e.key === "Enter" && !e.shiftKey && handleChatSubmit()}
+                  className="w-full bg-transparent border-0 text-gray-900 placeholder:text-gray-500 text-sm focus-visible:ring-0 focus-visible:ring-offset-0 resize-none min-h-[80px] max-h-[120px] shadow-none outline-none focus:outline-none p-4"
+                  rows={3}
+                  disabled={v0.isLoading}
+                />
+                <div className="flex items-center justify-between p-3 pt-0">
+                  <div className="flex items-center space-x-2">
+                    <input
+                      type="file"
+                      ref={fileInputRef}
+                      onChange={handleFileUpload}
+                      accept=".txt,.doc,.docx,.pdf"
+                      className="hidden"
+                    />
+                    <Button
+                      variant="ghost"
                       size="sm"
-                      disabled={!isStreaming && !inputMessage.trim()}
-                      className={`${isStreaming ? "bg-red-600 hover:bg-red-700" : "bg-[#027659] hover:bg-[#065f46]"} text-white rounded-lg px-4 py-2`}
+                      onClick={() => fileInputRef.current?.click()}
+                      className="text-gray-500 hover:text-gray-700 h-8 px-2"
+                      disabled={v0.isLoading}
                     >
-                      {isStreaming ? (
-                        <>
-                          <div className="w-3 h-3 bg-white rounded-sm mr-2"></div>
-                          Stop
-                        </>
-                      ) : (
-                        <Send className="h-4 w-4" />
-                      )}
+                      <Upload className="h-4 w-4" />
                     </Button>
                   </div>
+                  <Button
+                    onClick={
+                      isStreaming
+                        ? () => {
+                            setIsStreaming(false)
+                            setChatMessages((prev) => prev.filter((msg) => !msg.isLoading))
+                          }
+                        : handleChatSubmit
+                    }
+                    size="sm"
+                    disabled={!isStreaming && !inputMessage.trim()}
+                    className={`${isStreaming ? "bg-red-600 hover:bg-red-700" : "bg-[#027659] hover:bg-[#065f46]"} text-white rounded-lg px-4 py-2`}
+                  >
+                    {isStreaming ? (
+                      <>
+                        <div className="w-3 h-3 bg-white rounded-sm mr-2"></div>
+                        Stop
+                      </>
+                    ) : (
+                      <Send className="h-4 w-4" />
+                    )}
+                  </Button>
                 </div>
               </div>
             </div>
