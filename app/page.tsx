@@ -231,13 +231,13 @@ export default function SlydPROHome() {
         {/* Hero Section */}
         <div className="text-center mb-12 sm:mb-16">
           <h1 className="font-bold text-foreground mb-4 sm:mb-6 leading-tight text-3xl sm:text-4xl lg:text-5xl">
-            Create something{" "}
+          Design something{" "}
             <span className="bg-gradient-to-r from-[#027659] to-[#10b981] bg-clip-text text-transparent">
               Presentable
             </span>
           </h1>
           <p className="text-lg sm:text-xl text-muted-foreground max-w-2xl mx-auto leading-relaxed px-4">
-            Design pitch decks and presentation slides by chatting with AI
+          Create presentation slides by chatting with AI
           </p>
         </div>
 

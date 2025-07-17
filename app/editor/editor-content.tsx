@@ -635,7 +635,7 @@ function EditorContent() {
         id: Date.now().toString(),
         type: "assistant",
         content:
-          "Hi! I'm your AI presentation assistant. Describe what kind of presentation you'd like to create, and I'll help you build it slide by slide. \n\nFor example:\n• 'Create a startup pitch deck for a food delivery app'\n• 'Make a quarterly business review presentation'\n• 'Build a product launch presentation'",
+          "Hi! Ask SlydPRO AI to design your presentation slides. \n\nFor example:\n• 'Create a startup pitch deck for a food delivery app'\n• 'Make a quarterly business review presentation'\n• 'Build a product launch presentation'",
         timestamp: new Date(),
       }
       setChatMessages([welcomeMessage])
