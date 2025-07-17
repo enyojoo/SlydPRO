@@ -690,9 +690,9 @@ function EditorContent() {
 
   return (
     <TooltipProvider>
-      <div className="flex h-screen bg-gradient-to-br from-gray-50 to-green-50/30 lg:gap-x-4 xl:gap-x-6 2xl:gap-x-8 3xl:gap-x-10 justify-center">
+      <div className="flex h-screen bg-gradient-to-br from-gray-50 to-green-50/30">
         {/* Left Sidebar - Slide Thumbnails */}
-        <div className="lg:w-[200px] xl:w-[240px] 2xl:w-[260px] 3xl:w-[280px] bg-white border-r border-gray-200 flex flex-col shadow-sm">
+        <div className="w-[272px] 2xl:w-[252px] xl:w-[232px] lg:w-48 bg-white border-r border-gray-200 flex flex-col shadow-sm">
           {/* Header */}
           <div className="p-4 h-[61px] flex items-center justify-between">
             <div className="flex items-center space-x-3">
@@ -935,7 +935,7 @@ function EditorContent() {
             {isStreaming ? (
               <div className="relative">
                 {/* Skeleton Slide */}
-                <div className="lg:w-[624px] lg:h-[351px] xl:w-[720px] xl:h-[405px] 2xl:w-[800px] 2xl:h-[450px] 3xl:w-[960px] 3xl:h-[540px] shadow-2xl rounded-lg overflow-hidden border-4 border-white bg-gradient-to-br from-gray-200 to-gray-300 animate-pulse">
+                <div className="w-[992px] h-[558px] 2xl:w-[832px] 2xl:h-[468px] xl:w-[752px] xl:h-[423px] lg:w-[640px] lg:h-[360px] shadow-2xl rounded-lg overflow-hidden border-4 border-white bg-gradient-to-br from-gray-200 to-gray-300 animate-pulse">
                   <div className="h-full p-12 flex flex-col justify-center items-center">
                     <div className="text-center space-y-6">
                       <div className="w-16 h-16 bg-[#027659]/20 rounded-2xl flex items-center justify-center mx-auto animate-pulse">
@@ -962,7 +962,7 @@ function EditorContent() {
               <div className="relative">
                 {/* Main Slide */}
                 <div
-                  className="lg:w-[624px] lg:h-[351px] xl:w-[720px] xl:h-[405px] 2xl:w-[800px] 2xl:h-[450px] 3xl:w-[960px] 3xl:h-[540px] shadow-2xl rounded-lg overflow-hidden border-4 border-white"
+                  className="w-[992px] h-[558px] 2xl:w-[832px] 2xl:h-[468px] xl:w-[752px] xl:h-[423px] lg:w-[640px] lg:h-[360px] shadow-2xl rounded-lg overflow-hidden border-4 border-white"
                   style={{
                     backgroundColor: currentSlide.background,
                     color: currentSlide.textColor,
@@ -1046,7 +1046,7 @@ function EditorContent() {
         </div>
 
         {/* Right Sidebar - AI Chat */}
-        <div className="lg:w-[200px] xl:w-[240px] 2xl:w-[280px] 3xl:w-[320px] bg-white border-l border-gray-200 flex flex-col shadow-lg">
+        <div className="w-[312px] 2xl:w-[272px] xl:w-[232px] lg:w-48 bg-white border-l border-gray-200 flex flex-col shadow-lg">
           {/* Chat Header */}
           <div className="p-6 border-b border-gray-100 bg-gradient-to-r from-blue-50 to-indigo-50">
             {/* Edit Mode Toggle */}
