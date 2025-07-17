@@ -28,6 +28,7 @@ import {
   Minimize,
   Loader2,
   Check,
+  Square,
 } from "lucide-react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { useV0Integration } from "@/hooks/useV0Integration"
@@ -72,6 +73,19 @@ const colorThemes = [
   { name: "Red", primary: "#dc2626", secondary: "#ef4444", text: "#ffffff" },
   { name: "Orange", primary: "#ea580c", secondary: "#f97316", text: "#ffffff" },
   { name: "Dark", primary: "#1f2937", secondary: "#374151", text: "#ffffff" },
+]
+
+// Estimated slide names for progress display
+const SLIDE_NAMES_ESTIMATE = [
+  "Title Slide",
+  "Problem Statement",
+  "Solution Overview",
+  "Market Analysis",
+  "Business Model",
+  "Competition Analysis",
+  "Team Introduction",
+  "Financial Projections",
+  "Call to Action",
 ]
 
 function EditorContent() {
@@ -136,7 +150,7 @@ function EditorContent() {
         generationProgress: {
           stage: "thinking",
           thinkingTime: 0,
-          version: 1,
+          version: chatMessages.filter((m) => m.generationProgress?.version).length + 1,
         },
       }
 
@@ -150,7 +164,7 @@ function EditorContent() {
         thinkingTime += 1
         setChatMessages((prev) =>
           prev.map((msg) =>
-            msg.isLoading
+            msg.id === loadingMessage.id && msg.isLoading
               ? {
                   ...msg,
                   generationProgress: {
@@ -169,59 +183,39 @@ function EditorContent() {
         uploadedFile,
         // onChunk - Real-time content streaming
         (chunk: string) => {
-          setStreamingContent((prev) => prev + chunk)
+          setStreamingContent((prev) => {
+            const newContent = prev + chunk
+            // Update progress based on new content
+            const slideMatches = newContent.match(/(?:##|###)\s*(?:Slide\s*\d+:?\s*)?(.+?)(?=(?:##|###)|$)/gs)
+            const completedSlides = slideMatches ? slideMatches.length : 0
+            let currentSlideTitle = ""
+            if (slideMatches && slideMatches.length > 0) {
+              const lastMatch = slideMatches[slideMatches.length - 1]
+              currentSlideTitle = lastMatch
+                .split("\n")[0]
+                .replace(/^#+\s*(?:Slide\s*\d+:?\s*)?/, "")
+                .trim()
+            }
 
-          // Transition to designing phase when we start getting content
-          if (chunk.includes("##") || chunk.includes("Slide")) {
-            clearInterval(thinkingInterval)
-            setChatMessages((prev) =>
-              prev.map((msg) =>
-                msg.isLoading
+            // Transition to designing phase if not already, and update progress
+            setChatMessages((prevMsgs) =>
+              prevMsgs.map((msg) =>
+                msg.id === loadingMessage.id
                   ? {
                       ...msg,
                       generationProgress: {
                         ...msg.generationProgress!,
                         stage: "designing",
-                        totalSlides: 7, // We'll update this as we detect slides
-                        completedSlides: 0,
+                        totalSlides: SLIDE_NAMES_ESTIMATE.length, // Use estimated total slides
+                        completedSlides: completedSlides,
+                        currentSlide: currentSlideTitle,
                       },
                     }
                   : msg,
               ),
             )
-
-            // Count slides in real-time as they're generated
-            const slideMatches = (streamingContent + chunk).match(
-              /(?:##|###)\s*(?:Slide\s*\d+:?\s*)?(.+?)(?=(?:##|###)|$)/gs,
-            )
-            if (slideMatches) {
-              const completedSlides = slideMatches.length
-              const slideNames = [
-                "Title Slide",
-                "Problem Statement",
-                "Solution Overview",
-                "Market Analysis",
-                "Business Model",
-                "Financial Projections",
-                "Call to Action",
-              ]
-
-              setChatMessages((prev) =>
-                prev.map((msg) =>
-                  msg.isLoading
-                    ? {
-                        ...msg,
-                        generationProgress: {
-                          ...msg.generationProgress!,
-                          completedSlides,
-                          currentSlide: slideNames[completedSlides - 1] || `Slide ${completedSlides}`,
-                        },
-                      }
-                    : msg,
-                ),
-              )
-            }
-          }
+            return newContent
+          })
         },
         // onComplete
         async (result) => {
@@ -256,7 +250,7 @@ function EditorContent() {
             // Update the loading message to show completion
             setChatMessages((prev) =>
               prev.map((msg) =>
-                msg.isLoading
+                msg.id === loadingMessage.id
                   ? {
                       ...msg,
                       isLoading: false,
@@ -278,19 +272,26 @@ function EditorContent() {
         (error) => {
           setIsStreaming(false)
           clearInterval(thinkingInterval)
-          setChatMessages((prev) => prev.filter((msg) => !msg.isLoading))
-
-          const errorMessage: ChatMessage = {
-            id: (Date.now() + 3).toString(),
-            type: "assistant",
-            content: `I encountered an error: ${error.message}\n\nPlease try again or describe your presentation differently.`,
-            timestamp: new Date(),
-          }
-          setChatMessages((prev) => [...prev, errorMessage])
+          setChatMessages((prev) =>
+            prev.map((msg) =>
+              msg.id === loadingMessage.id
+                ? {
+                    ...msg,
+                    isLoading: false,
+                    content: `I encountered an error: ${error.message}\n\nPlease try again or describe your presentation differently.`,
+                    generationProgress: {
+                      ...msg.generationProgress!,
+                      stage: "complete", // Mark as complete even on error
+                      isComplete: true,
+                    },
+                  }
+                : msg,
+            ),
+          )
         },
       )
     },
-    [v0, uploadedFile, selectedTheme, projectName, authUser],
+    [v0, uploadedFile, selectedTheme, projectName, authUser, chatMessages],
   )
 
   const autoSave = useCallback(async () => {
@@ -353,7 +354,7 @@ function EditorContent() {
       thinkingTime += 1
       setChatMessages((prev) =>
         prev.map((msg) =>
-          msg.isLoading
+          msg.id === loadingMessage.id && msg.isLoading
             ? {
                 ...msg,
                 generationProgress: {
@@ -366,80 +367,107 @@ function EditorContent() {
       )
     }, 1000)
 
-    if (editMode === "selected" && selectedSlide) {
-      // Edit only the selected slide
-      const slide = slides.find((s) => s.id === selectedSlide)
-      if (slide) {
-        const result = await v0.editSlide(selectedSlide, slide.title, currentInput)
+    try {
+      if (editMode === "selected" && selectedSlide) {
+        // Edit only the selected slide
+        const slide = slides.find((s) => s.id === selectedSlide)
+        if (slide) {
+          const result = await v0.editSlide(v0.currentChatId!, slide.title, currentInput)
+
+          clearInterval(thinkingInterval)
+
+          if (result) {
+            setSlides(
+              result.slides.map((s, index) => ({
+                ...s,
+                background: index === 0 ? selectedTheme.primary : selectedTheme.secondary,
+                textColor: selectedTheme.text,
+              })),
+            )
+            setChatMessages((prev) =>
+              prev.map((msg) =>
+                msg.id === loadingMessage.id
+                  ? {
+                      ...msg,
+                      isLoading: false,
+                      content: `Great! I've updated the "${slide.title}" slide based on your request. The changes should now be visible in the preview.`,
+                      generationProgress: {
+                        ...msg.generationProgress!,
+                        stage: "complete",
+                        isComplete: true,
+                        completedSlides: result.slides.length,
+                        totalSlides: result.slides.length,
+                      },
+                    }
+                  : msg,
+              ),
+            )
+          }
+        }
+      } else {
+        // Regenerate all slides or create new ones
+        let result
+        if (slides.length > 0 && v0.currentChatId) {
+          result = await v0.regenerateAllSlides(v0.currentChatId, currentInput)
+        } else {
+          result = await v0.generateSlides(currentInput, uploadedFile)
+        }
 
         clearInterval(thinkingInterval)
-        setChatMessages((prev) => prev.filter((msg) => !msg.isLoading))
 
         if (result) {
-          setSlides(
-            result.slides.map((s, index) => ({
-              ...s,
-              background: index === 0 ? selectedTheme.primary : selectedTheme.secondary,
-              textColor: selectedTheme.text,
-            })),
-          )
-          const assistantMessage: ChatMessage = {
-            id: (Date.now() + 2).toString(),
-            type: "assistant",
-            content: `Great! I've updated the "${slide.title}" slide based on your request. The changes should now be visible in the preview.`,
-            timestamp: new Date(),
+          const themedSlides = result.slides.map((slide, index) => ({
+            ...slide,
+            background: index === 0 ? selectedTheme.primary : selectedTheme.secondary,
+            textColor: selectedTheme.text,
+          }))
+          setSlides(themedSlides)
+          if (themedSlides.length > 0 && !selectedSlide) {
+            setSelectedSlide(themedSlides[0].id)
+            setCurrentSlideIndex(0)
           }
-          setChatMessages((prev) => [...prev, assistantMessage])
+
+          setChatMessages((prev) =>
+            prev.map((msg) =>
+              msg.id === loadingMessage.id
+                ? {
+                    ...msg,
+                    isLoading: false,
+                    content:
+                      slides.length > 0
+                        ? "Perfect! I've updated all slides based on your feedback. Take a look at the changes in the preview."
+                        : `Excellent! I've created ${result.slides.length} slides for your presentation. You can now review them, make edits, or ask for specific changes.`,
+                    generationProgress: {
+                      ...msg.generationProgress!,
+                      stage: "complete",
+                      isComplete: true,
+                      completedSlides: result.slides.length,
+                      totalSlides: result.slides.length,
+                    },
+                  }
+                : msg,
+            ),
+          )
         }
       }
-    } else {
-      // Regenerate all slides or create new ones
-      let result
-      if (slides.length > 0) {
-        result = await v0.regenerateAllSlides(currentInput)
-      } else {
-        result = await v0.generateSlides(currentInput, uploadedFile)
-      }
-
+    } catch (error: any) {
       clearInterval(thinkingInterval)
-      setChatMessages((prev) => prev.filter((msg) => !msg.isLoading))
-
-      if (result) {
-        const themedSlides = result.slides.map((slide, index) => ({
-          ...slide,
-          background: index === 0 ? selectedTheme.primary : selectedTheme.secondary,
-          textColor: selectedTheme.text,
-        }))
-        setSlides(themedSlides)
-        if (themedSlides.length > 0 && !selectedSlide) {
-          setSelectedSlide(themedSlides[0].id)
-          setCurrentSlideIndex(0)
-        }
-
-        const assistantMessage: ChatMessage = {
-          id: (Date.now() + 2).toString(),
-          type: "assistant",
-          content:
-            slides.length > 0
-              ? "Perfect! I've updated all slides based on your feedback. Take a look at the changes in the preview."
-              : `Excellent! I've created ${result.slides.length} slides for your presentation. You can now review them, make edits, or ask for specific changes.`,
-          timestamp: new Date(),
-        }
-        setChatMessages((prev) => [...prev, assistantMessage])
-      }
-    }
-
-    if (v0.error) {
-      clearInterval(thinkingInterval)
-      setChatMessages((prev) => prev.filter((msg) => !msg.isLoading))
-
-      const errorMessage: ChatMessage = {
-        id: (Date.now() + 3).toString(),
-        type: "assistant",
-        content: `I encountered an error: ${v0.error}\n\nPlease try rephrasing your request or try again.`,
-        timestamp: new Date(),
-      }
-      setChatMessages((prev) => [...prev, errorMessage])
+      setChatMessages((prev) =>
+        prev.map((msg) =>
+          msg.id === loadingMessage.id
+            ? {
+                ...msg,
+                isLoading: false,
+                content: `I encountered an error: ${error.message || "Failed to process request"}\n\nPlease try rephrasing your request or try again.`,
+                generationProgress: {
+                  ...msg.generationProgress!,
+                  stage: "complete", // Mark as complete even on error
+                  isComplete: true,
+                },
+              }
+            : msg,
+        ),
+      )
     }
   }
 
@@ -461,32 +489,85 @@ function EditorContent() {
         content: "Analyzing your document and creating slides...",
         timestamp: new Date(),
         isLoading: true,
+        generationProgress: {
+          stage: "thinking",
+          thinkingTime: 0,
+          version: chatMessages.filter((m) => m.generationProgress?.version).length + 1,
+        },
       }
 
       setChatMessages((prev) => [...prev, userMessage, loadingMessage])
 
-      const result = await v0.generateSlides("Create a presentation from this document", file)
+      let thinkingTime = 0
+      const thinkingInterval = setInterval(() => {
+        thinkingTime += 1
+        setChatMessages((prev) =>
+          prev.map((msg) =>
+            msg.id === loadingMessage.id && msg.isLoading
+              ? {
+                  ...msg,
+                  generationProgress: {
+                    ...msg.generationProgress!,
+                    thinkingTime,
+                  },
+                }
+              : msg,
+          ),
+        )
+      }, 1000)
 
-      // Remove loading message
-      setChatMessages((prev) => prev.filter((msg) => !msg.isLoading))
+      try {
+        const result = await v0.generateSlides("Create a presentation from this document", file)
 
-      if (result) {
-        const themedSlides = result.slides.map((slide, index) => ({
-          ...slide,
-          background: index === 0 ? selectedTheme.primary : selectedTheme.secondary,
-          textColor: selectedTheme.text,
-        }))
-        setSlides(themedSlides)
-        setSelectedSlide(themedSlides[0]?.id || "")
-        setCurrentSlideIndex(0)
+        clearInterval(thinkingInterval)
 
-        const assistantMessage: ChatMessage = {
-          id: (Date.now() + 2).toString(),
-          type: "assistant",
-          content: `Great! I've analyzed your document and created ${result.slides.length} slides. The presentation covers the key points from your file. Feel free to ask me to adjust any content or styling.`,
-          timestamp: new Date(),
+        if (result) {
+          const themedSlides = result.slides.map((slide, index) => ({
+            ...slide,
+            background: index === 0 ? selectedTheme.primary : selectedTheme.secondary,
+            textColor: selectedTheme.text,
+          }))
+          setSlides(themedSlides)
+          setSelectedSlide(themedSlides[0]?.id || "")
+          setCurrentSlideIndex(0)
+
+          setChatMessages((prev) =>
+            prev.map((msg) =>
+              msg.id === loadingMessage.id
+                ? {
+                    ...msg,
+                    isLoading: false,
+                    content: `Great! I've analyzed your document and created ${result.slides.length} slides. The presentation covers the key points from your file. Feel free to ask me to adjust any content or styling.`,
+                    generationProgress: {
+                      ...msg.generationProgress!,
+                      stage: "complete",
+                      isComplete: true,
+                      completedSlides: result.slides.length,
+                      totalSlides: result.slides.length,
+                    },
+                  }
+                : msg,
+            ),
+          )
         }
-        setChatMessages((prev) => [...prev, assistantMessage])
+      } catch (error: any) {
+        clearInterval(thinkingInterval)
+        setChatMessages((prev) =>
+          prev.map((msg) =>
+            msg.id === loadingMessage.id
+              ? {
+                  ...msg,
+                  isLoading: false,
+                  content: `I encountered an error: ${error.message || "Failed to process document"}\n\nPlease try again or upload a different file.`,
+                  generationProgress: {
+                    ...msg.generationProgress!,
+                    stage: "complete", // Mark as complete even on error
+                    isComplete: true,
+                  },
+                }
+              : msg,
+          ),
+        )
       }
     }
   }
@@ -495,8 +576,6 @@ function EditorContent() {
     setSelectedSlide(slideId)
     setCurrentSlideIndex(index)
     setEditMode("selected")
-
-    // Remove the automatic chat message - only update the UI indicator
   }
 
   const handleThemeChange = (themeName: string) => {
@@ -652,7 +731,7 @@ function EditorContent() {
     }
 
     setIsInitialized(true)
-  }, [authUser, messages]) // Add authUser and messages as dependencies
+  }, [authUser, messages, searchParams, handleInitialGeneration, isInitialized])
 
   // Show warning for small screens
   if (isSmallScreen) {
@@ -723,7 +802,7 @@ function EditorContent() {
             <div className="p-2 space-y-2">
               {isStreaming
                 ? // Skeleton thumbnails while loading
-                  Array.from({ length: 7 }, (_, index) => (
+                  Array.from({ length: SLIDE_NAMES_ESTIMATE.length }, (_, index) => (
                     <div
                       key={`skeleton-${index}`}
                       className="relative group rounded-lg border-2 border-gray-200 bg-white"
@@ -1094,7 +1173,7 @@ function EditorContent() {
                     // User message - right aligned
                     <div className="flex items-start justify-end space-x-3">
                       <div className="flex-1 min-w-0 flex flex-col items-end">
-                        <div className="bg-[#027659] text-white rounded-2xl px-4 py-3 max-w-[80%]">
+                        <div className="bg-[#027659] text-white rounded-2xl px-4 py-3 max-w-[calc(100%-4rem)]">
                           <p className="text-sm whitespace-pre-wrap">{message.content}</p>
                         </div>
 
@@ -1162,7 +1241,7 @@ function EditorContent() {
                         </AvatarFallback>
                       </Avatar>
                       <div className="flex-1 min-w-0">
-                        <div className="bg-gray-100 text-gray-900 rounded-2xl px-4 py-3 max-w-[80%]">
+                        <div className="bg-gray-100 text-gray-900 rounded-2xl px-4 py-3 max-w-[calc(100%-4rem)]">
                           {message.isLoading ? (
                             <div className="space-y-4">
                               {message.generationProgress?.stage === "thinking" && (
@@ -1204,19 +1283,8 @@ function EditorContent() {
                                     <p className="text-xs text-gray-600 mb-3">Creating slides:</p>
                                     <div className="relative">
                                       {Array.from({ length: message.generationProgress.totalSlides || 0 }, (_, i) => {
-                                        const slideNames = [
-                                          "Title Slide",
-                                          "Problem Statement",
-                                          "Solution Overview",
-                                          "Market Analysis",
-                                          "Business Model",
-                                          "Financial Projections",
-                                          "Call to Action",
-                                        ]
-
                                         const isCompleted = i < (message.generationProgress?.completedSlides || 0)
                                         const isCurrent = i === (message.generationProgress?.completedSlides || 0)
-                                        const isUpcoming = i > (message.generationProgress?.completedSlides || 0)
 
                                         return (
                                           <div key={i} className="relative flex items-center">
@@ -1258,7 +1326,7 @@ function EditorContent() {
                                                 >
                                                   {isCurrent && message.generationProgress?.currentSlide
                                                     ? message.generationProgress.currentSlide
-                                                    : slideNames[i] || `Slide ${i + 1}`}
+                                                    : SLIDE_NAMES_ESTIMATE[i] || `Slide ${i + 1}`}
                                                 </span>
                                                 <span className="text-gray-400 text-xs ml-2">{i + 1}</span>
                                               </div>
@@ -1360,14 +1428,7 @@ function EditorContent() {
                     disabled={!isStreaming && !inputMessage.trim()}
                     className={`${isStreaming ? "bg-red-600 hover:bg-red-700" : "bg-[#027659] hover:bg-[#065f46]"} text-white rounded-lg px-4 py-2`}
                   >
-                    {isStreaming ? (
-                      <>
-                        <div className="w-3 h-3 bg-white rounded-sm mr-2"></div>
-                        Stop
-                      </>
-                    ) : (
-                      <Send className="h-4 w-4" />
-                    )}
+                    {isStreaming ? <Square className="h-4 w-4 text-white" /> : <Send className="h-4 w-4" />}
                   </Button>
                 </div>
               </div>
