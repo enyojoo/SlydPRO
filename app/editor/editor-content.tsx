@@ -962,7 +962,7 @@ function EditorContent() {
               <div className="relative">
                 {/* Main Slide */}
                 <div
-                  className="lg:w-[624px] lg:h-[351px] xl:w-[720px] xl:h-[405px] 2xl:w-[800px] 2xl:h-[450px] 3xl:w-[960px] 3xl:h-[540px] shadow-2xl rounded-lg overflow-hidden border-4 border-white"
+                  className="lg:w-[632px] lg:h-[355px] xl:w-[732px] xl:h-[412px] 2xl:w-[816px] 2xl:h-[459px] 3xl:w-[980px] 3xl:h-[551px] shadow-2xl rounded-lg overflow-hidden border-4 border-white"
                   style={{
                     backgroundColor: currentSlide.background,
                     color: currentSlide.textColor,
