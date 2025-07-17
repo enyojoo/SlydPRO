@@ -691,7 +691,7 @@ function EditorContent() {
   return (
     <TooltipProvider>
       <div className="flex h-screen justify-center bg-gradient-to-br from-gray-50 to-green-50/30">
-        <div className="flex h-full max-w-[1024px] lg:max-w-[1180px] xl:max-w-[1320px] 2xl:max-w-[1560px]">
+        <div className="flex h-full">
           {/* Left Sidebar - Slide Thumbnails */}
           <div className="w-[180px] lg:w-[200px] xl:w-[220px] 2xl:w-[240px] bg-white border-r border-gray-200 flex flex-col shadow-sm">
             {/* Header */}
