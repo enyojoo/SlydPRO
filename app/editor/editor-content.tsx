@@ -137,7 +137,7 @@ function EditorContent() {
           stage: "thinking",
           thinkingTime: 0,
           version: 1,
-          totalSlides: 7,
+          totalSlides: 0,
           completedSlides: 0,
         },
       }
@@ -165,68 +165,51 @@ function EditorContent() {
         )
       }, 1000)
 
-      // Simulate real-time slide generation progress
-      let currentSlideIndex = 0
-      const slideNames = [
-        "Title Slide",
-        "Problem Statement",
-        "Solution Overview",
-        "Market Analysis",
-        "Business Model",
-        "Financial Projections",
-        "Call to Action",
-      ]
+      // Use streaming generation with real-time updates
+      await v0.generateSlidesStreaming(
+        prompt,
+        uploadedFile,
+        // onChunk - real-time content streaming
+        (chunk: string) => {
+          setStreamingContent((prev) => prev + chunk)
 
-      // Transition to designing after thinking
-      setTimeout(() => {
-        clearInterval(thinkingInterval)
-        setChatMessages((prev) =>
-          prev.map((msg) =>
-            msg.isLoading
-              ? {
-                  ...msg,
-                  generationProgress: {
-                    ...msg.generationProgress!,
-                    stage: "designing",
-                    currentSlide: slideNames[0],
-                  },
-                }
-              : msg,
-          ),
-        )
-
-        // Simulate slide-by-slide generation
-        const slideInterval = setInterval(() => {
-          currentSlideIndex++
-
+          // Transition to designing stage when we start getting content
           setChatMessages((prev) =>
             prev.map((msg) =>
-              msg.isLoading
+              msg.isLoading && msg.generationProgress?.stage === "thinking"
                 ? {
                     ...msg,
                     generationProgress: {
-                      ...msg.generationProgress!,
-                      completedSlides: currentSlideIndex,
-                      currentSlide: slideNames[currentSlideIndex] || `Slide ${currentSlideIndex + 1}`,
+                      ...msg.generationProgress,
+                      stage: "designing",
+                      currentSlide: "slide content",
                     },
                   }
                 : msg,
             ),
           )
 
-          if (currentSlideIndex >= slideNames.length) {
-            clearInterval(slideInterval)
+          // Parse slides from streaming content to update progress
+          const slideMatches = (streamingContent + chunk).match(
+            /(?:##|###)\s*(?:Slide\s*\d+:?\s*)?(.+?)(?=(?:##|###)|$)/gs,
+          )
+          if (slideMatches) {
+            const completedSlides = slideMatches.length
+            setChatMessages((prev) =>
+              prev.map((msg) =>
+                msg.isLoading
+                  ? {
+                      ...msg,
+                      generationProgress: {
+                        ...msg.generationProgress!,
+                        completedSlides,
+                        totalSlides: Math.max(completedSlides, msg.generationProgress?.totalSlides || 0),
+                      },
+                    }
+                  : msg,
+              ),
+            )
           }
-        }, 800) // Each slide takes ~800ms to generate
-      }, 3000) // Think for 3 seconds
-
-      // Use streaming generation
-      await v0.generateSlidesStreaming(
-        prompt,
-        uploadedFile,
-        // onChunk
-        (chunk: string) => {
-          setStreamingContent((prev) => prev + chunk)
         },
         // onComplete
         async (result) => {
@@ -296,7 +279,7 @@ function EditorContent() {
         },
       )
     },
-    [v0, uploadedFile, selectedTheme, projectName, authUser],
+    [v0, uploadedFile, selectedTheme, projectName, authUser, streamingContent],
   )
 
   // Add function to toggle progress minimization
@@ -675,7 +658,7 @@ function EditorContent() {
     }
 
     setIsInitialized(true)
-  }, [authUser, messages, handleInitialGeneration, searchParams]) // Add authUser and messages as dependencies
+  }, [authUser, messages, handleInitialGeneration, searchParams, streamingContent]) // Add authUser and messages as dependencies
 
   // Show warning for small screens
   if (isSmallScreen) {
@@ -791,16 +774,18 @@ function EditorContent() {
                       {/* Slide Preview */}
                       <div className="p-3 pt-4">
                         <div
-                          className="w-full aspect-video rounded border overflow-hidden text-xs"
+                          className="w-full aspect-video rounded border overflow-hidden text-xs relative"
                           style={{
                             backgroundColor: slide.background,
                             color: slide.textColor,
                           }}
                         >
-                          <div className="p-2 h-full flex flex-col">
-                            <div className="font-bold text-[8px] mb-1 truncate">{slide.title}</div>
-                            <div className="text-[7px] opacity-80 line-clamp-3">
-                              {slide.content.substring(0, 60)}...
+                          <div className="absolute inset-0 p-1.5 lg:p-2 flex flex-col">
+                            <div className="font-bold text-[7px] lg:text-[8px] xl:text-[9px] 2xl:text-[10px] mb-1 truncate leading-tight">
+                              {slide.title}
+                            </div>
+                            <div className="text-[6px] lg:text-[7px] xl:text-[8px] 2xl:text-[9px] opacity-80 line-clamp-3 leading-tight overflow-hidden">
+                              {slide.content.substring(0, 50)}...
                             </div>
                           </div>
                         </div>
@@ -1134,6 +1119,16 @@ function EditorContent() {
                                 <Copy className="h-3 w-3" />
                               )}
                             </Button>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="h-6 w-6 p-0 text-white/70 hover:text-white hover:bg-red-200/20"
+                              onClick={() => {
+                                setChatMessages((prev) => prev.filter((m) => m.id !== message.id))
+                              }}
+                            >
+                              <Trash2 className="h-3 w-3" />
+                            </Button>
                           </div>
                         </div>
                       </div>
@@ -1167,75 +1162,55 @@ function EditorContent() {
                             )}
 
                             {message.generationProgress?.stage === "designing" && (
-                              <div className="border border-blue-200 rounded-xl p-4 bg-blue-50/50">
-                                <div className="flex items-center justify-between mb-4">
+                              <div className="border border-blue-200 rounded-lg p-3 bg-blue-50/50">
+                                <div className="flex items-center justify-between mb-3">
                                   <div className="flex items-center space-x-2">
-                                    <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse"></div>
-                                    <span className="text-sm font-semibold text-blue-900">
+                                    <div className="w-1.5 h-1.5 bg-blue-500 rounded-full animate-pulse"></div>
+                                    <span className="text-xs font-semibold text-blue-900">
                                       Version {message.generationProgress.version}
                                     </span>
                                   </div>
-                                  <span className="text-xs text-blue-600 font-medium px-2 py-1 bg-blue-100 rounded-full">
+                                  <span className="text-xs text-blue-600 font-medium px-2 py-0.5 bg-blue-100 rounded-md">
                                     Designing
                                   </span>
                                 </div>
 
                                 {/* Real-time slide generation progress */}
-                                <div className="space-y-2">
-                                  <p className="text-xs text-blue-700 font-medium mb-3">Creating slides:</p>
-                                  <div className="space-y-2">
-                                    {Array.from({ length: message.generationProgress.totalSlides || 7 }, (_, i) => {
-                                      const slideNames = [
-                                        "Title Slide",
-                                        "Problem Statement",
-                                        "Solution Overview",
-                                        "Market Analysis",
-                                        "Business Model",
-                                        "Financial Projections",
-                                        "Call to Action",
-                                      ]
-
+                                <div className="space-y-1.5">
+                                  {Array.from(
+                                    { length: Math.max(1, message.generationProgress?.completedSlides || 0) },
+                                    (_, i) => {
                                       const isCompleted = i < (message.generationProgress?.completedSlides || 0)
-                                      const isCurrent = i === (message.generationProgress?.completedSlides || 0)
-                                      const isUpcoming = i > (message.generationProgress?.completedSlides || 0)
+                                      const isCurrent =
+                                        i === (message.generationProgress?.completedSlides || 0) && !isCompleted
 
                                       return (
-                                        <div key={i} className="flex items-center space-x-3 py-1">
+                                        <div key={i} className="flex items-center space-x-2 py-0.5">
                                           {/* Status indicator */}
-                                          <div className="w-4 h-4 flex items-center justify-center">
+                                          <div className="w-3 h-3 flex items-center justify-center">
                                             {isCompleted ? (
-                                              <div className="w-4 h-4 bg-green-500 rounded-full flex items-center justify-center">
-                                                <Check className="w-2.5 h-2.5 text-white" />
-                                              </div>
-                                            ) : isCurrent ? (
-                                              <div className="w-4 h-4 bg-blue-500 rounded-full flex items-center justify-center">
-                                                <Loader2 className="w-2.5 h-2.5 text-white animate-spin" />
+                                              <div className="w-3 h-3 bg-green-500 rounded-full flex items-center justify-center">
+                                                <Check className="w-2 h-2 text-white" />
                                               </div>
                                             ) : (
-                                              <div className="w-4 h-4 bg-gray-300 rounded-full"></div>
+                                              <div className="w-3 h-3 bg-blue-500 rounded-full flex items-center justify-center">
+                                                <Loader2 className="w-2 h-2 text-white animate-spin" />
+                                              </div>
                                             )}
                                           </div>
 
                                           {/* Slide info */}
-                                          <div className="flex-1">
-                                            <span
-                                              className={`text-xs ${
-                                                isCompleted
-                                                  ? "text-green-700 font-medium"
-                                                  : isCurrent
-                                                    ? "text-blue-700 font-medium"
-                                                    : "text-gray-500"
-                                              }`}
-                                            >
-                                              {slideNames[i] || `Slide ${i + 1}`}
-                                            </span>
-                                          </div>
-
-                                          <span className="text-xs text-gray-400 font-mono">{i + 1}</span>
+                                          <span
+                                            className={`text-xs ${
+                                              isCompleted ? "text-green-700 font-medium" : "text-blue-700 font-medium"
+                                            }`}
+                                          >
+                                            {isCompleted ? `Designed slide ${i + 1}` : `Designing slide ${i + 1}`}
+                                          </span>
                                         </div>
                                       )
-                                    })}
-                                  </div>
+                                    },
+                                  )}
                                 </div>
                               </div>
                             )}
@@ -1246,52 +1221,43 @@ function EditorContent() {
 
                             {/* Completed generation progress */}
                             {message.generationProgress?.isComplete && (
-                              <div
-                                className={`border rounded-xl p-4 transition-all duration-200 ${
-                                  message.generationProgress.isMinimized
-                                    ? "border-green-200 bg-green-50/30"
-                                    : "border-green-200 bg-green-50/50"
-                                }`}
-                              >
+                              <div className="border border-green-200 rounded-lg p-3 bg-green-50/30">
                                 <div className="flex items-center justify-between">
                                   <div className="flex items-center space-x-2">
-                                    <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                                    <span className="text-sm font-semibold text-green-900">
+                                    <div className="w-1.5 h-1.5 bg-green-500 rounded-full"></div>
+                                    <span className="text-xs font-semibold text-green-900">
                                       Version {message.generationProgress.version}
                                     </span>
                                   </div>
                                   <div className="flex items-center space-x-2">
-                                    <span className="text-xs text-green-600 font-medium px-2 py-1 bg-green-100 rounded-full">
+                                    <span className="text-xs text-green-600 font-medium px-2 py-0.5 bg-green-100 rounded-md">
                                       Complete
                                     </span>
                                     <Button
                                       size="sm"
                                       variant="ghost"
-                                      className="h-6 w-6 p-0 text-green-600 hover:text-green-700 hover:bg-green-100"
+                                      className="h-5 w-5 p-0 text-green-600 hover:text-green-700 hover:bg-green-100"
                                       onClick={() => toggleProgressMinimization(message.id)}
                                     >
                                       {message.generationProgress.isMinimized ? (
-                                        <Plus className="h-3 w-3" />
+                                        <Plus className="h-2.5 w-2.5" />
                                       ) : (
-                                        <Minimize className="h-3 w-3" />
+                                        <Minimize className="h-2.5 w-2.5" />
                                       )}
                                     </Button>
                                   </div>
                                 </div>
 
                                 {!message.generationProgress.isMinimized && (
-                                  <div className="mt-3 pt-3 border-t border-green-200">
-                                    <p className="text-xs text-green-700">
-                                      Successfully generated {message.generationProgress.completedSlides} slides
-                                    </p>
-                                    <div className="flex flex-wrap gap-1 mt-2">
-                                      {Array.from(
-                                        { length: message.generationProgress.completedSlides || 0 },
-                                        (_, i) => (
-                                          <div key={i} className="w-2 h-2 bg-green-400 rounded-full"></div>
-                                        ),
-                                      )}
-                                    </div>
+                                  <div className="mt-2 pt-2 border-t border-green-200 space-y-1">
+                                    {Array.from({ length: message.generationProgress.completedSlides || 0 }, (_, i) => (
+                                      <div key={i} className="flex items-center space-x-2 py-0.5">
+                                        <div className="w-3 h-3 bg-green-500 rounded-full flex items-center justify-center">
+                                          <Check className="w-2 h-2 text-white" />
+                                        </div>
+                                        <span className="text-xs text-green-700">Designed slide {i + 1}</span>
+                                      </div>
+                                    ))}
                                   </div>
                                 )}
                               </div>
@@ -1317,6 +1283,16 @@ function EditorContent() {
                                 ) : (
                                   <Copy className="h-3 w-3" />
                                 )}
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                className="h-6 w-6 p-0 text-red-500 hover:text-red-700 hover:bg-red-50"
+                                onClick={() => {
+                                  setChatMessages((prev) => prev.filter((m) => m.id !== message.id))
+                                }}
+                              >
+                                <Trash2 className="h-3 w-3" />
                               </Button>
                             </div>
                           </div>
