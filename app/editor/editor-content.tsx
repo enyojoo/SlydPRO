@@ -1036,9 +1036,9 @@ function EditorContent() {
                     <Zap className="h-12 w-12 text-blue-600" />
                   </div>
                 </div>
-                <h2 className="text-3xl font-bold text-gray-900 mb-4">Create Something Presentable</h2>
+                <h2 className="text-3xl font-bold text-gray-900 mb-4">Ready to Design</h2>
                 <p className="text-lg text-gray-600 leading-relaxed">
-              Ask SlydPRO AI to design your presentation slide and pitch deck. Share for each slides, describe your topic, audience, or upload a document to get started.
+              Ask SlydPRO AI to design your presentation slides.
 
                 </p>
               </div>
