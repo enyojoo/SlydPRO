@@ -21,13 +21,10 @@ import { Edit2, Trash2 } from "lucide-react"
 
 interface Presentation {
   id: string
+  user_id: string
   name: string
-  description?: string
   slides: any[]
   thumbnail?: string
-  is_starred: boolean
-  views: number
-  category?: string
   created_at: string
   updated_at: string
 }
@@ -99,7 +96,7 @@ export default function SlydPROHome() {
     }
   }
 
-  const createPresentationAPI = async (data: { name: string; slides: any[]; category: string }) => {
+  const createPresentationAPI = async (data: { name: string; slides: any[] }) => {
     if (!session) {
       throw new Error("No session found")
     }
@@ -136,7 +133,6 @@ export default function SlydPROHome() {
       const presentation = await createPresentationAPI({
         name: "Untitled Presentation",
         slides: [],
-        category: "ai-generated",
       })
 
       // Add message to chat context
@@ -176,7 +172,6 @@ export default function SlydPROHome() {
         const presentation = await createPresentationAPI({
           name: "Untitled Presentation",
           slides: [],
-          category: "ai-generated",
         })
 
         const userMessage = {
@@ -251,7 +246,6 @@ export default function SlydPROHome() {
           Authorization: `Bearer ${session.access_token}`,
         },
         body: JSON.stringify({
-          ...selectedPresentation,
           name: newName.trim(),
         }),
       })

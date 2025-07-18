@@ -1,14 +1,12 @@
 interface CreatePresentationData {
   name: string
   slides: any[]
-  category?: string
 }
 
 interface UpdatePresentationData {
   name?: string
   slides?: any[]
   thumbnail?: string
-  category?: string
 }
 
 class PresentationsAPI {
