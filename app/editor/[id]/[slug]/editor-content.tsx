@@ -327,28 +327,15 @@ Make sure each slide tells part of a compelling story and uses appropriate visua
             // Create new presentation in database
             if (authUser && session) {
               try {
-                // If we already have a presentation ID, update it
-                if (currentPresentationId) {
-                  const presentation = await presentationsAPI.updatePresentation(currentPresentationId, {
-                    name: projectName,
-                    slides: themedSlides,
-                  })
-                  setCurrentPresentationId(presentation.id)
+                const presentation = await presentationsAPI.createPresentation({
+                  name: projectName,
+                  slides: themedSlides,
+                  category: "ai-generated",
+                })
+                setCurrentPresentationId(presentation.id)
 
-                  // Update URL with presentation ID
-                  updateURL(projectName, presentation.id)
-                } else {
-                  // Otherwise create a new presentation
-                  const presentation = await presentationsAPI.createPresentation({
-                    name: projectName,
-                    slides: themedSlides,
-                    category: "ai-generated",
-                  })
-                  setCurrentPresentationId(presentation.id)
-
-                  // Update URL with new presentation ID
-                  updateURL(projectName, presentation.id)
-                }
+                // Update URL with new presentation ID
+                updateURL(projectName, presentation.id)
               } catch (error) {
                 console.error("Failed to save presentation:", error)
               }
@@ -391,17 +378,7 @@ Make sure each slide tells part of a compelling story and uses appropriate visua
         },
       )
     },
-    [
-      v0,
-      uploadedFile,
-      selectedTheme,
-      projectName,
-      authUser,
-      session,
-      streamingContent,
-      updateURL,
-      currentPresentationId,
-    ],
+    [v0, uploadedFile, selectedTheme, projectName, authUser, session, streamingContent, updateURL],
   )
 
   const toggleProgressMinimization = (messageId: string) => {
@@ -713,45 +690,47 @@ Make sure each slide tells part of a compelling story and uses appropriate visua
 
     const presentationId = params.id as string
 
-    // Load existing presentation
-    const loadPresentation = async () => {
-      try {
-        if (authUser && session) {
-          const presentation = await presentationsAPI.getPresentation(presentationId)
-          setSlides(presentation.slides || [])
-          setSelectedSlide(presentation.slides?.[0]?.id || "")
-          setCurrentSlideIndex(0)
-          setProjectName(presentation.name)
-          setCurrentPresentationId(presentation.id)
+    if (presentationId && presentationId !== "new") {
+      // Load existing presentation
+      const loadPresentation = async () => {
+        try {
+          if (authUser && session) {
+            const presentation = await presentationsAPI.getPresentation(presentationId)
+            setSlides(presentation.slides)
+            setSelectedSlide(presentation.slides[0]?.id || "")
+            setCurrentSlideIndex(0)
+            setProjectName(presentation.name)
+            setCurrentPresentationId(presentation.id)
 
-          const welcomeMessage: ChatMessage = {
-            id: Date.now().toString(),
-            type: "assistant",
-            content: `🎨 Welcome to "${presentation.name}"! ${
-              presentation.slides?.length > 0
-                ? `This presentation has ${presentation.slides.length} slides.`
-                : "Let's create some slides for your presentation."
-            }\n\n✨ **What I can help you with:**\n• Design slides with modern elements\n• Add charts, icons, and visual enhancements\n• Change color themes and layouts\n• Optimize content hierarchy and typography\n• Apply advanced design principles\n\nWhat would you like to create?`,
-            timestamp: new Date(),
+            const welcomeMessage: ChatMessage = {
+              id: Date.now().toString(),
+              type: "assistant",
+              content: `🎨 Welcome back to "${presentation.name}"! This presentation has ${presentation.slides.length} professionally designed slides.\n\n✨ **What I can help you with:**\n• Redesign individual slides with modern elements\n• Add charts, icons, and visual enhancements\n• Change color themes and layouts\n• Optimize content hierarchy and typography\n• Apply advanced design principles\n\nWhat design improvements would you like to make?`,
+              timestamp: new Date(),
+            }
+            setChatMessages([welcomeMessage])
           }
-          setChatMessages([welcomeMessage])
+        } catch (error) {
+          console.error("Failed to load presentation:", error)
+          router.push("/")
         }
-      } catch (error) {
-        console.error("Failed to load presentation:", error)
+      }
 
-        // If presentation not found, create a new one
-        if (messages.length > 0) {
-          const lastMessage = messages[messages.length - 1]
-          if (lastMessage.type === "user") {
-            setTimeout(() => {
-              handleInitialGeneration(lastMessage.content)
-            }, 100)
-          }
+      loadPresentation()
+    } else {
+      // New presentation from home page
+      setChatMessages([])
+
+      if (messages.length > 0) {
+        const lastMessage = messages[messages.length - 1]
+        if (lastMessage.type === "user") {
+          setTimeout(() => {
+            handleInitialGeneration(lastMessage.content)
+          }, 100)
         }
       }
     }
 
-    loadPresentation()
     setIsInitialized(true)
   }, [authUser, session, messages, handleInitialGeneration, params.id, router])
 

@@ -18,10 +18,10 @@ import { Footer } from "@/components/footer"
 import { PLATFORM_CONFIG } from "@/lib/constants"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { Edit2, Trash2 } from "lucide-react"
+import { presentationsAPI } from "@/lib/presentations-api"
 
 interface Presentation {
   id: string
-  user_id: string
   name: string
   slides: any[]
   thumbnail?: string
@@ -48,6 +48,7 @@ export default function SlydPROHome() {
   const [authError, setAuthError] = useState("")
   const [presentations, setPresentations] = useState<Presentation[]>([])
   const [presentationsLoading, setPresentationsLoading] = useState(false)
+  const [isCreatingPresentation, setIsCreatingPresentation] = useState(false)
   const [formData, setFormData] = useState({
     name: "",
     email: "",
@@ -76,18 +77,8 @@ export default function SlydPROHome() {
 
     setPresentationsLoading(true)
     try {
-      const response = await fetch("/api/presentations", {
-        headers: {
-          Authorization: `Bearer ${session.access_token}`,
-        },
-      })
-
-      if (response.ok) {
-        const data = await response.json()
-        setPresentations(data)
-      } else {
-        console.error("Failed to fetch presentations")
-      }
+      const data = await presentationsAPI.getUserPresentations()
+      setPresentations(data)
     } catch (error) {
       console.error("Error fetching presentations:", error)
     } finally {
@@ -96,34 +87,21 @@ export default function SlydPROHome() {
   }
 
   const handleChatSubmit = async () => {
-    if (!inputMessage.trim()) return
+    if (!inputMessage.trim() || isCreatingPresentation) return
 
     if (!isAuthenticated) {
       setShowAuthDialog(true)
       return
     }
 
-    // Create a new presentation in Supabase
+    setIsCreatingPresentation(true)
+
     try {
-      const response = await fetch("/api/presentations", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${session?.access_token}`,
-        },
-        body: JSON.stringify({
-          name: "Untitled Presentation",
-          slides: [],
-        }),
+      // Create presentation in Supabase first
+      const presentation = await presentationsAPI.createPresentation({
+        name: "Untitled Presentation",
+        slides: [],
       })
-
-      if (!response.ok) {
-        const errorData = await response.json()
-        console.error("API Error:", errorData)
-        throw new Error(errorData.error || "Failed to create presentation")
-      }
-
-      const presentation = await response.json()
 
       // Add message to chat context
       const userMessage = {
@@ -136,10 +114,14 @@ export default function SlydPROHome() {
       clearMessages()
       addMessage(userMessage)
 
-      // Redirect to editor with the actual presentation ID
-      router.push(`/editor/${presentation.id}/${createSlug("Untitled Presentation")}`)
+      // Redirect to editor with real presentation ID
+      const slug = createSlug(presentation.name)
+      router.push(`/editor/${presentation.id}/${slug}`)
     } catch (error) {
-      console.error("Error creating presentation:", error)
+      console.error("Failed to create presentation:", error)
+      // Handle error - maybe show a toast or alert
+    } finally {
+      setIsCreatingPresentation(false)
     }
   }
 
@@ -151,26 +133,16 @@ export default function SlydPROHome() {
         return
       }
 
+      if (isCreatingPresentation) return
+
+      setIsCreatingPresentation(true)
+
       try {
-        const response = await fetch("/api/presentations", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${session?.access_token}`,
-          },
-          body: JSON.stringify({
-            name: `${file.name.split(".")[0]} Presentation`,
-            slides: [],
-          }),
+        // Create presentation in Supabase first
+        const presentation = await presentationsAPI.createPresentation({
+          name: "Untitled Presentation",
+          slides: [],
         })
-
-        if (!response.ok) {
-          const errorData = await response.json()
-          console.error("API Error:", errorData)
-          throw new Error(errorData.error || "Failed to create presentation")
-        }
-
-        const presentation = await response.json()
 
         const userMessage = {
           id: Date.now().toString(),
@@ -182,10 +154,13 @@ export default function SlydPROHome() {
         clearMessages()
         addMessage(userMessage)
 
-        // Redirect to editor with the actual presentation ID
-        router.push(`/editor/${presentation.id}/${createSlug(presentation.name)}`)
+        // Redirect to editor with real presentation ID
+        const slug = createSlug(presentation.name)
+        router.push(`/editor/${presentation.id}/${slug}?file=${encodeURIComponent(file.name)}`)
       } catch (error) {
-        console.error("Error creating presentation:", error)
+        console.error("Failed to create presentation:", error)
+      } finally {
+        setIsCreatingPresentation(false)
       }
     }
   }
@@ -231,48 +206,29 @@ export default function SlydPROHome() {
   }
 
   const confirmRename = async () => {
-    if (!selectedPresentation || !newName.trim() || !session) return
+    if (!selectedPresentation || !newName.trim()) return
 
     try {
-      const response = await fetch(`/api/presentations/${selectedPresentation.id}`, {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${session.access_token}`,
-        },
-        body: JSON.stringify({
-          ...selectedPresentation,
-          name: newName.trim(),
-        }),
+      await presentationsAPI.updatePresentation(selectedPresentation.id, {
+        name: newName.trim(),
       })
-
-      if (response.ok) {
-        await fetchPresentations()
-        setShowRenameDialog(false)
-        setSelectedPresentation(null)
-        setNewName("")
-      }
+      await fetchPresentations()
+      setShowRenameDialog(false)
+      setSelectedPresentation(null)
+      setNewName("")
     } catch (error) {
       console.error("Error renaming presentation:", error)
     }
   }
 
   const confirmDelete = async () => {
-    if (!selectedPresentation || !session) return
+    if (!selectedPresentation) return
 
     try {
-      const response = await fetch(`/api/presentations/${selectedPresentation.id}`, {
-        method: "DELETE",
-        headers: {
-          Authorization: `Bearer ${session.access_token}`,
-        },
-      })
-
-      if (response.ok) {
-        await fetchPresentations()
-        setShowDeleteDialog(false)
-        setSelectedPresentation(null)
-      }
+      await presentationsAPI.deletePresentation(selectedPresentation.id)
+      await fetchPresentations()
+      setShowDeleteDialog(false)
+      setSelectedPresentation(null)
     } catch (error) {
       console.error("Error deleting presentation:", error)
     }
@@ -313,6 +269,7 @@ export default function SlydPROHome() {
                   onKeyPress={(e) => e.key === "Enter" && !e.shiftKey && handleChatSubmit()}
                   className="w-full bg-muted border-0 text-foreground placeholder:text-muted-foreground text-sm sm:text-base focus-visible:ring-0 focus-visible:ring-offset-0 resize-none min-h-[100px] sm:min-h-[120px] max-h-[200px] shadow-none outline-none focus:outline-none rounded-xl p-3 sm:p-4"
                   rows={4}
+                  disabled={isCreatingPresentation}
                 />
               </div>
               <div className="flex items-center justify-between mt-3 sm:mt-4">
@@ -322,6 +279,7 @@ export default function SlydPROHome() {
                     size="sm"
                     onClick={() => fileInputRef.current?.click()}
                     className="text-muted-foreground hover:text-foreground hover:bg-muted rounded-lg px-2 sm:px-3 py-2"
+                    disabled={isCreatingPresentation}
                   >
                     <Upload className="h-4 w-4 mr-1 sm:mr-2" />
                     <span className="hidden sm:inline">Upload</span>
@@ -330,10 +288,19 @@ export default function SlydPROHome() {
                 <Button
                   onClick={handleChatSubmit}
                   className="bg-[#027659] hover:bg-[#065f46] text-white rounded-lg px-4 sm:px-6 py-2 shadow-sm hover:shadow-md transition-all duration-200"
-                  disabled={!inputMessage.trim()}
+                  disabled={!inputMessage.trim() || isCreatingPresentation}
                 >
-                  <span className="mr-2">Create</span>
-                  <ArrowUp className="h-4 w-4" />
+                  {isCreatingPresentation ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      <span>Creating...</span>
+                    </>
+                  ) : (
+                    <>
+                      <span className="mr-2">Create</span>
+                      <ArrowUp className="h-4 w-4" />
+                    </>
+                  )}
                 </Button>
               </div>
             </div>

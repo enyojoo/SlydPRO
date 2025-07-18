@@ -12,7 +12,7 @@ export class PresentationsAPI {
 
   async createPresentation(data: {
     name: string
-    slides: any[]
+    slides?: any[]
   }): Promise<Presentation> {
     const response = await fetch("/api/presentations", {
       method: "POST",
@@ -20,12 +20,14 @@ export class PresentationsAPI {
         "Content-Type": "application/json",
         ...(await this.getAuthHeaders()),
       },
-      body: JSON.stringify(data),
+      body: JSON.stringify({
+        name: data.name,
+        slides: data.slides || [],
+      }),
     })
 
     if (!response.ok) {
-      const errorData = await response.json()
-      throw new Error(errorData.error || "Failed to create presentation")
+      throw new Error("Failed to create presentation")
     }
 
     return response.json()
@@ -42,8 +44,7 @@ export class PresentationsAPI {
     })
 
     if (!response.ok) {
-      const errorData = await response.json()
-      throw new Error(errorData.error || "Failed to update presentation")
+      throw new Error("Failed to update presentation")
     }
 
     return response.json()
