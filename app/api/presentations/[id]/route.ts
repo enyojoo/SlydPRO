@@ -69,11 +69,10 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
       thumbnail = generateSVGThumbnail(slides[0])
     }
 
-    // Update presentation - only use columns that exist in the table
-    const updateData: any = {}
-    if (name !== undefined) updateData.name = name
-    if (slides !== undefined) updateData.slides = slides
-    if (thumbnail !== undefined) updateData.thumbnail = thumbnail
+    // Update presentation
+    const updateData: any = { name }
+    if (slides) updateData.slides = slides
+    if (thumbnail) updateData.thumbnail = thumbnail
 
     const { data: presentation, error } = await supabase
       .from("presentations")

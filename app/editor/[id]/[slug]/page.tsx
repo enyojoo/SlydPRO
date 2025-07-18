@@ -1,15 +1,12 @@
-import { EditorWrapper } from "./editor-wrapper"
+import type { Metadata } from "next"
+import EditorWrapper from "./editor-wrapper"
 
-interface PageProps {
-  params: {
-    id: string
-    slug: string
-  }
-  searchParams: {
-    file?: string
-  }
+export const metadata: Metadata = {
+  title: "Editor - SlydPRO",
+  description:
+    "SlydPRO is a platform that lets you design pitch decks and presentation slides by chatting with AI to save time and create something presentable.",
 }
 
-export default function EditorPage({ params, searchParams }: PageProps) {
-  return <EditorWrapper presentationId={params.id} slug={params.slug} file={searchParams.file} />
+export default function EditorPage() {
+  return <EditorWrapper />
 }

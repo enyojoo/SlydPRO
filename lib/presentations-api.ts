@@ -1,103 +1,88 @@
-interface CreatePresentationData {
-  name: string
-  slides: any[]
-}
+"use client"
 
-interface UpdatePresentationData {
-  name?: string
-  slides?: any[]
-  thumbnail?: string
-}
+import { supabase, type Presentation } from "./supabase"
 
-class PresentationsAPI {
-  private getAuthHeaders() {
-    // Get session from auth context or localStorage
-    const session = JSON.parse(localStorage.getItem("supabase.auth.token") || "{}")
-    if (!session?.access_token) {
-      throw new Error("No authentication token found")
+export class PresentationsAPI {
+  private async getAuthHeaders() {
+    const {
+      data: { session },
+    } = await supabase.auth.getSession()
+    return session ? { Authorization: `Bearer ${session.access_token}` } : {}
+  }
+
+  async createPresentation(data: {
+    name: string
+    slides: any[]
+    category?: string
+  }): Promise<Presentation> {
+    const response = await fetch("/api/presentations", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        ...(await this.getAuthHeaders()),
+      },
+      body: JSON.stringify(data),
+    })
+
+    if (!response.ok) {
+      const errorData = await response.json()
+      throw new Error(errorData.error || "Failed to create presentation")
     }
 
-    return {
-      Authorization: `Bearer ${session.access_token}`,
-      "Content-Type": "application/json",
+    return response.json()
+  }
+
+  async updatePresentation(id: string, data: Partial<Presentation>): Promise<Presentation> {
+    const response = await fetch(`/api/presentations/${id}`, {
+      method: "PUT",
+      headers: {
+        "Content-Type": "application/json",
+        ...(await this.getAuthHeaders()),
+      },
+      body: JSON.stringify(data),
+    })
+
+    if (!response.ok) {
+      const errorData = await response.json()
+      throw new Error(errorData.error || "Failed to update presentation")
+    }
+
+    return response.json()
+  }
+
+  async deletePresentation(id: string): Promise<void> {
+    const response = await fetch(`/api/presentations/${id}`, {
+      method: "DELETE",
+      headers: await this.getAuthHeaders(),
+    })
+
+    if (!response.ok) {
+      throw new Error("Failed to delete presentation")
     }
   }
 
-  async createPresentation(data: CreatePresentationData) {
-    try {
-      const response = await fetch("/api/presentations", {
-        method: "POST",
-        headers: this.getAuthHeaders(),
-        body: JSON.stringify(data),
-      })
+  async getPresentation(id: string): Promise<Presentation> {
+    const response = await fetch(`/api/presentations/${id}`, {
+      headers: await this.getAuthHeaders(),
+    })
 
-      if (!response.ok) {
-        const error = await response.json()
-        throw new Error(error.error || "Failed to create presentation")
-      }
-
-      return await response.json()
-    } catch (error) {
-      console.error("Create presentation error:", error)
-      throw error
+    if (!response.ok) {
+      throw new Error("Failed to fetch presentation")
     }
+
+    return response.json()
   }
 
-  async getPresentation(id: string) {
-    try {
-      const response = await fetch(`/api/presentations/${id}`, {
-        headers: this.getAuthHeaders(),
-      })
+  async getUserPresentations(): Promise<Presentation[]> {
+    const response = await fetch("/api/presentations", {
+      headers: await this.getAuthHeaders(),
+    })
 
-      if (!response.ok) {
-        const error = await response.json()
-        throw new Error(error.error || "Failed to get presentation")
-      }
-
-      return await response.json()
-    } catch (error) {
-      console.error("Get presentation error:", error)
-      throw error
+    if (!response.ok) {
+      throw new Error("Failed to fetch presentations")
     }
-  }
 
-  async updatePresentation(id: string, data: UpdatePresentationData) {
-    try {
-      const response = await fetch(`/api/presentations/${id}`, {
-        method: "PUT",
-        headers: this.getAuthHeaders(),
-        body: JSON.stringify(data),
-      })
-
-      if (!response.ok) {
-        const error = await response.json()
-        throw new Error(error.error || "Failed to update presentation")
-      }
-
-      return await response.json()
-    } catch (error) {
-      console.error("Update presentation error:", error)
-      throw error
-    }
-  }
-
-  async deletePresentation(id: string) {
-    try {
-      const response = await fetch(`/api/presentations/${id}`, {
-        method: "DELETE",
-        headers: this.getAuthHeaders(),
-      })
-
-      if (!response.ok) {
-        const error = await response.json()
-        throw new Error(error.error || "Failed to delete presentation")
-      }
-
-      return true
-    } catch (error) {
-      console.error("Delete presentation error:", error)
-      throw error
-    }
+    return response.json()
   }
 }
 

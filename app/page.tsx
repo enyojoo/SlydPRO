@@ -21,10 +21,13 @@ import { Edit2, Trash2 } from "lucide-react"
 
 interface Presentation {
   id: string
-  user_id: string
   name: string
+  description?: string
   slides: any[]
   thumbnail?: string
+  is_starred: boolean
+  views: number
+  category?: string
   created_at: string
   updated_at: string
 }
@@ -48,7 +51,6 @@ export default function SlydPROHome() {
   const [authError, setAuthError] = useState("")
   const [presentations, setPresentations] = useState<Presentation[]>([])
   const [presentationsLoading, setPresentationsLoading] = useState(false)
-  const [isCreating, setIsCreating] = useState(false)
   const [formData, setFormData] = useState({
     name: "",
     email: "",
@@ -96,44 +98,34 @@ export default function SlydPROHome() {
     }
   }
 
-  const createPresentationAPI = async (data: { name: string; slides: any[] }) => {
-    if (!session) {
-      throw new Error("No session found")
-    }
-
-    const response = await fetch("/api/presentations", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${session.access_token}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(data),
-    })
-
-    if (!response.ok) {
-      const error = await response.json()
-      throw new Error(error.error || "Failed to create presentation")
-    }
-
-    return await response.json()
-  }
-
   const handleChatSubmit = async () => {
-    if (!inputMessage.trim() || isCreating) return
+    if (!inputMessage.trim()) return
 
     if (!isAuthenticated) {
       setShowAuthDialog(true)
       return
     }
 
-    setIsCreating(true)
-
+    // Create a new presentation in Supabase
     try {
-      // Create new presentation in Supabase first
-      const presentation = await createPresentationAPI({
-        name: "Untitled Presentation",
-        slides: [],
+      const response = await fetch("/api/presentations", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${session?.access_token}`,
+        },
+        body: JSON.stringify({
+          name: "Untitled Presentation",
+          slides: [],
+          category: "ai-generated",
+        }),
       })
+
+      if (!response.ok) {
+        throw new Error("Failed to create presentation")
+      }
+
+      const presentation = await response.json()
 
       // Add message to chat context
       const userMessage = {
@@ -146,14 +138,10 @@ export default function SlydPROHome() {
       clearMessages()
       addMessage(userMessage)
 
-      // Redirect to editor with real presentation ID
-      const slug = createSlug("Untitled Presentation")
-      router.push(`/editor/${presentation.id}/${slug}`)
+      // Redirect to editor with the actual presentation ID
+      router.push(`/editor/${presentation.id}/${createSlug("Untitled Presentation")}`)
     } catch (error) {
-      console.error("Failed to create presentation:", error)
-      setIsCreating(false)
-      // Show error to user
-      alert("Failed to create presentation. Please try again.")
+      console.error("Error creating presentation:", error)
     }
   }
 
@@ -165,14 +153,25 @@ export default function SlydPROHome() {
         return
       }
 
-      setIsCreating(true)
-
       try {
-        // Create new presentation in Supabase first
-        const presentation = await createPresentationAPI({
-          name: "Untitled Presentation",
-          slides: [],
+        const response = await fetch("/api/presentations", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${session?.access_token}`,
+          },
+          body: JSON.stringify({
+            name: `${file.name.split(".")[0]} Presentation`,
+            slides: [],
+            category: "document-import",
+          }),
         })
+
+        if (!response.ok) {
+          throw new Error("Failed to create presentation")
+        }
+
+        const presentation = await response.json()
 
         const userMessage = {
           id: Date.now().toString(),
@@ -184,13 +183,10 @@ export default function SlydPROHome() {
         clearMessages()
         addMessage(userMessage)
 
-        // Redirect to editor with real presentation ID
-        const slug = createSlug("Untitled Presentation")
-        router.push(`/editor/${presentation.id}/${slug}?file=${encodeURIComponent(file.name)}`)
+        // Redirect to editor with the actual presentation ID
+        router.push(`/editor/${presentation.id}/${createSlug(presentation.name)}`)
       } catch (error) {
-        console.error("Failed to create presentation:", error)
-        setIsCreating(false)
-        alert("Failed to create presentation. Please try again.")
+        console.error("Error creating presentation:", error)
       }
     }
   }
@@ -246,6 +242,7 @@ export default function SlydPROHome() {
           Authorization: `Bearer ${session.access_token}`,
         },
         body: JSON.stringify({
+          ...selectedPresentation,
           name: newName.trim(),
         }),
       })
@@ -317,7 +314,6 @@ export default function SlydPROHome() {
                   onKeyPress={(e) => e.key === "Enter" && !e.shiftKey && handleChatSubmit()}
                   className="w-full bg-muted border-0 text-foreground placeholder:text-muted-foreground text-sm sm:text-base focus-visible:ring-0 focus-visible:ring-offset-0 resize-none min-h-[100px] sm:min-h-[120px] max-h-[200px] shadow-none outline-none focus:outline-none rounded-xl p-3 sm:p-4"
                   rows={4}
-                  disabled={isCreating}
                 />
               </div>
               <div className="flex items-center justify-between mt-3 sm:mt-4">
@@ -327,7 +323,6 @@ export default function SlydPROHome() {
                     size="sm"
                     onClick={() => fileInputRef.current?.click()}
                     className="text-muted-foreground hover:text-foreground hover:bg-muted rounded-lg px-2 sm:px-3 py-2"
-                    disabled={isCreating}
                   >
                     <Upload className="h-4 w-4 mr-1 sm:mr-2" />
                     <span className="hidden sm:inline">Upload</span>
@@ -336,19 +331,10 @@ export default function SlydPROHome() {
                 <Button
                   onClick={handleChatSubmit}
                   className="bg-[#027659] hover:bg-[#065f46] text-white rounded-lg px-4 sm:px-6 py-2 shadow-sm hover:shadow-md transition-all duration-200"
-                  disabled={!inputMessage.trim() || isCreating}
+                  disabled={!inputMessage.trim()}
                 >
-                  {isCreating ? (
-                    <>
-                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                      Creating...
-                    </>
-                  ) : (
-                    <>
-                      <span className="mr-2">Create</span>
-                      <ArrowUp className="h-4 w-4" />
-                    </>
-                  )}
+                  <span className="mr-2">Create</span>
+                  <ArrowUp className="h-4 w-4" />
                 </Button>
               </div>
             </div>

@@ -1,78 +1,86 @@
-import { type NextRequest, NextResponse } from "next/server"
+import type { NextRequest } from "next/server"
 
 export async function POST(request: NextRequest) {
   try {
-    const { messages, chatId } = await request.json()
+    const { message } = await request.json()
 
-    // Create a mock streaming response for now
-    const encoder = new TextEncoder()
+    console.log("V0 streaming request:", { message: message?.substring(0, 100) + "..." })
+
+    const apiKey = process.env.V0_API_KEY
+    if (!apiKey) {
+      console.error("V0 API key not configured")
+      return new Response("V0 API key not configured", { status: 500 })
+    }
+
+    // Create a streaming response
     const stream = new ReadableStream({
-      start(controller) {
-        // Simulate AI response generation
-        const mockResponse = `🎨 I'll help you create professional slides! Based on your request, here are some slides:
+      async start(controller) {
+        try {
+          console.log("Starting V0 streaming request...")
 
-SLIDE 1: Introduction
-Title: Welcome to Our Presentation
-Content: This is the opening slide that introduces the main topic and sets the tone for the entire presentation.
+          const response = await fetch("https://api.v0.dev/v1/chats", {
+            method: "POST",
+            headers: {
+              Authorization: `Bearer ${apiKey}`,
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({ message }),
+          })
 
-SLIDE 2: Problem Statement
-Title: The Challenge We Face
-Content: • Market gap identification
-• Current pain points
-• Opportunity for improvement
-• Why this matters now
+          console.log("V0 streaming response status:", response.status)
 
-SLIDE 3: Our Solution
-Title: Introducing Our Solution
-Content: • Innovative approach
-• Key features and benefits
-• How it addresses the problem
-• Unique value proposition
-
-SLIDE 4: Market Analysis
-Title: Market Opportunity
-Content: • Market size and growth
-• Target audience analysis
-• Competitive landscape
-• Market trends and insights
-
-SLIDE 5: Business Model
-Title: How We Make Money
-Content: • Revenue streams
-• Pricing strategy
-• Cost structure
-• Scalability potential
-
-I've created 5 professional slides with modern design principles, appropriate layouts, and compelling content structure. Each slide is designed to tell part of your story effectively!`
-
-        // Split response into chunks and send them
-        const chunks = mockResponse.split(" ")
-        let currentChunk = ""
-
-        const sendChunk = (index: number) => {
-          if (index >= chunks.length) {
-            controller.close()
+          if (!response.ok) {
+            const errorText = await response.text()
+            console.error("V0 streaming error:", response.status, errorText)
+            controller.error(new Error(`V0 API error: ${response.status} - ${errorText}`))
             return
           }
 
-          currentChunk += chunks[index] + " "
-          controller.enqueue(encoder.encode(currentChunk))
+          const data = await response.json()
+          console.log("V0 streaming data received:", { id: data.id, hasMessages: !!data.messages })
 
-          setTimeout(() => sendChunk(index + 1), 50) // Simulate streaming delay
+          // Extract content from response
+          let content = ""
+          if (data.messages && data.messages.length > 0) {
+            const assistantMessage = data.messages.find((m: any) => m.role === "assistant")
+            content = assistantMessage?.content || ""
+          } else if (data.message) {
+            content = data.message
+          }
+
+          // Simulate streaming by sending the response in chunks
+          const chunks = content.match(/.{1,50}/g) || [content]
+
+          for (let i = 0; i < chunks.length; i++) {
+            const chunk = chunks[i]
+            const streamData = `data: ${JSON.stringify({ chunk })}\n\n`
+            controller.enqueue(new TextEncoder().encode(streamData))
+
+            // Add small delay to simulate streaming
+            await new Promise((resolve) => setTimeout(resolve, 100))
+          }
+
+          // Send completion signal
+          const completeData = `data: ${JSON.stringify({ complete: true, response: data })}\n\n`
+          controller.enqueue(new TextEncoder().encode(completeData))
+
+          controller.close()
+        } catch (error) {
+          console.error("V0 streaming error:", error)
+          controller.error(error)
         }
-
-        sendChunk(0)
       },
     })
 
     return new Response(stream, {
       headers: {
-        "Content-Type": "text/plain",
-        "Transfer-Encoding": "chunked",
+        "Content-Type": "text/event-stream",
+        "Cache-Control": "no-cache",
+        Connection: "keep-alive",
       },
     })
   } catch (error) {
-    console.error("Stream error:", error)
-    return NextResponse.json({ error: "Failed to process request" }, { status: 500 })
+    console.error("Streaming error:", error)
+    return new Response("Streaming failed", { status: 500 })
   }
 }
