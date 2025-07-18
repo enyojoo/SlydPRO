@@ -18,25 +18,18 @@ import { Footer } from "@/components/footer"
 import { PLATFORM_CONFIG } from "@/lib/constants"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { Edit2, Trash2 } from "lucide-react"
-import { presentationsAPI } from "@/lib/presentations-api"
 
 interface Presentation {
   id: string
   name: string
+  description?: string
   slides: any[]
   thumbnail?: string
+  is_starred: boolean
+  views: number
+  category?: string
   created_at: string
   updated_at: string
-}
-
-// Helper function to create URL-friendly slug
-function createSlug(text: string): string {
-  return text
-    .toLowerCase()
-    .replace(/[^a-z0-9 -]/g, "")
-    .replace(/\s+/g, "-")
-    .replace(/-+/g, "-")
-    .trim()
 }
 
 export default function SlydPROHome() {
@@ -48,7 +41,6 @@ export default function SlydPROHome() {
   const [authError, setAuthError] = useState("")
   const [presentations, setPresentations] = useState<Presentation[]>([])
   const [presentationsLoading, setPresentationsLoading] = useState(false)
-  const [isCreatingPresentation, setIsCreatingPresentation] = useState(false)
   const [formData, setFormData] = useState({
     name: "",
     email: "",
@@ -77,8 +69,18 @@ export default function SlydPROHome() {
 
     setPresentationsLoading(true)
     try {
-      const data = await presentationsAPI.getUserPresentations()
-      setPresentations(data)
+      const response = await fetch("/api/presentations", {
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+        },
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        setPresentations(data)
+      } else {
+        console.error("Failed to fetch presentations")
+      }
     } catch (error) {
       console.error("Error fetching presentations:", error)
     } finally {
@@ -87,45 +89,27 @@ export default function SlydPROHome() {
   }
 
   const handleChatSubmit = async () => {
-    if (!inputMessage.trim() || isCreatingPresentation) return
+    if (!inputMessage.trim()) return
 
     if (!isAuthenticated) {
       setShowAuthDialog(true)
       return
     }
 
-    setIsCreatingPresentation(true)
-
-    try {
-      // Create presentation in Supabase first
-      const presentation = await presentationsAPI.createPresentation({
-        name: "Untitled Presentation",
-        slides: [],
-      })
-
-      // Add message to chat context
-      const userMessage = {
-        id: Date.now().toString(),
-        type: "user" as const,
-        content: inputMessage,
-        timestamp: new Date(),
-      }
-
-      clearMessages()
-      addMessage(userMessage)
-
-      // Redirect to editor with real presentation ID
-      const slug = createSlug(presentation.name)
-      router.push(`/editor/${presentation.id}/${slug}`)
-    } catch (error) {
-      console.error("Failed to create presentation:", error)
-      // Handle error - maybe show a toast or alert
-    } finally {
-      setIsCreatingPresentation(false)
+    // Add message to chat context
+    const userMessage = {
+      id: Date.now().toString(),
+      type: "user" as const,
+      content: inputMessage,
+      timestamp: new Date(),
     }
+
+    clearMessages()
+    addMessage(userMessage)
+    router.push("/editor")
   }
 
-  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
     if (file) {
       if (!isAuthenticated) {
@@ -133,35 +117,16 @@ export default function SlydPROHome() {
         return
       }
 
-      if (isCreatingPresentation) return
-
-      setIsCreatingPresentation(true)
-
-      try {
-        // Create presentation in Supabase first
-        const presentation = await presentationsAPI.createPresentation({
-          name: "Untitled Presentation",
-          slides: [],
-        })
-
-        const userMessage = {
-          id: Date.now().toString(),
-          type: "user" as const,
-          content: `Uploaded: ${file.name}`,
-          timestamp: new Date(),
-        }
-
-        clearMessages()
-        addMessage(userMessage)
-
-        // Redirect to editor with real presentation ID
-        const slug = createSlug(presentation.name)
-        router.push(`/editor/${presentation.id}/${slug}?file=${encodeURIComponent(file.name)}`)
-      } catch (error) {
-        console.error("Failed to create presentation:", error)
-      } finally {
-        setIsCreatingPresentation(false)
+      const userMessage = {
+        id: Date.now().toString(),
+        type: "user" as const,
+        content: `Uploaded: ${file.name}`,
+        timestamp: new Date(),
       }
+
+      clearMessages()
+      addMessage(userMessage)
+      router.push(`/editor?file=${encodeURIComponent(file.name)}`)
     }
   }
 
@@ -206,29 +171,48 @@ export default function SlydPROHome() {
   }
 
   const confirmRename = async () => {
-    if (!selectedPresentation || !newName.trim()) return
+    if (!selectedPresentation || !newName.trim() || !session) return
 
     try {
-      await presentationsAPI.updatePresentation(selectedPresentation.id, {
-        name: newName.trim(),
+      const response = await fetch(`/api/presentations/${selectedPresentation.id}`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({
+          ...selectedPresentation,
+          name: newName.trim(),
+        }),
       })
-      await fetchPresentations()
-      setShowRenameDialog(false)
-      setSelectedPresentation(null)
-      setNewName("")
+
+      if (response.ok) {
+        await fetchPresentations()
+        setShowRenameDialog(false)
+        setSelectedPresentation(null)
+        setNewName("")
+      }
     } catch (error) {
       console.error("Error renaming presentation:", error)
     }
   }
 
   const confirmDelete = async () => {
-    if (!selectedPresentation) return
+    if (!selectedPresentation || !session) return
 
     try {
-      await presentationsAPI.deletePresentation(selectedPresentation.id)
-      await fetchPresentations()
-      setShowDeleteDialog(false)
-      setSelectedPresentation(null)
+      const response = await fetch(`/api/presentations/${selectedPresentation.id}`, {
+        method: "DELETE",
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+        },
+      })
+
+      if (response.ok) {
+        await fetchPresentations()
+        setShowDeleteDialog(false)
+        setSelectedPresentation(null)
+      }
     } catch (error) {
       console.error("Error deleting presentation:", error)
     }
@@ -247,13 +231,13 @@ export default function SlydPROHome() {
         {/* Hero Section */}
         <div className="text-center mb-12 sm:mb-16">
           <h1 className="font-bold text-foreground mb-4 sm:mb-6 leading-tight text-3xl sm:text-4xl lg:text-5xl">
-            Design something{" "}
+          Design something{" "}
             <span className="bg-gradient-to-r from-[#027659] to-[#10b981] bg-clip-text text-transparent">
               Presentable
             </span>
           </h1>
           <p className="text-lg sm:text-xl text-muted-foreground max-w-2xl mx-auto leading-relaxed px-4">
-            Create presentation slides by chatting with AI
+          Create presentation slides by chatting with AI
           </p>
         </div>
 
@@ -269,7 +253,6 @@ export default function SlydPROHome() {
                   onKeyPress={(e) => e.key === "Enter" && !e.shiftKey && handleChatSubmit()}
                   className="w-full bg-muted border-0 text-foreground placeholder:text-muted-foreground text-sm sm:text-base focus-visible:ring-0 focus-visible:ring-offset-0 resize-none min-h-[100px] sm:min-h-[120px] max-h-[200px] shadow-none outline-none focus:outline-none rounded-xl p-3 sm:p-4"
                   rows={4}
-                  disabled={isCreatingPresentation}
                 />
               </div>
               <div className="flex items-center justify-between mt-3 sm:mt-4">
@@ -279,7 +262,6 @@ export default function SlydPROHome() {
                     size="sm"
                     onClick={() => fileInputRef.current?.click()}
                     className="text-muted-foreground hover:text-foreground hover:bg-muted rounded-lg px-2 sm:px-3 py-2"
-                    disabled={isCreatingPresentation}
                   >
                     <Upload className="h-4 w-4 mr-1 sm:mr-2" />
                     <span className="hidden sm:inline">Upload</span>
@@ -288,19 +270,10 @@ export default function SlydPROHome() {
                 <Button
                   onClick={handleChatSubmit}
                   className="bg-[#027659] hover:bg-[#065f46] text-white rounded-lg px-4 sm:px-6 py-2 shadow-sm hover:shadow-md transition-all duration-200"
-                  disabled={!inputMessage.trim() || isCreatingPresentation}
+                  disabled={!inputMessage.trim()}
                 >
-                  {isCreatingPresentation ? (
-                    <>
-                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                      <span>Creating...</span>
-                    </>
-                  ) : (
-                    <>
-                      <span className="mr-2">Create</span>
-                      <ArrowUp className="h-4 w-4" />
-                    </>
-                  )}
+                  <span className="mr-2">Create</span>
+                  <ArrowUp className="h-4 w-4" />
                 </Button>
               </div>
             </div>
@@ -337,7 +310,7 @@ export default function SlydPROHome() {
                   <Card
                     key={presentation.id}
                     className="cursor-pointer hover:shadow-lg transition-all duration-200 border border-border hover:border-muted-foreground bg-card overflow-hidden"
-                    onClick={() => router.push(`/editor/${presentation.id}/${createSlug(presentation.name)}`)}
+                    onClick={() => router.push(`/editor?project=${presentation.id}`)}
                   >
                     {/* Actual Slide Thumbnail */}
                     <div className="w-full h-40 flex flex-col justify-center p-4 text-white relative overflow-hidden">

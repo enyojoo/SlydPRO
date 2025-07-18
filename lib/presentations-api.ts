@@ -12,7 +12,8 @@ export class PresentationsAPI {
 
   async createPresentation(data: {
     name: string
-    slides?: any[]
+    slides: any[]
+    category?: string
   }): Promise<Presentation> {
     const response = await fetch("/api/presentations", {
       method: "POST",
@@ -20,10 +21,7 @@ export class PresentationsAPI {
         "Content-Type": "application/json",
         ...(await this.getAuthHeaders()),
       },
-      body: JSON.stringify({
-        name: data.name,
-        slides: data.slides || [],
-      }),
+      body: JSON.stringify(data),
     })
 
     if (!response.ok) {
