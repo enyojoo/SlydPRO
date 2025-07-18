@@ -24,7 +24,10 @@ export async function POST(request: NextRequest) {
               Authorization: `Bearer ${apiKey}`,
               "Content-Type": "application/json",
             },
-            body: JSON.stringify({ message }),
+            body: JSON.stringify({
+              message,
+              stream: true,
+            }),
           })
 
           console.log("V0 streaming response status:", response.status)
@@ -36,33 +39,47 @@ export async function POST(request: NextRequest) {
             return
           }
 
-          const data = await response.json()
-          console.log("V0 streaming data received:", { id: data.id, hasMessages: !!data.messages })
-
-          // Extract content from response
-          let content = ""
-          if (data.messages && data.messages.length > 0) {
-            const assistantMessage = data.messages.find((m: any) => m.role === "assistant")
-            content = assistantMessage?.content || ""
-          } else if (data.message) {
-            content = data.message
+          if (!response.body) {
+            controller.error(new Error("No response body"))
+            return
           }
 
-          // Simulate streaming by sending the response in chunks
-          const chunks = content.match(/.{1,50}/g) || [content]
+          const reader = response.body.getReader()
+          const decoder = new TextDecoder()
 
-          for (let i = 0; i < chunks.length; i++) {
-            const chunk = chunks[i]
-            const streamData = `data: ${JSON.stringify({ chunk })}\n\n`
-            controller.enqueue(new TextEncoder().encode(streamData))
+          try {
+            while (true) {
+              const { done, value } = await reader.read()
 
-            // Add small delay to simulate streaming
-            await new Promise((resolve) => setTimeout(resolve, 100))
+              if (done) {
+                break
+              }
+
+              const chunk = decoder.decode(value, { stream: true })
+              const lines = chunk.split("\n")
+
+              for (const line of lines) {
+                if (line.startsWith("data: ")) {
+                  const data = line.slice(6)
+                  if (data === "[DONE]") {
+                    controller.close()
+                    return
+                  }
+
+                  try {
+                    const parsed = JSON.parse(data)
+                    const streamData = `data: ${JSON.stringify({ chunk: parsed.content || parsed.delta?.content || "" })}\n\n`
+                    controller.enqueue(new TextEncoder().encode(streamData))
+                  } catch (parseError) {
+                    // Skip invalid JSON
+                    continue
+                  }
+                }
+              }
+            }
+          } finally {
+            reader.releaseLock()
           }
-
-          // Send completion signal
-          const completeData = `data: ${JSON.stringify({ complete: true, response: data })}\n\n`
-          controller.enqueue(new TextEncoder().encode(completeData))
 
           controller.close()
         } catch (error) {

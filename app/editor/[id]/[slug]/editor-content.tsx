@@ -19,7 +19,6 @@ import {
   SkipForward,
   Zap,
   Target,
-  RefreshCw,
   Play,
   Download,
   Minimize,
@@ -324,20 +323,16 @@ Make sure each slide tells part of a compelling story and uses appropriate visua
             setSelectedSlide(themedSlides[0]?.id || "")
             setCurrentSlideIndex(0)
 
-            // Create new presentation in database
-            if (authUser && session) {
+            // Update existing presentation in database
+            if (authUser && session && currentPresentationId) {
               try {
-                const presentation = await presentationsAPI.createPresentation({
+                await presentationsAPI.updatePresentation(currentPresentationId, {
                   name: projectName,
                   slides: themedSlides,
                   category: "ai-generated",
                 })
-                setCurrentPresentationId(presentation.id)
-
-                // Update URL with new presentation ID
-                updateURL(projectName, presentation.id)
               } catch (error) {
-                console.error("Failed to save presentation:", error)
+                console.error("Failed to update presentation:", error)
               }
             }
 
@@ -378,7 +373,7 @@ Make sure each slide tells part of a compelling story and uses appropriate visua
         },
       )
     },
-    [v0, uploadedFile, selectedTheme, projectName, authUser, session, streamingContent, updateURL],
+    [v0, uploadedFile, selectedTheme, projectName, authUser, session, streamingContent, currentPresentationId],
   )
 
   const toggleProgressMinimization = (messageId: string) => {
@@ -718,7 +713,8 @@ Make sure each slide tells part of a compelling story and uses appropriate visua
 
       loadPresentation()
     } else {
-      // New presentation from home page
+      // New presentation - set the ID from params
+      setCurrentPresentationId(presentationId)
       setChatMessages([])
 
       if (messages.length > 0) {
@@ -809,11 +805,14 @@ Make sure each slide tells part of a compelling story and uses appropriate visua
                       </div>
                       <div className="p-3 pt-4">
                         <div className="w-full aspect-video rounded border overflow-hidden bg-gray-200 animate-pulse">
-                          <div className="p-2 h-full flex flex-col space-y-2">
-                            <div className="h-2 bg-gray-300 rounded animate-pulse"></div>
-                            <div className="h-1 bg-gray-300 rounded animate-pulse w-3/4"></div>
-                            <div className="h-1 bg-gray-300 rounded animate-pulse w-1/2"></div>
+                          <div className="p-2 h-full flex flex-col justify-center">
+                            <div className="h-3 bg-gray-300 rounded mb-2 animate-pulse"></div>
+                            <div className="h-2 bg-gray-300 rounded mb-1 animate-pulse"></div>
+                            <div className="h-2 bg-gray-300 rounded w-3/4 animate-pulse"></div>
                           </div>
+                        </div>
+                        <div className="mt-2">
+                          <div className="h-3 bg-gray-200 rounded animate-pulse"></div>
                         </div>
                       </div>
                     </div>
@@ -821,61 +820,61 @@ Make sure each slide tells part of a compelling story and uses appropriate visua
                 : slides.map((slide, index) => (
                     <div
                       key={slide.id}
-                      className={`relative group cursor-pointer rounded-lg border-2 transition-all ${
+                      className={`relative group cursor-pointer rounded-lg border-2 transition-all duration-200 ${
                         selectedSlide === slide.id
-                          ? "border-[#027659] bg-[#027659]/5"
-                          : "border-gray-200 hover:border-gray-300 bg-white"
+                          ? "border-[#027659] bg-[#027659]/5 shadow-sm"
+                          : "border-gray-200 bg-white hover:border-gray-300 hover:shadow-sm"
                       }`}
                       onClick={() => handleSlideSelect(slide.id, index)}
                     >
                       {/* Slide Number */}
                       <div className="absolute -left-2 top-2 z-10">
                         <div
-                          className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-medium ${
+                          className={`w-6 h-6 rounded-full text-xs font-medium flex items-center justify-center ${
                             selectedSlide === slide.id
                               ? "bg-[#027659] text-white"
-                              : "bg-gray-100 text-gray-600 group-hover:bg-gray-200"
+                              : "bg-gray-500 text-white group-hover:bg-gray-600"
                           }`}
                         >
                           {index + 1}
                         </div>
                       </div>
 
-                      {/* Slide Preview */}
                       <div className="p-3 pt-4">
-                        <div
-                          className="w-full aspect-video rounded border overflow-hidden text-xs relative"
-                          style={{
-                            backgroundColor: slide.background,
-                            color: slide.textColor,
-                          }}
-                        >
-                          <div className="absolute inset-0 p-1.5 lg:p-2 flex flex-col">
-                            <div className="font-bold text-[7px] lg:text-[8px] xl:text-[9px] 2xl:text-[10px] mb-1 truncate leading-tight">
-                              {slide.title}
-                            </div>
-                            <div className="text-[6px] lg:text-[7px] xl:text-[8px] 2xl:text-[9px] opacity-80 line-clamp-3 leading-tight overflow-hidden">
-                              {slide.content.substring(0, 50)}...
-                            </div>
+                        {/* Slide Preview */}
+                        <div className="w-full aspect-video rounded border overflow-hidden">
+                          <div
+                            className="p-2 h-full flex flex-col justify-center text-white text-xs"
+                            style={{
+                              backgroundColor: slide.background,
+                              color: slide.textColor,
+                            }}
+                          >
+                            <h4 className="font-semibold mb-1 line-clamp-2 leading-tight">{slide.title}</h4>
+                            <p className="opacity-80 line-clamp-3 leading-relaxed">
+                              {slide.content.substring(0, 80)}...
+                            </p>
                           </div>
+                        </div>
+
+                        {/* Slide Title */}
+                        <div className="mt-2">
+                          <p className="text-xs font-medium text-gray-700 truncate">{slide.title}</p>
                         </div>
                       </div>
 
-                      {/* Hover Actions */}
-                      <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <div className="flex space-x-1">
-                          <Button size="icon" variant="ghost" className="h-6 w-6 bg-white/80 hover:bg-white">
-                            <Copy className="h-3 w-3" />
-                          </Button>
-                          <Button
-                            size="icon"
-                            variant="ghost"
-                            className="h-6 w-6 bg-white/80 hover:bg-white text-red-500 hover:text-red-600"
-                          >
-                            <Trash2 className="h-3 w-3" />
-                          </Button>
-                        </div>
-                      </div>
+                      {/* Delete Button */}
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity h-6 w-6 hover:bg-red-100 hover:text-red-600"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          // Delete slide logic here
+                        }}
+                      >
+                        <Trash2 className="h-3 w-3" />
+                      </Button>
                     </div>
                   ))}
             </div>
@@ -885,634 +884,500 @@ Make sure each slide tells part of a compelling story and uses appropriate visua
         {/* Main Content Area */}
         <div className="flex-1 flex flex-col">
           {/* Top Toolbar */}
-          <div className="bg-white border-b border-gray-200 px-6 py-3">
-            <div className="flex items-center justify-between">
-              {/* Left Section - Project Title */}
-              <div className="flex-1">
-                <Input
-                  ref={nameInputRef}
-                  value={projectName}
-                  onChange={(e) => setProjectName(e.target.value)}
-                  onFocus={handleNameInputFocus}
-                  onBlur={handleNameInputBlur}
-                  onKeyPress={handleNameInputKeyPress}
-                  className="w-auto min-w-[200px] max-w-md bg-transparent border-0 text-base font-normal text-gray-900 placeholder:text-gray-500 focus-visible:ring-0 focus-visible:ring-offset-0 shadow-none outline-none focus:outline-none px-3 py-2 h-auto hover:bg-gray-50 focus:bg-gray-50 rounded-lg transition-colors"
-                  placeholder="Enter presentation title..."
-                  style={{ width: `${Math.max(200, projectName.length * 8 + 24)}px` }}
-                />
-                {isSaving && (
-                  <div className="flex items-center space-x-2 text-sm text-muted-foreground">
-                    <Loader2 className="h-3 w-3 animate-spin" />
-                    <span>Saving...</span>
-                  </div>
+          <div className="h-[61px] bg-white border-b border-gray-200 flex items-center justify-between px-6 shadow-sm">
+            <div className="flex items-center space-x-4">
+              {/* Project Name */}
+              <div className="flex items-center space-x-2">
+                {isEditingName ? (
+                  <Input
+                    ref={nameInputRef}
+                    value={projectName}
+                    onChange={(e) => setProjectName(e.target.value)}
+                    onBlur={handleNameInputBlur}
+                    onKeyPress={handleNameInputKeyPress}
+                    className="text-lg font-semibold bg-transparent border-none p-0 h-auto focus-visible:ring-0 focus-visible:ring-offset-0"
+                  />
+                ) : (
+                  <h1
+                    className="text-lg font-semibold text-gray-900 cursor-pointer hover:text-[#027659] transition-colors"
+                    onClick={handleNameInputFocus}
+                  >
+                    {projectName}
+                  </h1>
                 )}
+                {isSaving && <Loader2 className="h-4 w-4 animate-spin text-gray-400" />}
               </div>
 
-              <div></div>
-
-              {/* Right Section - Play and Share */}
-              <div className="flex items-center space-x-3">
-                <Button variant="outline" onClick={handlePresentationMode} className="flex items-center bg-transparent">
-                  <Play className="h-4 w-4 mr-2" />
-                  Play
-                </Button>
-
+              {/* Edit Mode Toggle */}
+              <div className="flex items-center space-x-2 bg-gray-100 rounded-lg p-1">
                 <Button
-                  onClick={() => setShowExportDialog(true)}
-                  className="bg-[#027659] hover:bg-[#065f46] text-white"
+                  variant={editMode === "all" ? "default" : "ghost"}
+                  size="sm"
+                  onClick={() => setEditMode("all")}
+                  className={`text-xs px-3 py-1 h-7 ${
+                    editMode === "all"
+                      ? "bg-white text-gray-900 shadow-sm"
+                      : "text-gray-600 hover:text-gray-900 hover:bg-white/50"
+                  }`}
                 >
-                  <Download className="h-4 w-4 mr-2" />
-                  Export
+                  All slides
+                </Button>
+                <Button
+                  variant={editMode === "selected" ? "default" : "ghost"}
+                  size="sm"
+                  onClick={() => setEditMode("selected")}
+                  className={`text-xs px-3 py-1 h-7 ${
+                    editMode === "selected"
+                      ? "bg-white text-gray-900 shadow-sm"
+                      : "text-gray-600 hover:text-gray-900 hover:bg-white/50"
+                  }`}
+                >
+                  Selected slide
                 </Button>
               </div>
             </div>
+
+            {/* Right Actions */}
+            <div className="flex items-center space-x-3">
+              {/* Theme Selector */}
+              <select
+                value={selectedTheme.name}
+                onChange={(e) => handleThemeChange(e.target.value)}
+                className="text-sm border border-gray-300 rounded-lg px-3 py-1.5 bg-white focus:outline-none focus:ring-2 focus:ring-[#027659] focus:border-transparent"
+              >
+                {colorThemes.map((theme) => (
+                  <option key={theme.name} value={theme.name}>
+                    {theme.name}
+                  </option>
+                ))}
+              </select>
+
+              {/* Action Buttons */}
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handlePresentationMode}
+                className="text-gray-700 border-gray-300 hover:bg-gray-50 bg-transparent"
+              >
+                <Play className="h-4 w-4 mr-2" />
+                Present
+              </Button>
+
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowExportDialog(true)}
+                className="text-gray-700 border-gray-300 hover:bg-gray-50"
+              >
+                <Download className="h-4 w-4 mr-2" />
+                Export
+              </Button>
+            </div>
           </div>
 
-          {/* Slide Preview Area */}
-          <div className="flex-1 flex items-center justify-center bg-gray-100">
-            {isPresentationMode && (
-              <div className="fixed inset-0 bg-black z-50 flex items-center justify-center">
-                {currentSlide && (
-                  <div
-                    className="w-full h-full flex items-center justify-center"
-                    style={{
-                      backgroundColor: currentSlide.background,
-                      color: currentSlide.textColor,
-                    }}
-                  >
-                    <div className="max-w-6xl mx-auto p-16">
-                      {currentSlide.layout === "title" ? (
-                        <div className="text-center">
-                          <h1 className="text-8xl font-bold mb-12 leading-tight">{currentSlide.title}</h1>
-                          <p className="text-4xl opacity-90 leading-relaxed">{currentSlide.content}</p>
+          {/* Main Content */}
+          <div className="flex-1 flex">
+            {/* Slide Preview */}
+            <div className="flex-1 flex flex-col bg-gray-50">
+              {/* Slide Navigation */}
+              <div className="h-12 bg-white border-b border-gray-200 flex items-center justify-center space-x-4">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    if (currentSlideIndex > 0) {
+                      const newIndex = currentSlideIndex - 1
+                      setCurrentSlideIndex(newIndex)
+                      setSelectedSlide(slides[newIndex].id)
+                    }
+                  }}
+                  disabled={currentSlideIndex === 0}
+                  className="text-gray-600 hover:text-gray-900"
+                >
+                  <SkipBack className="h-4 w-4" />
+                </Button>
+
+                <span className="text-sm text-gray-600 font-medium">
+                  {currentSlideIndex + 1} of {slides.length}
+                </span>
+
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    if (currentSlideIndex < slides.length - 1) {
+                      const newIndex = currentSlideIndex + 1
+                      setCurrentSlideIndex(newIndex)
+                      setSelectedSlide(slides[newIndex].id)
+                    }
+                  }}
+                  disabled={currentSlideIndex === slides.length - 1}
+                  className="text-gray-600 hover:text-gray-900"
+                >
+                  <SkipForward className="h-4 w-4" />
+                </Button>
+              </div>
+
+              {/* Slide Display */}
+              <div className="flex-1 flex items-center justify-center p-8">
+                {isStreaming ? (
+                  <div className="w-full max-w-4xl aspect-video bg-white rounded-lg shadow-lg border border-gray-200 flex flex-col items-center justify-center space-y-6">
+                    <div className="text-center space-y-4">
+                      <div className="flex items-center justify-center space-x-3">
+                        <div className="w-8 h-8 bg-[#027659] rounded-full flex items-center justify-center">
+                          <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={2}
+                              d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"
+                            />
+                          </svg>
                         </div>
-                      ) : (
-                        <>
-                          <h1 className="text-7xl font-bold mb-16 leading-tight">{currentSlide.title}</h1>
-                          <div className="text-4xl leading-relaxed opacity-90 space-y-8">
-                            {currentSlide.content.split("\n").map((line, index) => (
-                              <p key={index}>{line}</p>
-                            ))}
-                          </div>
-                        </>
-                      )}
+                        <div className="w-2 h-2 bg-[#027659] rounded-full animate-pulse"></div>
+                      </div>
+                      <h3 className="text-2xl font-bold text-[#027659]">SlydPRO Designing</h3>
+                      <p className="text-gray-600">Creating your professional presentation...</p>
+                    </div>
+
+                    <div className="flex space-x-1">
+                      {[0, 1, 2, 3, 4].map((i) => (
+                        <div
+                          key={i}
+                          className="w-2 h-8 bg-[#027659] rounded-full animate-pulse"
+                          style={{
+                            animationDelay: `${i * 0.2}s`,
+                            animationDuration: "1s",
+                          }}
+                        />
+                      ))}
+                    </div>
+
+                    <div className="flex items-center space-x-4 text-sm text-gray-500">
+                      <div className="flex items-center space-x-2">
+                        <div className="w-4 h-4 border-2 border-[#027659] border-t-transparent rounded-full animate-spin"></div>
+                        <span>Analyzing content</span>
+                      </div>
+                      <div className="w-1 h-1 bg-gray-300 rounded-full"></div>
+                      <div className="flex items-center space-x-2">
+                        <Target className="w-4 h-4 text-[#027659]" />
+                        <span>Applying design principles</span>
+                      </div>
+                      <div className="w-1 h-1 bg-gray-300 rounded-full"></div>
+                      <div className="flex items-center space-x-2">
+                        <Zap className="w-4 h-4 text-[#027659]" />
+                        <span>Optimizing layouts</span>
+                      </div>
+                    </div>
+
+                    <div className="flex space-x-3">
+                      <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center">
+                        <div className="w-4 h-4 bg-blue-500 rounded"></div>
+                      </div>
+                      <div className="w-8 h-8 bg-green-100 rounded-lg flex items-center justify-center">
+                        <div className="w-4 h-4 bg-green-500 rounded-full"></div>
+                      </div>
+                      <div className="w-8 h-8 bg-purple-100 rounded-lg flex items-center justify-center">
+                        <div className="w-4 h-4 bg-purple-500 rounded-full"></div>
+                      </div>
+                      <div className="w-8 h-8 bg-orange-100 rounded-lg flex items-center justify-center">
+                        <div className="w-4 h-4 bg-orange-500 rounded"></div>
+                      </div>
+                    </div>
+                  </div>
+                ) : currentSlide ? (
+                  <div className="w-full max-w-4xl aspect-video bg-white rounded-lg shadow-lg border border-gray-200 overflow-hidden">
+                    <div
+                      className="w-full h-full p-12 flex flex-col justify-center"
+                      style={{
+                        backgroundColor: currentSlide.background,
+                        color: currentSlide.textColor,
+                      }}
+                    >
+                      <h2 className="text-4xl font-bold mb-6 leading-tight">{currentSlide.title}</h2>
+                      <div className="text-lg leading-relaxed whitespace-pre-wrap opacity-90">
+                        {currentSlide.content}
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="w-full max-w-4xl aspect-video bg-white rounded-lg shadow-lg border border-gray-200 flex items-center justify-center">
+                    <div className="text-center space-y-4">
+                      <div className="w-16 h-16 bg-gray-100 rounded-2xl flex items-center justify-center mx-auto">
+                        <Plus className="w-8 h-8 text-gray-400" />
+                      </div>
+                      <div>
+                        <h3 className="text-xl font-semibold text-gray-900 mb-2">No slides yet</h3>
+                        <p className="text-gray-600">Start by describing your presentation in the chat</p>
+                      </div>
                     </div>
                   </div>
                 )}
-
-                {/* Presentation Controls */}
-                <div className="absolute bottom-8 left-1/2 transform -translate-x-1/2 flex items-center space-x-4 bg-black/50 backdrop-blur-sm rounded-full px-6 py-3">
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => {
-                      if (currentSlideIndex > 0) {
-                        const newIndex = currentSlideIndex - 1
-                        setCurrentSlideIndex(newIndex)
-                        setSelectedSlide(slides[newIndex].id)
-                      }
-                    }}
-                    disabled={currentSlideIndex === 0}
-                    className="text-white hover:bg-white/20"
-                  >
-                    <SkipBack className="h-5 w-5" />
-                  </Button>
-
-                  <span className="text-white font-medium px-4">
-                    {currentSlideIndex + 1} / {slides.length}
-                  </span>
-
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => {
-                      if (currentSlideIndex < slides.length - 1) {
-                        const newIndex = currentSlideIndex + 1
-                        setCurrentSlideIndex(newIndex)
-                        setSelectedSlide(slides[newIndex].id)
-                      }
-                    }}
-                    disabled={currentSlideIndex === slides.length - 1}
-                    className="text-white hover:bg-white/20"
-                  >
-                    <SkipForward className="h-5 w-5" />
-                  </Button>
-
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={exitPresentationMode}
-                    className="text-white hover:bg-white/20 ml-4"
-                  >
-                    <Minimize className="h-5 w-5" />
-                  </Button>
-                </div>
               </div>
-            )}
-            {isStreaming ? (
-              <div className="relative">
-                {/* Design-focused Skeleton Slide */}
-                <div className="lg:w-[632px] lg:h-[355px] xl:w-[732px] xl:h-[412px] 2xl:w-[816px] 2xl:h-[459px] 3xl:w-[980px] 3xl:h-[551px] shadow-2xl rounded-lg overflow-hidden border-4 border-white bg-gradient-to-br from-gray-100 to-gray-200 relative">
-                  <div className="h-full p-12 flex flex-col justify-center items-center relative overflow-hidden">
-                    {/* Animated paint strokes in background */}
-                    <div className="absolute inset-0 opacity-20">
-                      <div
-                        className="absolute top-8 left-8 w-32 h-1 bg-[#027659] rounded-full animate-pulse"
-                        style={{ animationDelay: "0s" }}
-                      ></div>
-                      <div
-                        className="absolute top-16 left-12 w-24 h-1 bg-[#10b981] rounded-full animate-pulse"
-                        style={{ animationDelay: "0.5s" }}
-                      ></div>
-                      <div
-                        className="absolute top-24 left-16 w-40 h-1 bg-[#027659] rounded-full animate-pulse"
-                        style={{ animationDelay: "1s" }}
-                      ></div>
+            </div>
 
-                      <div
-                        className="absolute bottom-20 right-8 w-28 h-1 bg-[#10b981] rounded-full animate-pulse"
-                        style={{ animationDelay: "1.5s" }}
-                      ></div>
-                      <div
-                        className="absolute bottom-12 right-12 w-36 h-1 bg-[#027659] rounded-full animate-pulse"
-                        style={{ animationDelay: "2s" }}
-                      ></div>
+            {/* Right Sidebar - Chat */}
+            <div className="w-80 bg-white border-l border-gray-200 flex flex-col shadow-sm">
+              {/* Chat Header */}
+              <div className="p-4 border-b border-gray-100">
+                <h3 className="font-semibold text-gray-900 flex items-center">
+                  <div className="w-2 h-2 bg-green-500 rounded-full mr-2"></div>
+                  AI Design Expert
+                </h3>
+                <p className="text-xs text-gray-500 mt-1">Professional presentation designer</p>
+              </div>
 
+              {/* Chat Messages */}
+              <ScrollArea className="flex-1 p-4">
+                <div className="space-y-4">
+                  {chatMessages.map((message) => (
+                    <div
+                      key={message.id}
+                      className={`flex ${message.type === "user" ? "justify-end" : "justify-start"}`}
+                    >
                       <div
-                        className="absolute top-1/2 left-1/4 w-20 h-1 bg-[#10b981] rounded-full animate-pulse"
-                        style={{ animationDelay: "0.8s" }}
-                      ></div>
-                      <div
-                        className="absolute top-1/2 right-1/4 w-32 h-1 bg-[#027659] rounded-full animate-pulse"
-                        style={{ animationDelay: "1.3s" }}
-                      ></div>
+                        className={`max-w-[85%] rounded-2xl px-4 py-3 ${
+                          message.type === "user"
+                            ? "bg-[#027659] text-white"
+                            : "bg-gray-100 text-gray-900 border border-gray-200"
+                        }`}
+                      >
+                        {message.isLoading ? (
+                          <div className="space-y-3">
+                            {message.generationProgress && (
+                              <div className="space-y-2">
+                                <div className="flex items-center justify-between">
+                                  <span className="text-sm font-medium">
+                                    {message.generationProgress.stage === "thinking" && "🤔 Analyzing your request..."}
+                                    {message.generationProgress.stage === "designing" && "🎨 Designing slides..."}
+                                    {message.generationProgress.stage === "complete" && "✅ Complete!"}
+                                  </span>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-6 w-6 hover:bg-gray-200"
+                                    onClick={() => toggleProgressMinimization(message.id)}
+                                  >
+                                    <Minimize className="h-3 w-3" />
+                                  </Button>
+                                </div>
+
+                                {!message.generationProgress.isMinimized && (
+                                  <>
+                                    {message.generationProgress.stage === "thinking" && (
+                                      <div className="flex items-center space-x-2 text-sm text-gray-600">
+                                        <div className="w-4 h-4 border-2 border-[#027659] border-t-transparent rounded-full animate-spin"></div>
+                                        <span>Thinking... ({message.generationProgress.thinkingTime}s)</span>
+                                      </div>
+                                    )}
+
+                                    {message.generationProgress.stage === "designing" && (
+                                      <div className="space-y-2">
+                                        <div className="flex justify-between text-sm text-gray-600">
+                                          <span>Progress</span>
+                                          <span>
+                                            {message.generationProgress.completedSlides || 0}/
+                                            {message.generationProgress.totalSlides || "?"}
+                                          </span>
+                                        </div>
+                                        <div className="w-full bg-gray-200 rounded-full h-2">
+                                          <div
+                                            className="bg-[#027659] h-2 rounded-full transition-all duration-300"
+                                            style={{
+                                              width: `${
+                                                message.generationProgress.totalSlides
+                                                  ? (
+                                                      message.generationProgress.completedSlides! /
+                                                        message.generationProgress.totalSlides
+                                                    ) * 100
+                                                  : 0
+                                              }%`,
+                                            }}
+                                          ></div>
+                                        </div>
+                                      </div>
+                                    )}
+                                  </>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        ) : (
+                          <div className="space-y-2">
+                            <div className="text-sm whitespace-pre-wrap">{message.content}</div>
+                            {message.type === "assistant" && (
+                              <div className="flex items-center justify-end space-x-2 mt-2">
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-6 w-6 hover:bg-gray-200"
+                                  onClick={() => handleCopyMessage(message.id, message.content)}
+                                >
+                                  {copiedMessageId === message.id ? (
+                                    <Check className="h-3 w-3 text-green-600" />
+                                  ) : (
+                                    <Copy className="h-3 w-3" />
+                                  )}
+                                </Button>
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                  <div ref={chatEndRef} />
+                </div>
+              </ScrollArea>
+
+              {/* Chat Input */}
+              <div className="p-4 border-t border-gray-100">
+                <div className="space-y-3">
+                  <div className="relative">
+                    <Textarea
+                      value={inputMessage}
+                      onChange={(e) => setInputMessage(e.target.value)}
+                      placeholder={
+                        slides.length === 0
+                          ? "Describe your presentation... (e.g., 'Create a startup pitch deck with modern design')"
+                          : editMode === "selected"
+                            ? "How should I redesign this slide? (e.g., 'Add charts and icons, make it more visual')"
+                            : "What design changes would you like? (e.g., 'Make it more colorful and add icons')"
+                      }
+                      onKeyPress={(e) => {
+                        if (e.key === "Enter" && !e.shiftKey) {
+                          e.preventDefault()
+                          handleChatSubmit()
+                        }
+                      }}
+                      className="min-h-[80px] max-h-[120px] resize-none text-sm border-gray-300 focus:border-[#027659] focus:ring-[#027659]"
+                      disabled={isStreaming}
+                    />
+                  </div>
+
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-2">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => fileInputRef.current?.click()}
+                        className="text-gray-500 hover:text-gray-700 hover:bg-gray-100"
+                        disabled={isStreaming}
+                      >
+                        <Upload className="h-4 w-4 mr-1" />
+                        <span className="text-xs">Upload</span>
+                      </Button>
+                      {uploadedFile && (
+                        <span className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded">{uploadedFile.name}</span>
+                      )}
                     </div>
 
-                    <div className="text-center space-y-6 z-10">
-                      <div className="flex items-center justify-center space-x-3">
-                        {/* Design brush icon with animation */}
-                        <div className="relative">
-                          <svg className="w-8 h-8 text-[#027659] animate-pulse" fill="currentColor" viewBox="0 0 24 24">
-                            <path d="M9.4 16.6L4.8 12l4.6-4.6L8 6l-6 6 6 6 1.4-1.4zm5.2 0L19.2 12l-4.6-4.6L16 6l6 6-6 6-1.4-1.4z" />
-                          </svg>
-                          <div className="absolute -top-1 -right-1 w-3 h-3 bg-[#10b981] rounded-full animate-ping"></div>
-                        </div>
-                        <h2 className="text-4xl font-bold text-[#027659]">SlydPRO Designing</h2>
-                      </div>
-
-                      {/* Animated design elements */}
-                      <div className="flex justify-center items-center space-x-4">
-                        <div className="flex space-x-2">
-                          <div className="w-3 h-3 bg-[#027659] rounded-full animate-bounce"></div>
-                          <div
-                            className="w-3 h-3 bg-[#10b981] rounded-full animate-bounce"
-                            style={{ animationDelay: "0.1s" }}
-                          ></div>
-                          <div
-                            className="w-3 h-3 bg-[#027659] rounded-full animate-bounce"
-                            style={{ animationDelay: "0.2s" }}
-                          ></div>
-                        </div>
-                      </div>
-
-                      {/* Design progress indicators */}
-                      <div className="flex justify-center space-x-2 mt-4">
-                        <div
-                          className="w-2 h-8 bg-[#027659] rounded-full animate-pulse"
-                          style={{ animationDelay: "0s" }}
-                        ></div>
-                        <div
-                          className="w-2 h-6 bg-[#10b981] rounded-full animate-pulse"
-                          style={{ animationDelay: "0.2s" }}
-                        ></div>
-                        <div
-                          className="w-2 h-10 bg-[#027659] rounded-full animate-pulse"
-                          style={{ animationDelay: "0.4s" }}
-                        ></div>
-                        <div
-                          className="w-2 h-7 bg-[#10b981] rounded-full animate-pulse"
-                          style={{ animationDelay: "0.6s" }}
-                        ></div>
-                        <div
-                          className="w-2 h-9 bg-[#027659] rounded-full animate-pulse"
-                          style={{ animationDelay: "0.8s" }}
-                        ></div>
-                      </div>
-                    </div>
-
-                    {/* Floating design elements */}
-                    <div
-                      className="absolute top-4 right-4 w-4 h-4 bg-[#10b981] rounded-full animate-ping"
-                      style={{ animationDelay: "1s" }}
-                    ></div>
-                    <div
-                      className="absolute bottom-4 left-4 w-3 h-3 bg-[#027659] rounded-full animate-ping"
-                      style={{ animationDelay: "1.5s" }}
-                    ></div>
-                    <div
-                      className="absolute top-1/3 right-8 w-2 h-2 bg-[#10b981] rounded-full animate-ping"
-                      style={{ animationDelay: "2s" }}
-                    ></div>
+                    <Button
+                      onClick={handleChatSubmit}
+                      disabled={!inputMessage.trim() || isStreaming}
+                      className="bg-[#027659] hover:bg-[#065f46] text-white"
+                      size="sm"
+                    >
+                      {isStreaming ? (
+                        <>
+                          <Square className="h-4 w-4 mr-2" />
+                          Stop
+                        </>
+                      ) : (
+                        <>
+                          <Send className="h-4 w-4 mr-2" />
+                          Send
+                        </>
+                      )}
+                    </Button>
                   </div>
                 </div>
+
+                <input
+                  type="file"
+                  ref={fileInputRef}
+                  onChange={handleFileUpload}
+                  accept=".txt,.doc,.docx,.pdf"
+                  className="hidden"
+                />
               </div>
-            ) : currentSlide ? (
-              <div className="relative">
-                {/* Main Slide */}
+            </div>
+          </div>
+        </div>
+
+        {/* Export Dialog */}
+        <ExportDialog
+          open={showExportDialog}
+          onOpenChange={setShowExportDialog}
+          slides={slides}
+          projectName={projectName}
+        />
+
+        {/* Presentation Mode */}
+        {isPresentationMode && (
+          <div className="fixed inset-0 bg-black z-50 flex items-center justify-center">
+            <div className="w-full h-full flex items-center justify-center">
+              {currentSlide && (
                 <div
-                  className="lg:w-[632px] lg:h-[355px] xl:w-[732px] xl:h-[412px] 2xl:w-[816px] 2xl:h-[459px] 3xl:w-[980px] 3xl:h-[551px] shadow-2xl rounded-lg overflow-hidden border-4 border-white"
+                  className="w-full h-full flex flex-col justify-center px-16"
                   style={{
                     backgroundColor: currentSlide.background,
                     color: currentSlide.textColor,
                   }}
                 >
-                  <div className="h-full p-12 flex flex-col justify-center relative">
-                    {currentSlide.layout === "title" ? (
-                      <div className="text-center">
-                        <h1 className="text-7xl font-bold mb-8 leading-tight">{currentSlide.title}</h1>
-                        <p className="text-3xl opacity-90 leading-relaxed max-w-4xl mx-auto">{currentSlide.content}</p>
-                      </div>
-                    ) : (
-                      <>
-                        <h1 className="text-6xl font-bold mb-12 leading-tight">{currentSlide.title}</h1>
-                        <div className="text-3xl leading-relaxed opacity-90 space-y-6">
-                          {currentSlide.content.split("\n").map((line, index) => (
-                            <p key={index}>{line}</p>
-                          ))}
-                        </div>
-                      </>
-                    )}
-                  </div>
+                  <h1 className="text-6xl font-bold mb-8 leading-tight">{currentSlide.title}</h1>
+                  <div className="text-2xl leading-relaxed whitespace-pre-wrap opacity-90">{currentSlide.content}</div>
                 </div>
-
-                {/* Navigation Controls */}
-                <div className="absolute -bottom-16 left-1/2 transform -translate-x-1/2 flex items-center space-x-4">
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    onClick={() => {
-                      if (currentSlideIndex > 0) {
-                        const newIndex = currentSlideIndex - 1
-                        setCurrentSlideIndex(newIndex)
-                        setSelectedSlide(slides[newIndex].id)
-                      }
-                    }}
-                    disabled={currentSlideIndex === 0}
-                    className="bg-white shadow-lg hover:shadow-xl"
-                  >
-                    <SkipBack className="h-4 w-4" />
-                  </Button>
-
-                  <div className="flex items-center space-x-2 bg-white rounded-full px-6 py-3 shadow-lg border">
-                    <span className="text-sm font-medium text-gray-700">
-                      {currentSlideIndex + 1} / {slides.length}
-                    </span>
-                  </div>
-
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    onClick={() => {
-                      if (currentSlideIndex < slides.length - 1) {
-                        const newIndex = currentSlideIndex + 1
-                        setCurrentSlideIndex(newIndex)
-                        setSelectedSlide(slides[newIndex].id)
-                      }
-                    }}
-                    disabled={currentSlideIndex === slides.length - 1}
-                    className="bg-white shadow-lg hover:shadow-xl"
-                  >
-                    <SkipForward className="h-4 w-4" />
-                  </Button>
-                </div>
-              </div>
-            ) : (
-              <div className="text-center text-gray-500 max-w-md">
-                <div className="mb-6">
-                  <div className="w-24 h-24 bg-gradient-to-r from-blue-100 to-indigo-100 rounded-2xl flex items-center justify-center mx-auto mb-6">
-                    <Zap className="h-12 w-12 text-blue-600" />
-                  </div>
-                </div>
-                <h2 className="text-3xl font-bold text-gray-900 mb-4">Ready to Design</h2>
-                <p className="text-lg text-gray-600 leading-relaxed">
-                  Ask SlydPRO AI to design your presentation slides.
-                </p>
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Right Sidebar - AI Chat */}
-        <div className="lg:w-[220px] xl:w-[260px] 2xl:w-[300px] 3xl:w-[360px] bg-white border-l border-gray-200 flex flex-col shadow-lg">
-          {/* Chat Header */}
-          <div className="p-6 border-b border-gray-100 bg-gradient-to-r from-blue-50 to-indigo-50">
-            {/* Edit Mode Toggle */}
-            <div className="flex items-center space-x-2">
-              <Button
-                variant={editMode === "all" ? "default" : "outline"}
-                size="sm"
-                onClick={() => setEditMode("all")}
-                className="flex-1 text-xs"
-              >
-                <RefreshCw className="h-3 w-3 mr-1" />
-                All Slides
-              </Button>
-              <Button
-                variant={editMode === "selected" ? "default" : "outline"}
-                size="sm"
-                onClick={() => setEditMode("selected")}
-                className="flex-1 text-xs"
-                disabled={!selectedSlide}
-              >
-                <Target className="h-3 w-3 mr-1" />
-                Selected
-              </Button>
+              )}
             </div>
 
-            {selectedSlide && editMode === "selected" && (
-              <div className="bg-[#10b981]/10 border border-[#10b981]/20 rounded-lg p-3 mt-3">
-                <div className="flex items-center space-x-2">
-                  <div className="w-2 h-2 bg-[#027659] rounded-full animate-pulse"></div>
-                  <span className="text-xs font-medium text-[#027659]">Editing: Slide {currentSlideIndex + 1}</span>
-                </div>
-                <p className="text-xs text-[#027659]/80 mt-1 truncate">
-                  {slides.find((s) => s.id === selectedSlide)?.title}
-                </p>
-              </div>
-            )}
-          </div>
-
-          {/* Chat Messages */}
-          <ScrollArea className="flex-1 p-3">
-            <div className="space-y-4">
-              {chatMessages.map((message) => (
-                <div key={message.id} className="space-y-2">
-                  {message.type === "user" ? (
-                    <div className="flex justify-end">
-                      <div className="bg-[#027659] text-white rounded-2xl px-4 py-3 max-w-[85%] shadow-sm">
-                        <p className="text-sm whitespace-pre-wrap leading-relaxed">{message.content}</p>
-                        <div className="flex items-center justify-between mt-2 pt-2 border-t border-white/20">
-                          <span className="text-xs opacity-70">
-                            {message.timestamp.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
-                          </span>
-                          <div className="flex space-x-1">
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              className="h-6 w-6 p-0 text-white/70 hover:text-white hover:bg-white/20"
-                              onClick={() => handleCopyMessage(message.id, message.content)}
-                            >
-                              {copiedMessageId === message.id ? (
-                                <Check className="h-3 w-3" />
-                              ) : (
-                                <Copy className="h-3 w-3" />
-                              )}
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              className="h-6 w-6 p-0 text-white/70 hover:text-white hover:bg-red-200/20"
-                              onClick={() => {
-                                setChatMessages((prev) => prev.filter((m) => m.id !== message.id))
-                              }}
-                            >
-                              <Trash2 className="h-3 w-3" />
-                            </Button>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="flex justify-start">
-                      <div className="bg-gray-50 border border-gray-200 text-gray-900 rounded-2xl px-4 py-3 max-w-[85%] shadow-sm">
-                        {message.isLoading ? (
-                          <div className="space-y-4">
-                            {message.generationProgress?.stage === "thinking" && (
-                              <div className="space-y-3">
-                                <div className="flex items-center space-x-3">
-                                  <div className="flex space-x-1">
-                                    <div className="w-2 h-2 bg-blue-500 rounded-full animate-bounce"></div>
-                                    <div
-                                      className="w-2 h-2 bg-blue-500 rounded-full animate-bounce"
-                                      style={{ animationDelay: "0.1s" }}
-                                    ></div>
-                                    <div
-                                      className="w-2 h-2 bg-blue-500 rounded-full animate-bounce"
-                                      style={{ animationDelay: "0.2s" }}
-                                    ></div>
-                                  </div>
-                                  <span className="text-sm font-medium text-gray-700">Thinking...</span>
-                                </div>
-                                <p className="text-xs text-gray-500">
-                                  Analyzing design requirements ({message.generationProgress.thinkingTime}s)
-                                </p>
-                              </div>
-                            )}
-
-                            {message.generationProgress?.stage === "designing" && (
-                              <div className="border border-blue-200 rounded-lg p-3 bg-blue-50/50">
-                                <div className="flex items-center justify-between mb-3">
-                                  <div className="flex items-center space-x-2">
-                                    <div className="w-1.5 h-1.5 bg-blue-500 rounded-full animate-pulse"></div>
-                                    <span className="text-xs font-semibold text-blue-900">
-                                      Version {message.generationProgress.version}
-                                    </span>
-                                  </div>
-                                  <span className="text-xs text-blue-600 font-medium px-2 py-0.5 bg-blue-100 rounded-md">
-                                    Designing
-                                  </span>
-                                </div>
-
-                                <div className="space-y-1.5">
-                                  {Array.from(
-                                    { length: Math.max(1, message.generationProgress?.completedSlides || 0) },
-                                    (_, i) => {
-                                      const isCompleted = i < (message.generationProgress?.completedSlides || 0)
-
-                                      return (
-                                        <div key={i} className="flex items-center space-x-2 py-0.5">
-                                          <div className="w-3 h-3 flex items-center justify-center">
-                                            {isCompleted ? (
-                                              <div className="w-3 h-3 bg-green-500 rounded-full flex items-center justify-center">
-                                                <Check className="w-2 h-2 text-white" />
-                                              </div>
-                                            ) : (
-                                              <div className="w-3 h-3 bg-blue-500 rounded-full flex items-center justify-center">
-                                                <Loader2 className="w-2 h-2 text-white animate-spin" />
-                                              </div>
-                                            )}
-                                          </div>
-
-                                          <span
-                                            className={`text-xs ${
-                                              isCompleted ? "text-green-700 font-medium" : "text-blue-700 font-medium"
-                                            }`}
-                                          >
-                                            {isCompleted ? `Designed slide ${i + 1}` : `Designing slide ${i + 1}`}
-                                          </span>
-                                        </div>
-                                      )
-                                    },
-                                  )}
-                                </div>
-                              </div>
-                            )}
-                          </div>
-                        ) : (
-                          <div className="space-y-3">
-                            <p className="text-sm whitespace-pre-wrap leading-relaxed">{message.content}</p>
-
-                            {message.generationProgress?.isComplete && (
-                              <div className="border border-green-200 rounded-lg p-3 bg-green-50/30">
-                                <div className="flex items-center justify-between">
-                                  <div className="flex items-center space-x-2">
-                                    <div className="w-1.5 h-1.5 bg-green-500 rounded-full"></div>
-                                    <span className="text-xs font-semibold text-green-900">
-                                      Version {message.generationProgress.version}
-                                    </span>
-                                  </div>
-                                  <div className="flex items-center space-x-2">
-                                    <span className="text-xs text-green-600 font-medium px-2 py-0.5 bg-green-100 rounded-md">
-                                      Complete
-                                    </span>
-                                    <Button
-                                      size="sm"
-                                      variant="ghost"
-                                      className="h-5 w-5 p-0 text-green-600 hover:text-green-700 hover:bg-green-100"
-                                      onClick={() => toggleProgressMinimization(message.id)}
-                                    >
-                                      {message.generationProgress.isMinimized ? (
-                                        <Plus className="h-2.5 w-2.5" />
-                                      ) : (
-                                        <Minimize className="h-2.5 w-2.5" />
-                                      )}
-                                    </Button>
-                                  </div>
-                                </div>
-
-                                {!message.generationProgress.isMinimized && (
-                                  <div className="mt-2 pt-2 border-t border-green-200 space-y-1">
-                                    {Array.from({ length: message.generationProgress.completedSlides || 0 }, (_, i) => (
-                                      <div key={i} className="flex items-center space-x-2 py-0.5">
-                                        <div className="w-3 h-3 bg-green-500 rounded-full flex items-center justify-center">
-                                          <Check className="w-2 h-2 text-white" />
-                                        </div>
-                                        <span className="text-xs text-green-700">Designed slide {i + 1}</span>
-                                      </div>
-                                    ))}
-                                  </div>
-                                )}
-                              </div>
-                            )}
-                          </div>
-                        )}
-
-                        {!message.isLoading && (
-                          <div className="flex items-center justify-between mt-3 pt-2 border-t border-gray-200">
-                            <span className="text-xs text-gray-500">
-                              {message.timestamp.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
-                            </span>
-                            <div className="flex space-x-1">
-                              <Button
-                                size="sm"
-                                variant="ghost"
-                                className="h-6 w-6 p-0 text-gray-500 hover:text-gray-700 hover:bg-gray-100"
-                                onClick={() => handleCopyMessage(message.id, message.content)}
-                              >
-                                {copiedMessageId === message.id ? (
-                                  <Check className="h-3 w-3 text-green-600" />
-                                ) : (
-                                  <Copy className="h-3 w-3" />
-                                )}
-                              </Button>
-                              <Button
-                                size="sm"
-                                variant="ghost"
-                                className="h-6 w-6 p-0 text-red-500 hover:text-red-700 hover:bg-red-50"
-                                onClick={() => {
-                                  setChatMessages((prev) => prev.filter((m) => m.id !== message.id))
-                                }}
-                              >
-                                <Trash2 className="h-3 w-3" />
-                              </Button>
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              ))}
-              <div ref={chatEndRef} />
-            </div>
-          </ScrollArea>
-
-          {/* Chat Input */}
-          <div className="p-4 border-t border-gray-100 bg-white">
-            <div className="space-y-3">
-              <div className="bg-gray-50 rounded-2xl border border-gray-200 overflow-hidden">
-                <Textarea
-                  value={inputMessage}
-                  onChange={(e) => setInputMessage(e.target.value)}
-                  placeholder={
-                    editMode === "selected"
-                      ? "How should I redesign this slide? (e.g., 'Add charts and icons', 'Make it more modern')"
-                      : slides.length > 0
-                        ? "Ask me to enhance your presentation design..."
-                        : "Describe the presentation you want me to design..."
+            {/* Presentation Controls */}
+            <div className="absolute bottom-8 left-1/2 transform -translate-x-1/2 flex items-center space-x-4 bg-black/50 rounded-full px-6 py-3">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  if (currentSlideIndex > 0) {
+                    const newIndex = currentSlideIndex - 1
+                    setCurrentSlideIndex(newIndex)
+                    setSelectedSlide(slides[newIndex].id)
                   }
-                  onKeyPress={(e) => e.key === "Enter" && !e.shiftKey && handleChatSubmit()}
-                  className="w-full bg-transparent border-0 text-gray-900 placeholder:text-gray-500 text-sm focus-visible:ring-0 focus-visible:ring-offset-0 resize-none min-h-[80px] max-h-[120px] shadow-none outline-none focus:outline-none p-4"
-                  rows={3}
-                  disabled={v0.isLoading}
-                />
-                <div className="flex items-center justify-between p-3 pt-0">
-                  <div className="flex items-center space-x-2">
-                    <input
-                      type="file"
-                      ref={fileInputRef}
-                      onChange={handleFileUpload}
-                      accept=".txt,.doc,.docx,.pdf"
-                      className="hidden"
-                    />
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => fileInputRef.current?.click()}
-                      className="text-gray-500 hover:text-gray-700 h-8 px-2"
-                      disabled={v0.isLoading}
-                    >
-                      <Upload className="h-4 w-4" />
-                    </Button>
-                  </div>
-                  <Button
-                    onClick={
-                      isStreaming
-                        ? () => {
-                            setIsStreaming(false)
-                            setChatMessages((prev) => prev.filter((msg) => !msg.isLoading))
-                          }
-                        : handleChatSubmit
-                    }
-                    size="sm"
-                    disabled={!isStreaming && !inputMessage.trim()}
-                    className={`${isStreaming ? "bg-red-600 hover:bg-red-700" : "bg-[#027659] hover:bg-[#065f46]"} text-white rounded-lg px-4 py-2`}
-                  >
-                    {isStreaming ? <Square className="h-4 w-4" /> : <Send className="h-4 w-4" />}
-                  </Button>
-                </div>
-              </div>
+                }}
+                disabled={currentSlideIndex === 0}
+                className="text-white hover:bg-white/20"
+              >
+                <SkipBack className="h-5 w-5" />
+              </Button>
+
+              <span className="text-white font-medium">
+                {currentSlideIndex + 1} / {slides.length}
+              </span>
+
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  if (currentSlideIndex < slides.length - 1) {
+                    const newIndex = currentSlideIndex + 1
+                    setCurrentSlideIndex(newIndex)
+                    setSelectedSlide(slides[newIndex].id)
+                  }
+                }}
+                disabled={currentSlideIndex === slides.length - 1}
+                className="text-white hover:bg-white/20"
+              >
+                <SkipForward className="h-5 w-5" />
+              </Button>
+
+              <div className="w-px h-6 bg-white/30 mx-2"></div>
+
+              <Button variant="ghost" size="sm" onClick={exitPresentationMode} className="text-white hover:bg-white/20">
+                Exit
+              </Button>
             </div>
           </div>
-        </div>
+        )}
       </div>
-
-      <ExportDialog
-        open={showExportDialog}
-        onOpenChange={setShowExportDialog}
-        projectName={projectName}
-        slideCount={slides.length}
-      />
     </TooltipProvider>
   )
 }
