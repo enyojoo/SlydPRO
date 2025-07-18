@@ -18,7 +18,6 @@ import { Footer } from "@/components/footer"
 import { PLATFORM_CONFIG } from "@/lib/constants"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { Edit2, Trash2 } from "lucide-react"
-import { presentationsAPI } from "@/lib/presentations-api"
 
 interface Presentation {
   id: string
@@ -97,41 +96,37 @@ export default function SlydPROHome() {
       return
     }
 
-    // Create new presentation immediately and get the ID
+    // Create new presentation first
     try {
-      const newPresentation = await presentationsAPI.createPresentation({
-        name: "Untitled Presentation",
-        slides: [],
-        category: "ai-generated",
+      const response = await fetch("/api/presentations/create-new", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${session?.access_token}`,
+        },
       })
 
-      // Add message to chat context
-      const userMessage = {
-        id: Date.now().toString(),
-        type: "user" as const,
-        content: inputMessage,
-        timestamp: new Date(),
+      if (response.ok) {
+        const presentation = await response.json()
+        const slug = "untitled-presentation"
+
+        // Add message to chat context
+        const userMessage = {
+          id: Date.now().toString(),
+          type: "user" as const,
+          content: inputMessage,
+          timestamp: new Date(),
+        }
+
+        clearMessages()
+        addMessage(userMessage)
+
+        // Redirect to new editor URL
+        router.push(`/editor/${presentation.id}/${slug}`)
+      } else {
+        console.error("Failed to create presentation")
       }
-
-      clearMessages()
-      addMessage(userMessage)
-
-      // Navigate to the new presentation with the actual ID
-      const slug = "untitled-presentation"
-      router.push(`/editor/${newPresentation.id}/${slug}`)
     } catch (error) {
-      console.error("Failed to create presentation:", error)
-      // Fallback to the old behavior if creation fails
-      const userMessage = {
-        id: Date.now().toString(),
-        type: "user" as const,
-        content: inputMessage,
-        timestamp: new Date(),
-      }
-
-      clearMessages()
-      addMessage(userMessage)
-      router.push("/editor/new/untitled-presentation")
+      console.error("Error creating presentation:", error)
     }
   }
 
@@ -143,16 +138,42 @@ export default function SlydPROHome() {
         return
       }
 
-      const userMessage = {
-        id: Date.now().toString(),
-        type: "user" as const,
-        content: `Uploaded: ${file.name}`,
-        timestamp: new Date(),
+      // Create new presentation and redirect
+      const createAndRedirect = async () => {
+        try {
+          const response = await fetch("/api/presentations/create-new", {
+            method: "POST",
+            headers: {
+              Authorization: `Bearer ${session?.access_token}`,
+            },
+          })
+
+          if (response.ok) {
+            const presentation = await response.json()
+            const slug = file.name
+              .toLowerCase()
+              .replace(/[^a-z0-9]+/g, "-")
+              .replace(/(^-|-$)/g, "")
+
+            const userMessage = {
+              id: Date.now().toString(),
+              type: "user" as const,
+              content: `Uploaded: ${file.name}`,
+              timestamp: new Date(),
+            }
+
+            clearMessages()
+            addMessage(userMessage)
+
+            // Redirect to new editor URL
+            router.push(`/editor/${presentation.id}/${slug}?file=${encodeURIComponent(file.name)}`)
+          }
+        } catch (error) {
+          console.error("Error creating presentation:", error)
+        }
       }
 
-      clearMessages()
-      addMessage(userMessage)
-      router.push(`/editor?file=${encodeURIComponent(file.name)}`)
+      createAndRedirect()
     }
   }
 
@@ -336,14 +357,7 @@ export default function SlydPROHome() {
                   <Card
                     key={presentation.id}
                     className="cursor-pointer hover:shadow-lg transition-all duration-200 border border-border hover:border-muted-foreground bg-card overflow-hidden"
-                    onClick={() => {
-                      const slug = presentation.name
-                        .toLowerCase()
-                        .replace(/[^a-z0-9]+/g, "-")
-                        .replace(/(^-|-$)/g, "")
-                        .substring(0, 50)
-                      router.push(`/editor/${presentation.id}/${slug}`)
-                    }}
+                    onClick={() => router.push(`/editor?project=${presentation.id}`)}
                   >
                     {/* Actual Slide Thumbnail */}
                     <div className="w-full h-40 flex flex-col justify-center p-4 text-white relative overflow-hidden">

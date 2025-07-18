@@ -27,11 +27,10 @@ import {
   Check,
   Square,
 } from "lucide-react"
-import { useRouter } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import { useV0Integration } from "@/hooks/useV0Integration"
 import { useChatContext } from "@/lib/chat-context"
 import { ExportDialog } from "@/components/export-dialog"
-import { getTemplateById } from "@/lib/slide-templates"
 import { presentationsAPI } from "@/lib/presentations-api"
 import { useAuth } from "@/lib/auth-context"
 
@@ -64,11 +63,6 @@ interface GenerationProgress {
   isMinimized?: boolean
 }
 
-interface EditorContentProps {
-  id: string
-  slug: string
-}
-
 const colorThemes = [
   { name: "Blue", primary: "#1e40af", secondary: "#3b82f6", text: "#ffffff" },
   { name: "Purple", primary: "#7c3aed", secondary: "#a855f7", text: "#ffffff" },
@@ -78,7 +72,14 @@ const colorThemes = [
   { name: "Dark", primary: "#1f2937", secondary: "#374151", text: "#ffffff" },
 ]
 
-function EditorContent({ id, slug }: EditorContentProps) {
+interface EditorContentProps {
+  params: {
+    id: string
+    slug: string
+  }
+}
+
+function EditorContent({ params }: EditorContentProps) {
   const [isSmallScreen, setIsSmallScreen] = useState(false)
   const [slides, setSlides] = useState<Slide[]>([])
   const [selectedSlide, setSelectedSlide] = useState<string>("")
@@ -100,12 +101,13 @@ function EditorContent({ id, slug }: EditorContentProps) {
   const [copiedMessageId, setCopiedMessageId] = useState<string | null>(null)
 
   const router = useRouter()
+  const searchParams = useSearchParams()
   const v0 = useV0Integration()
   const fileInputRef = useRef<HTMLInputElement>(null)
   const chatEndRef = useRef<HTMLDivElement>(null)
   const nameInputRef = useRef<HTMLInputElement>(null)
   const { messages } = useChatContext()
-  const { user: authUser, isLoading: authLoading, session } = useAuth()
+  const { user: authUser, isLoading: authLoading } = useAuth()
 
   const checkScreenSize = () => {
     setIsSmallScreen(window.innerWidth < 1024)
@@ -121,74 +123,7 @@ function EditorContent({ id, slug }: EditorContentProps) {
     }
   }
 
-  // Generate slug from project name
-  const generateSlug = useCallback((name: string) => {
-    return name
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, "-")
-      .replace(/(^-|-$)/g, "")
-      .substring(0, 50)
-  }, [])
-
-  // Update URL when project name changes
-  const updateURL = useCallback(
-    (newName: string) => {
-      if (currentPresentationId && currentPresentationId !== "new") {
-        const newSlug = generateSlug(newName)
-        if (newSlug !== slug) {
-          router.replace(`/editor/${currentPresentationId}/${newSlug}`, { scroll: false })
-        }
-      }
-    },
-    [currentPresentationId, slug, router, generateSlug],
-  )
-
-  // Auto-save presentation to Supabase
-  const autoSave = useCallback(async () => {
-    if (!currentPresentationId || !authUser || !session || slides.length === 0) return
-
-    setIsSaving(true)
-    try {
-      await presentationsAPI.updatePresentation(currentPresentationId, {
-        name: projectName,
-        slides,
-        thumbnail: slides[0]?.background,
-      })
-    } catch (error) {
-      console.error("Auto-save failed:", error)
-    } finally {
-      setIsSaving(false)
-    }
-  }, [currentPresentationId, authUser, session, slides, projectName])
-
-  // Create new presentation in Supabase
-  const createNewPresentation = useCallback(
-    async (initialSlides: Slide[], name: string) => {
-      if (!authUser || !session) return null
-
-      try {
-        const presentation = await presentationsAPI.createPresentation({
-          name,
-          slides: initialSlides,
-          category: "ai-generated",
-        })
-
-        setCurrentPresentationId(presentation.id)
-
-        // Update URL to use the new presentation ID
-        const newSlug = generateSlug(name)
-        router.replace(`/editor/${presentation.id}/${newSlug}`, { scroll: false })
-
-        return presentation.id
-      } catch (error) {
-        console.error("Failed to create presentation:", error)
-        return null
-      }
-    },
-    [authUser, session, router, generateSlug],
-  )
-
-  // Update the handleInitialGeneration function to create presentation in Supabase:
+  // Update the handleInitialGeneration function to provide real-time streaming:
   const handleInitialGeneration = useCallback(
     async (prompt: string) => {
       const userMessage: ChatMessage = {
@@ -298,8 +233,28 @@ function EditorContent({ id, slug }: EditorContentProps) {
             setSelectedSlide(themedSlides[0]?.id || "")
             setCurrentSlideIndex(0)
 
-            // The presentation is already created, just update it with slides
-            setCurrentPresentationId(id)
+            // Save to database and redirect to new URL
+            if (authUser) {
+              try {
+                const presentation = await presentationsAPI.createPresentation({
+                  name: projectName,
+                  slides: themedSlides,
+                  category: "ai-generated",
+                })
+                setCurrentPresentationId(presentation.id)
+
+                // Generate slug from project name
+                const slug = projectName
+                  .toLowerCase()
+                  .replace(/[^a-z0-9]+/g, "-")
+                  .replace(/(^-|-$)/g, "")
+
+                // Update URL without page reload
+                window.history.replaceState(null, "", `/editor/${presentation.id}/${slug}`)
+              } catch (error) {
+                console.error("Failed to save presentation:", error)
+              }
+            }
 
             // Update to completion state
             setChatMessages((prev) =>
@@ -332,16 +287,14 @@ function EditorContent({ id, slug }: EditorContentProps) {
           const errorMessage: ChatMessage = {
             id: (Date.now() + 3).toString(),
             type: "assistant",
-            content: `I encountered an error: ${error.message}
-
-Please try again or describe your presentation differently.`,
+            content: `I encountered an error: ${error.message}\n\nPlease try again or describe your presentation differently.`,
             timestamp: new Date(),
           }
           setChatMessages((prev) => [...prev, errorMessage])
         },
       )
     },
-    [v0, uploadedFile, selectedTheme, streamingContent, id],
+    [v0, uploadedFile, selectedTheme, projectName, authUser, streamingContent],
   )
 
   // Add function to toggle progress minimization
@@ -361,23 +314,43 @@ Please try again or describe your presentation differently.`,
     )
   }
 
-  // Auto-save when slides or project name changes
+  const autoSave = useCallback(async () => {
+    if (!currentPresentationId || !authUser || slides.length === 0) return
+
+    setIsSaving(true)
+    try {
+      await presentationsAPI.updatePresentation(currentPresentationId, {
+        name: projectName,
+        slides,
+        thumbnail: slides[0]?.background,
+      })
+
+      // Update URL slug if name changed
+      const currentSlug = params.slug
+      const newSlug = projectName
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, "-")
+        .replace(/(^-|-$)/g, "")
+
+      if (currentSlug !== newSlug) {
+        window.history.replaceState(null, "", `/editor/${currentPresentationId}/${newSlug}`)
+      }
+    } catch (error) {
+      console.error("Auto-save failed:", error)
+    } finally {
+      setIsSaving(false)
+    }
+  }, [currentPresentationId, authUser, slides, projectName, params.slug])
+
   useEffect(() => {
     const saveTimer = setTimeout(() => {
-      if (slides.length > 0 && currentPresentationId && currentPresentationId !== "new") {
+      if (slides.length > 0) {
         autoSave()
       }
     }, 2000) // Auto-save after 2 seconds of inactivity
 
     return () => clearTimeout(saveTimer)
-  }, [slides, projectName, autoSave, currentPresentationId])
-
-  // Update URL when project name changes
-  useEffect(() => {
-    if (projectName !== "Untitled Presentation") {
-      updateURL(projectName)
-    }
-  }, [projectName, updateURL])
+  }, [slides, projectName, autoSave])
 
   const handleChatSubmit = async () => {
     if (!inputMessage.trim() || v0.isLoading) return
@@ -495,9 +468,7 @@ Please try again or describe your presentation differently.`,
       const errorMessage: ChatMessage = {
         id: (Date.now() + 3).toString(),
         type: "assistant",
-        content: `I encountered an error: ${v0.error}
-
-Please try rephrasing your request or try again.`,
+        content: `I encountered an error: ${v0.error}\n\nPlease try rephrasing your request or try again.`,
         timestamp: new Date(),
       }
       setChatMessages((prev) => [...prev, errorMessage])
@@ -541,11 +512,6 @@ Please try rephrasing your request or try again.`,
         setSelectedSlide(themedSlides[0]?.id || "")
         setCurrentSlideIndex(0)
 
-        // Create new presentation in Supabase if this is a new presentation
-        if (id === "new") {
-          await createNewPresentation(themedSlides, projectName)
-        }
-
         const assistantMessage: ChatMessage = {
           id: (Date.now() + 2).toString(),
           type: "assistant",
@@ -587,7 +553,7 @@ Please try rephrasing your request or try again.`,
 
   const handleNameSave = () => {
     setIsEditingName(false)
-    // Auto-save logic will be triggered by useEffect
+    // Auto-save logic can be added here
   }
 
   const handlePresentationMode = () => {
@@ -649,87 +615,54 @@ Please try rephrasing your request or try again.`,
   useEffect(() => {
     if (isInitialized) return
 
-    const loadPresentation = async () => {
-      if (id === "new") {
-        // New presentation - check if there's an initial message from home page
-        setCurrentPresentationId("new")
-        setChatMessages([])
+    const presentationId = params.id
 
-        if (messages.length > 0) {
-          const lastMessage = messages[messages.length - 1]
-          if (lastMessage.type === "user") {
-            // Process the initial message
-            setTimeout(() => {
-              handleInitialGeneration(lastMessage.content)
-            }, 100)
-          }
-        }
-      } else {
-        // Load existing presentation from database or start with empty presentation
+    if (presentationId && presentationId !== "new") {
+      // Load existing presentation from database
+      const loadPresentation = async () => {
         try {
-          if (authUser && session) {
-            const presentation = await presentationsAPI.getPresentation(id)
+          if (authUser) {
+            const presentation = await presentationsAPI.getPresentation(presentationId)
             setSlides(presentation.slides)
             setSelectedSlide(presentation.slides[0]?.id || "")
             setCurrentSlideIndex(0)
             setProjectName(presentation.name)
             setCurrentPresentationId(presentation.id)
 
-            // If presentation has no slides and there's a message from home page, start generation
-            if (presentation.slides.length === 0 && messages.length > 0) {
-              const lastMessage = messages[messages.length - 1]
-              if (lastMessage.type === "user") {
-                setTimeout(() => {
-                  handleInitialGeneration(lastMessage.content)
-                }, 100)
-              }
-            } else if (presentation.slides.length > 0) {
-              // Welcome back message for existing presentations with slides
-              const welcomeMessage: ChatMessage = {
-                id: Date.now().toString(),
-                type: "assistant",
-                content: `Welcome back to "${presentation.name}"! This presentation has ${presentation.slides.length} slides and was last updated ${new Date(presentation.updated_at).toLocaleDateString()}.
-
-You can now:
-• Edit individual slides by selecting them
-• Regenerate content with new ideas
-• Change colors and themes
-• Ask me to modify specific aspects
-
-What would you like to work on?`,
-                timestamp: new Date(),
-              }
-              setChatMessages([welcomeMessage])
+            const welcomeMessage: ChatMessage = {
+              id: Date.now().toString(),
+              type: "assistant",
+              content: `Welcome back to "${presentation.name}"! This presentation has ${presentation.slides.length} slides and was last updated ${new Date(presentation.updated_at).toLocaleDateString()}.\n\nYou can now:\n• Edit individual slides by selecting them\n• Regenerate content with new ideas\n• Change colors and themes\n• Ask me to modify specific aspects\n\nWhat would you like to work on?`,
+              timestamp: new Date(),
             }
-          } else {
-            // Fallback to template loading if not authenticated
-            const project = getTemplateById(id)
-            if (project) {
-              setSlides(project.slides)
-              setSelectedSlide(project.slides[0]?.id || "")
-              setCurrentSlideIndex(0)
-              setProjectName(project.name)
-              setCurrentPresentationId(id)
-            }
+            setChatMessages([welcomeMessage])
           }
         } catch (error) {
           console.error("Failed to load presentation:", error)
-          // Fallback to template loading
-          const project = getTemplateById(id)
-          if (project) {
-            setSlides(project.slides)
-            setSelectedSlide(project.slides[0]?.id || "")
-            setCurrentSlideIndex(0)
-            setProjectName(project.name)
-            setCurrentPresentationId(id)
-          }
+          // Redirect to home if presentation not found
+          router.push("/")
+        }
+      }
+
+      loadPresentation()
+    } else {
+      // New presentation - no initial welcome message, start clean
+      setChatMessages([])
+
+      // Check if there's an initial message from home page
+      if (messages.length > 0) {
+        const lastMessage = messages[messages.length - 1]
+        if (lastMessage.type === "user") {
+          // Process the initial message
+          setTimeout(() => {
+            handleInitialGeneration(lastMessage.content)
+          }, 100)
         }
       }
     }
 
-    loadPresentation()
     setIsInitialized(true)
-  }, [authUser, session, messages, handleInitialGeneration, id, streamingContent])
+  }, [authUser, messages, handleInitialGeneration, params.id, streamingContent])
 
   // Show warning for small screens
   if (isSmallScreen) {
@@ -1427,11 +1360,11 @@ What would you like to work on?`,
                               <Button
                                 size="sm"
                                 variant="ghost"
-                                className="h-6 w-6 p-0 text-gray-400 hover:text-gray-600 hover:bg-gray-100"
+                                className="h-6 w-6 p-0 text-gray-500 hover:text-gray-700 hover:bg-gray-100"
                                 onClick={() => handleCopyMessage(message.id, message.content)}
                               >
                                 {copiedMessageId === message.id ? (
-                                  <Check className="h-3 w-3" />
+                                  <Check className="h-3 w-3 text-green-600" />
                                 ) : (
                                   <Copy className="h-3 w-3" />
                                 )}
@@ -1439,7 +1372,7 @@ What would you like to work on?`,
                               <Button
                                 size="sm"
                                 variant="ghost"
-                                className="h-6 w-6 p-0 text-gray-400 hover:text-red-500 hover:bg-red-50"
+                                className="h-6 w-6 p-0 text-red-500 hover:text-red-700 hover:bg-red-50"
                                 onClick={() => {
                                   setChatMessages((prev) => prev.filter((m) => m.id !== message.id))
                                 }}
@@ -1459,97 +1392,71 @@ What would you like to work on?`,
           </ScrollArea>
 
           {/* Chat Input */}
-          <div className="p-4 border-t border-gray-100 bg-gray-50/50">
+          <div className="p-4 border-t border-gray-100 bg-white">
             <div className="space-y-3">
-              {/* Theme Selector */}
-              <div className="flex items-center space-x-2">
-                <span className="text-xs font-medium text-gray-600">Theme:</span>
-                <div className="flex space-x-1">
-                  {colorThemes.slice(0, 4).map((theme) => (
-                    <button
-                      key={theme.name}
-                      onClick={() => handleThemeChange(theme.name)}
-                      className={`w-6 h-6 rounded-full border-2 transition-all ${
-                        selectedTheme.name === theme.name ? "border-gray-400 scale-110" : "border-gray-200"
-                      }`}
-                      style={{ backgroundColor: theme.primary }}
-                      title={theme.name}
-                    />
-                  ))}
-                </div>
-              </div>
-
-              {/* Input Area */}
-              <div className="relative">
+              <div className="bg-gray-50 rounded-2xl border border-gray-200 overflow-hidden">
                 <Textarea
                   value={inputMessage}
                   onChange={(e) => setInputMessage(e.target.value)}
                   placeholder={
-                    editMode === "selected" && selectedSlide
-                      ? `Edit slide ${currentSlideIndex + 1}...`
-                      : "Ask SlydPRO to design or edit slides..."
+                    editMode === "selected"
+                      ? "How should I modify this slide?"
+                      : slides.length > 0
+                        ? "Ask me to modify your presentation..."
+                        : "Describe the presentation you want to create..."
                   }
-                  onKeyPress={(e) => {
-                    if (e.key === "Enter" && !e.shiftKey) {
-                      e.preventDefault()
-                      handleChatSubmit()
-                    }
-                  }}
-                  className="w-full bg-white border border-gray-200 text-gray-900 placeholder:text-gray-500 text-sm focus-visible:ring-1 focus-visible:ring-[#027659] focus-visible:border-[#027659] resize-none min-h-[80px] max-h-[120px] rounded-xl p-3 pr-12"
-                  disabled={v0.isLoading || isStreaming}
+                  onKeyPress={(e) => e.key === "Enter" && !e.shiftKey && handleChatSubmit()}
+                  className="w-full bg-transparent border-0 text-gray-900 placeholder:text-gray-500 text-sm focus-visible:ring-0 focus-visible:ring-offset-0 resize-none min-h-[80px] max-h-[120px] shadow-none outline-none focus:outline-none p-4"
+                  rows={3}
+                  disabled={v0.isLoading}
                 />
-
-                {/* Send Button */}
-                <div className="absolute bottom-3 right-3">
+                <div className="flex items-center justify-between p-3 pt-0">
+                  <div className="flex items-center space-x-2">
+                    <input
+                      type="file"
+                      ref={fileInputRef}
+                      onChange={handleFileUpload}
+                      accept=".txt,.doc,.docx,.pdf"
+                      className="hidden"
+                    />
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => fileInputRef.current?.click()}
+                      className="text-gray-500 hover:text-gray-700 h-8 px-2"
+                      disabled={v0.isLoading}
+                    >
+                      <Upload className="h-4 w-4" />
+                    </Button>
+                  </div>
                   <Button
-                    onClick={handleChatSubmit}
-                    size="icon"
-                    className="h-8 w-8 bg-[#027659] hover:bg-[#065f46] text-white rounded-lg shadow-sm"
-                    disabled={!inputMessage.trim() || v0.isLoading || isStreaming}
+                    onClick={
+                      isStreaming
+                        ? () => {
+                            setIsStreaming(false)
+                            setChatMessages((prev) => prev.filter((msg) => !msg.isLoading))
+                          }
+                        : handleChatSubmit
+                    }
+                    size="sm"
+                    disabled={!isStreaming && !inputMessage.trim()}
+                    className={`${isStreaming ? "bg-red-600 hover:bg-red-700" : "bg-[#027659] hover:bg-[#065f46]"} text-white rounded-lg px-4 py-2`}
                   >
-                    {v0.isLoading || isStreaming ? <Square className="h-3 w-3" /> : <Send className="h-3 w-3" />}
+                    {isStreaming ? <Square className="h-4 w-4" /> : <Send className="h-4 w-4" />}
                   </Button>
                 </div>
               </div>
-
-              {/* Upload Button */}
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => fileInputRef.current?.click()}
-                className="w-full bg-white hover:bg-gray-50 text-gray-700 border-gray-200"
-                disabled={v0.isLoading || isStreaming}
-              >
-                <Upload className="h-4 w-4 mr-2" />
-                Upload Document
-              </Button>
-
-              <input
-                type="file"
-                ref={fileInputRef}
-                onChange={handleFileUpload}
-                accept=".txt,.doc,.docx,.pdf,.ppt,.pptx"
-                className="hidden"
-              />
-
-              {/* Error Display */}
-              {v0.error && (
-                <div className="bg-red-50 border border-red-200 rounded-lg p-3">
-                  <p className="text-xs text-red-600">{v0.error}</p>
-                </div>
-              )}
             </div>
           </div>
         </div>
-
-        {/* Export Dialog */}
-        <ExportDialog
-          open={showExportDialog}
-          onOpenChange={setShowExportDialog}
-          projectName={projectName}
-          slideCount={slides.length}
-        />
       </div>
+
+      <ExportDialog
+        open={showExportDialog}
+        onOpenChange={setShowExportDialog}
+        projectName={projectName}
+        slideCount={slides.length}
+      />
     </TooltipProvider>
   )
 }

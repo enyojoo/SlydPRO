@@ -15,10 +15,12 @@ const EditorContent = dynamic(() => import("./editor-content"), {
 })
 
 interface EditorWrapperProps {
-  id: string
-  slug: string
+  params: {
+    id: string
+    slug: string
+  }
 }
 
-export default function EditorWrapper({ id, slug }: EditorWrapperProps) {
-  return <EditorContent id={id} slug={slug} />
+export default function EditorWrapper({ params }: EditorWrapperProps) {
+  return <EditorContent params={params} />
 }

@@ -2,14 +2,6 @@
 
 import { supabase, type Presentation } from "./supabase"
 
-function generateSlug(title: string): string {
-  return title
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/(^-|-$)/g, "")
-    .substring(0, 50) // Limit length
-}
-
 export class PresentationsAPI {
   private async getAuthHeaders() {
     const {
@@ -22,7 +14,7 @@ export class PresentationsAPI {
     name: string
     slides: any[]
     category?: string
-  }): Promise<Presentation & { slug: string }> {
+  }): Promise<Presentation> {
     const response = await fetch("/api/presentations", {
       method: "POST",
       headers: {
@@ -36,11 +28,7 @@ export class PresentationsAPI {
       throw new Error("Failed to create presentation")
     }
 
-    const presentation = await response.json()
-    return {
-      ...presentation,
-      slug: generateSlug(presentation.name),
-    }
+    return response.json()
   }
 
   async updatePresentation(id: string, data: Partial<Presentation>): Promise<Presentation> {
