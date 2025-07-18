@@ -31,6 +31,16 @@ function getInitials(name: string): string {
   return (words[0].charAt(0) + words[words.length - 1].charAt(0)).toUpperCase()
 }
 
+// Add this helper function at the top of the file
+function createSlug(text: string): string {
+  return text
+    .toLowerCase()
+    .replace(/[^a-z0-9 -]/g, "")
+    .replace(/\s+/g, "-")
+    .replace(/-+/g, "-")
+    .trim()
+}
+
 interface Project {
   id: string
   name: string
@@ -156,7 +166,7 @@ export default function RecentPresentationsClient() {
               <Card
                 key={project.id}
                 className="cursor-pointer hover:shadow-lg transition-all duration-200 border border-border hover:border-muted-foreground bg-card overflow-hidden"
-                onClick={() => router.push(`/editor?project=${project.id}`)}
+                onClick={() => router.push(`/editor/${project.id}/${createSlug(project.name)}`)}
               >
                 {/* Actual Slide Thumbnail */}
                 <div

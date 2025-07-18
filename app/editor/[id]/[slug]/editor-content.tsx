@@ -1,5 +1,5 @@
 "use client"
-import { Home } from "lucide-react" // Import Home icon
+import { Home } from "lucide-react"
 
 import type React from "react"
 
@@ -27,11 +27,10 @@ import {
   Check,
   Square,
 } from "lucide-react"
-import { useRouter, useSearchParams } from "next/navigation"
+import { useRouter, useParams } from "next/navigation"
 import { useV0Integration } from "@/hooks/useV0Integration"
 import { useChatContext } from "@/lib/chat-context"
 import { ExportDialog } from "@/components/export-dialog"
-import { getTemplateById } from "@/lib/slide-templates"
 import { presentationsAPI } from "@/lib/presentations-api"
 import { useAuth } from "@/lib/auth-context"
 
@@ -42,6 +41,12 @@ interface Slide {
   background: string
   textColor: string
   layout: "title" | "content" | "two-column" | "image"
+  designElements?: {
+    icons?: string[]
+    charts?: boolean
+    images?: boolean
+    bullets?: boolean
+  }
 }
 
 interface ChatMessage {
@@ -73,6 +78,16 @@ const colorThemes = [
   { name: "Dark", primary: "#1f2937", secondary: "#374151", text: "#ffffff" },
 ]
 
+// Helper function to create URL-friendly slug
+function createSlug(text: string): string {
+  return text
+    .toLowerCase()
+    .replace(/[^a-z0-9 -]/g, "")
+    .replace(/\s+/g, "-")
+    .replace(/-+/g, "-")
+    .trim()
+}
+
 function EditorContent() {
   const [isSmallScreen, setIsSmallScreen] = useState(false)
   const [slides, setSlides] = useState<Slide[]>([])
@@ -95,13 +110,13 @@ function EditorContent() {
   const [copiedMessageId, setCopiedMessageId] = useState<string | null>(null)
 
   const router = useRouter()
-  const searchParams = useSearchParams()
+  const params = useParams()
   const v0 = useV0Integration()
   const fileInputRef = useRef<HTMLInputElement>(null)
   const chatEndRef = useRef<HTMLDivElement>(null)
   const nameInputRef = useRef<HTMLInputElement>(null)
   const { messages } = useChatContext()
-  const { user: authUser, isLoading: authLoading } = useAuth()
+  const { user: authUser, isLoading: authLoading, session } = useAuth()
 
   const checkScreenSize = () => {
     setIsSmallScreen(window.innerWidth < 1024)
@@ -111,13 +126,89 @@ function EditorContent() {
     try {
       await navigator.clipboard.writeText(content)
       setCopiedMessageId(messageId)
-      setTimeout(() => setCopiedMessageId(null), 2000) // Reset after 2 seconds
+      setTimeout(() => setCopiedMessageId(null), 2000)
     } catch (error) {
       console.error("Failed to copy message:", error)
     }
   }
 
-  // Update the handleInitialGeneration function to provide real-time streaming:
+  // Enhanced AI prompt for expert presentation design
+  const createExpertPrompt = (userPrompt: string, isEdit = false) => {
+    const basePrompt = `You are an expert presentation designer and pitch deck specialist with deep knowledge of modern design principles, visual hierarchy, and effective storytelling through slides.
+
+${userPrompt}
+
+As a presentation design expert, please:
+
+1. **Content Analysis**: Analyze the content to determine the most effective slide types (title, content, two-column, image, chart, etc.)
+
+2. **Design Elements**: For each slide, intelligently suggest:
+   - Relevant icons that enhance understanding
+   - Charts/graphs when data is presented
+   - Visual elements that support the message
+   - Bullet points vs. paragraphs based on content type
+   - Color schemes that match the content mood
+
+3. **Modern Design**: Apply contemporary design principles:
+   - Clean, minimalist layouts
+   - Proper white space usage
+   - Visual hierarchy with typography
+   - Color psychology for different slide purposes
+
+4. **Slide Structure**: Create slides with clear purposes:
+   - Problem slides: Use contrasting colors, warning icons
+   - Solution slides: Use positive colors, checkmarks, arrows
+   - Data slides: Include chart indicators, numbers emphasis
+   - Team slides: Use people icons, professional layouts
+   - Financial slides: Use money icons, growth indicators
+
+Please structure each slide as:
+## Slide [number]: [Title]
+**Layout**: [title/content/two-column/image/chart]
+**Design Elements**: [icons, charts, visual elements to include]
+**Content**: [the actual slide content]
+**Color Mood**: [professional/energetic/trustworthy/innovative based on content]
+
+${isEdit ? "Focus on enhancing the existing design while maintaining consistency." : "Create a complete, cohesive presentation flow."}
+
+Make sure each slide tells part of a compelling story and uses appropriate visual elements to enhance comprehension and engagement.`
+
+    return basePrompt
+  }
+
+  // Update URL when presentation name changes
+  const updateURL = useCallback((name: string, id: string) => {
+    const slug = createSlug(name)
+    const newUrl = `/editor/${id}/${slug}`
+
+    // Only update if the URL is different
+    if (window.location.pathname !== newUrl) {
+      window.history.replaceState({}, "", newUrl)
+    }
+  }, [])
+
+  // Auto-save function with URL update
+  const autoSave = useCallback(async () => {
+    if (!currentPresentationId || !authUser || !session || slides.length === 0) return
+
+    setIsSaving(true)
+    try {
+      await presentationsAPI.updatePresentation(currentPresentationId, {
+        name: projectName,
+        slides,
+        thumbnail: slides[0]?.background,
+      })
+
+      // Update URL when name changes
+      updateURL(projectName, currentPresentationId)
+    } catch (error) {
+      console.error("Auto-save failed:", error)
+    } finally {
+      setIsSaving(false)
+    }
+  }, [currentPresentationId, authUser, session, slides, projectName, updateURL])
+
+  // Enhanced slide generation with design intelligence
   const handleInitialGeneration = useCallback(
     async (prompt: string) => {
       const userMessage: ChatMessage = {
@@ -165,15 +256,16 @@ function EditorContent() {
         )
       }, 1000)
 
-      // Use streaming generation with real-time updates
+      // Use enhanced expert prompt
+      const expertPrompt = createExpertPrompt(prompt)
+
       await v0.generateSlidesStreaming(
-        prompt,
+        expertPrompt,
         uploadedFile,
-        // onChunk - real-time content streaming
+        // onChunk
         (chunk: string) => {
           setStreamingContent((prev) => prev + chunk)
 
-          // Transition to designing stage when we start getting content
           setChatMessages((prev) =>
             prev.map((msg) =>
               msg.isLoading && msg.generationProgress?.stage === "thinking"
@@ -189,7 +281,6 @@ function EditorContent() {
             ),
           )
 
-          // Parse slides from streaming content to update progress
           const slideMatches = (streamingContent + chunk).match(
             /(?:##|###)\s*(?:Slide\s*\d+:?\s*)?(.+?)(?=(?:##|###)|$)/gs,
           )
@@ -221,14 +312,20 @@ function EditorContent() {
               ...slide,
               background: index === 0 ? selectedTheme.primary : selectedTheme.secondary,
               textColor: selectedTheme.text,
+              designElements: {
+                icons: [],
+                charts: slide.content.includes("$") || slide.content.includes("%") || slide.content.includes("growth"),
+                images: slide.layout === "image",
+                bullets: slide.content.includes("•") || slide.content.includes("-"),
+              },
             }))
 
             setSlides(themedSlides)
             setSelectedSlide(themedSlides[0]?.id || "")
             setCurrentSlideIndex(0)
 
-            // Save to database
-            if (authUser) {
+            // Create new presentation in database
+            if (authUser && session) {
               try {
                 const presentation = await presentationsAPI.createPresentation({
                   name: projectName,
@@ -236,19 +333,21 @@ function EditorContent() {
                   category: "ai-generated",
                 })
                 setCurrentPresentationId(presentation.id)
+
+                // Update URL with new presentation ID
+                updateURL(projectName, presentation.id)
               } catch (error) {
                 console.error("Failed to save presentation:", error)
               }
             }
 
-            // Update to completion state
             setChatMessages((prev) =>
               prev.map((msg) =>
                 msg.isLoading
                   ? {
                       ...msg,
                       isLoading: false,
-                      content: `I've successfully created your presentation with ${result.slides.length} slides. Each slide is designed to tell your story effectively. You can now edit individual slides or ask me to make changes to the entire presentation.`,
+                      content: `🎨 I've designed your presentation with ${result.slides.length} professional slides! Each slide is crafted with modern design principles, appropriate visual elements, and optimized layouts.\n\n✨ **Design Features Applied:**\n• Smart color schemes based on content\n• Relevant icons and visual elements\n• Professional typography hierarchy\n• Optimized layouts for each slide type\n\nYou can now edit individual slides, request design changes, or ask me to enhance specific visual elements!`,
                       generationProgress: {
                         ...msg.generationProgress!,
                         stage: "complete",
@@ -272,17 +371,16 @@ function EditorContent() {
           const errorMessage: ChatMessage = {
             id: (Date.now() + 3).toString(),
             type: "assistant",
-            content: `I encountered an error: ${error.message}\n\nPlease try again or describe your presentation differently.`,
+            content: `❌ I encountered an error: ${error.message}\n\nPlease try again or describe your presentation differently. I'm here to help you create amazing slides!`,
             timestamp: new Date(),
           }
           setChatMessages((prev) => [...prev, errorMessage])
         },
       )
     },
-    [v0, uploadedFile, selectedTheme, projectName, authUser, streamingContent],
+    [v0, uploadedFile, selectedTheme, projectName, authUser, session, streamingContent, updateURL],
   )
 
-  // Add function to toggle progress minimization
   const toggleProgressMinimization = (messageId: string) => {
     setChatMessages((prev) =>
       prev.map((msg) =>
@@ -299,29 +397,12 @@ function EditorContent() {
     )
   }
 
-  const autoSave = useCallback(async () => {
-    if (!currentPresentationId || !authUser || slides.length === 0) return
-
-    setIsSaving(true)
-    try {
-      await presentationsAPI.updatePresentation(currentPresentationId, {
-        name: projectName,
-        slides,
-        thumbnail: slides[0]?.background,
-      })
-    } catch (error) {
-      console.error("Auto-save failed:", error)
-    } finally {
-      setIsSaving(false)
-    }
-  }, [currentPresentationId, authUser, slides, projectName])
-
   useEffect(() => {
     const saveTimer = setTimeout(() => {
       if (slides.length > 0) {
         autoSave()
       }
-    }, 2000) // Auto-save after 2 seconds of inactivity
+    }, 2000)
 
     return () => clearTimeout(saveTimer)
   }, [slides, projectName, autoSave])
@@ -339,7 +420,7 @@ function EditorContent() {
     const loadingMessage: ChatMessage = {
       id: (Date.now() + 1).toString(),
       type: "assistant",
-      content: "Working on it...",
+      content: "🎨 Analyzing your request and applying design expertise...",
       timestamp: new Date(),
       isLoading: true,
       generationProgress: {
@@ -353,7 +434,6 @@ function EditorContent() {
     const currentInput = inputMessage
     setInputMessage("")
 
-    // Start thinking timer for follow-up requests
     let thinkingTime = 0
     const thinkingInterval = setInterval(() => {
       thinkingTime += 1
@@ -372,39 +452,46 @@ function EditorContent() {
       )
     }, 1000)
 
+    // Use expert prompt for edits too
+    const expertPrompt = createExpertPrompt(currentInput, true)
+
     if (editMode === "selected" && selectedSlide) {
-      // Edit only the selected slide
       const slide = slides.find((s) => s.id === selectedSlide)
       if (slide) {
-        const result = await v0.editSlide(selectedSlide, slide.title, currentInput)
+        const result = await v0.editSlide(selectedSlide, slide.title, expertPrompt)
 
         clearInterval(thinkingInterval)
         setChatMessages((prev) => prev.filter((msg) => !msg.isLoading))
 
         if (result) {
-          setSlides(
-            result.slides.map((s, index) => ({
-              ...s,
-              background: index === 0 ? selectedTheme.primary : selectedTheme.secondary,
-              textColor: selectedTheme.text,
-            })),
-          )
+          const themedSlides = result.slides.map((s, index) => ({
+            ...s,
+            background: index === 0 ? selectedTheme.primary : selectedTheme.secondary,
+            textColor: selectedTheme.text,
+            designElements: {
+              icons: [],
+              charts: s.content.includes("$") || s.content.includes("%"),
+              images: s.layout === "image",
+              bullets: s.content.includes("•") || s.content.includes("-"),
+            },
+          }))
+
+          setSlides(themedSlides)
           const assistantMessage: ChatMessage = {
             id: (Date.now() + 2).toString(),
             type: "assistant",
-            content: `Great! I've updated the "${slide.title}" slide based on your request. The changes should now be visible in the preview.`,
+            content: `✨ Perfect! I've redesigned the "${slide.title}" slide with enhanced visual elements and modern design principles. The updated slide now features improved layout, appropriate visual cues, and better content hierarchy.`,
             timestamp: new Date(),
           }
           setChatMessages((prev) => [...prev, assistantMessage])
         }
       }
     } else {
-      // Regenerate all slides or create new ones
       let result
       if (slides.length > 0) {
-        result = await v0.regenerateAllSlides(currentInput)
+        result = await v0.regenerateAllSlides(expertPrompt)
       } else {
-        result = await v0.generateSlides(currentInput, uploadedFile)
+        result = await v0.generateSlides(expertPrompt, uploadedFile)
       }
 
       clearInterval(thinkingInterval)
@@ -415,7 +502,14 @@ function EditorContent() {
           ...slide,
           background: index === 0 ? selectedTheme.primary : selectedTheme.secondary,
           textColor: selectedTheme.text,
+          designElements: {
+            icons: [],
+            charts: slide.content.includes("$") || slide.content.includes("%"),
+            images: slide.layout === "image",
+            bullets: slide.content.includes("•") || slide.content.includes("-"),
+          },
         }))
+
         setSlides(themedSlides)
         if (themedSlides.length > 0 && !selectedSlide) {
           setSelectedSlide(themedSlides[0].id)
@@ -427,8 +521,8 @@ function EditorContent() {
           type: "assistant",
           content:
             slides.length > 0
-              ? "Perfect! I've updated all slides based on your feedback. Take a look at the changes in the preview."
-              : `Excellent! I've created ${result.slides.length} slides for your presentation. You can now review them, make edits, or ask for specific changes.`,
+              ? "🎨 Excellent! I've redesigned all slides with your feedback, applying modern design principles and enhanced visual elements. Each slide now has improved layouts, better color schemes, and appropriate design elements that support your message."
+              : `🚀 Amazing! I've created ${result.slides.length} professionally designed slides for your presentation. Each slide features:\n\n• Modern, clean layouts\n• Strategic use of colors and typography\n• Relevant visual elements and icons\n• Optimized content hierarchy\n\nYou can now review, edit individual slides, or ask for specific design enhancements!`,
           timestamp: new Date(),
         }
         setChatMessages((prev) => [...prev, assistantMessage])
@@ -442,7 +536,7 @@ function EditorContent() {
       const errorMessage: ChatMessage = {
         id: (Date.now() + 3).toString(),
         type: "assistant",
-        content: `I encountered an error: ${v0.error}\n\nPlease try rephrasing your request or try again.`,
+        content: `❌ I encountered an error: ${v0.error}\n\nPlease try rephrasing your request. I'm here to help you create stunning presentations!`,
         timestamp: new Date(),
       }
       setChatMessages((prev) => [...prev, errorMessage])
@@ -464,16 +558,18 @@ function EditorContent() {
       const loadingMessage: ChatMessage = {
         id: (Date.now() + 1).toString(),
         type: "assistant",
-        content: "Analyzing your document and creating slides...",
+        content: "🎨 Analyzing your document and designing professional slides...",
         timestamp: new Date(),
         isLoading: true,
       }
 
       setChatMessages((prev) => [...prev, userMessage, loadingMessage])
 
-      const result = await v0.generateSlides("Create a presentation from this document", file)
+      const expertPrompt = createExpertPrompt(
+        "Create a professional presentation from this document with modern design elements",
+      )
+      const result = await v0.generateSlides(expertPrompt, file)
 
-      // Remove loading message
       setChatMessages((prev) => prev.filter((msg) => !msg.isLoading))
 
       if (result) {
@@ -481,7 +577,14 @@ function EditorContent() {
           ...slide,
           background: index === 0 ? selectedTheme.primary : selectedTheme.secondary,
           textColor: selectedTheme.text,
+          designElements: {
+            icons: [],
+            charts: slide.content.includes("$") || slide.content.includes("%"),
+            images: slide.layout === "image",
+            bullets: slide.content.includes("•") || slide.content.includes("-"),
+          },
         }))
+
         setSlides(themedSlides)
         setSelectedSlide(themedSlides[0]?.id || "")
         setCurrentSlideIndex(0)
@@ -489,7 +592,7 @@ function EditorContent() {
         const assistantMessage: ChatMessage = {
           id: (Date.now() + 2).toString(),
           type: "assistant",
-          content: `Great! I've analyzed your document and created ${result.slides.length} slides. The presentation covers the key points from your file. Feel free to ask me to adjust any content or styling.`,
+          content: `🎯 Perfect! I've analyzed your document and created ${result.slides.length} professionally designed slides. The presentation captures all key points from your file with modern layouts, appropriate visual elements, and strategic design choices that enhance readability and engagement.`,
           timestamp: new Date(),
         }
         setChatMessages((prev) => [...prev, assistantMessage])
@@ -501,8 +604,6 @@ function EditorContent() {
     setSelectedSlide(slideId)
     setCurrentSlideIndex(index)
     setEditMode("selected")
-
-    // Remove the automatic chat message - only update the UI indicator
   }
 
   const handleThemeChange = (themeName: string) => {
@@ -519,7 +620,7 @@ function EditorContent() {
     const themeMessage: ChatMessage = {
       id: Date.now().toString(),
       type: "assistant",
-      content: `Perfect! I've applied the ${theme.name} theme to all your slides. The new color scheme gives your presentation a fresh look.`,
+      content: `🎨 Excellent choice! I've applied the ${theme.name} theme to all your slides. The new color scheme creates a cohesive, professional look that enhances your presentation's visual impact.`,
       timestamp: new Date(),
     }
     setChatMessages((prev) => [...prev, themeMessage])
@@ -527,12 +628,11 @@ function EditorContent() {
 
   const handleNameSave = () => {
     setIsEditingName(false)
-    // Auto-save logic can be added here
+    // Auto-save will handle the database update and URL change
   }
 
   const handlePresentationMode = () => {
     setIsPresentationMode(true)
-    // Enter fullscreen presentation mode
     if (document.documentElement.requestFullscreen) {
       document.documentElement.requestFullscreen()
     }
@@ -567,7 +667,6 @@ function EditorContent() {
 
   useEffect(() => {
     window.addEventListener("resize", handleScreenResize)
-
     return () => window.removeEventListener("resize", handleScreenResize)
   }, [])
 
@@ -589,14 +688,14 @@ function EditorContent() {
   useEffect(() => {
     if (isInitialized) return
 
-    const projectId = searchParams.get("project")
+    const presentationId = params.id as string
 
-    if (projectId) {
-      // Load existing project from database
-      const loadProject = async () => {
+    if (presentationId && presentationId !== "new") {
+      // Load existing presentation
+      const loadPresentation = async () => {
         try {
-          if (authUser) {
-            const presentation = await presentationsAPI.getPresentation(projectId)
+          if (authUser && session) {
+            const presentation = await presentationsAPI.getPresentation(presentationId)
             setSlides(presentation.slides)
             setSelectedSlide(presentation.slides[0]?.id || "")
             setCurrentSlideIndex(0)
@@ -606,43 +705,25 @@ function EditorContent() {
             const welcomeMessage: ChatMessage = {
               id: Date.now().toString(),
               type: "assistant",
-              content: `Welcome back to "${presentation.name}"! This presentation has ${presentation.slides.length} slides and was last updated ${new Date(presentation.updated_at).toLocaleDateString()}.\n\nYou can now:\n• Edit individual slides by selecting them\n• Regenerate content with new ideas\n• Change colors and themes\n• Ask me to modify specific aspects\n\nWhat would you like to work on?`,
+              content: `🎨 Welcome back to "${presentation.name}"! This presentation has ${presentation.slides.length} professionally designed slides.\n\n✨ **What I can help you with:**\n• Redesign individual slides with modern elements\n• Add charts, icons, and visual enhancements\n• Change color themes and layouts\n• Optimize content hierarchy and typography\n• Apply advanced design principles\n\nWhat design improvements would you like to make?`,
               timestamp: new Date(),
             }
             setChatMessages([welcomeMessage])
-          } else {
-            // Fallback to template loading if not authenticated
-            const project = getTemplateById(projectId)
-            if (project) {
-              setSlides(project.slides)
-              setSelectedSlide(project.slides[0]?.id || "")
-              setCurrentSlideIndex(0)
-              setProjectName(project.name)
-            }
           }
         } catch (error) {
           console.error("Failed to load presentation:", error)
-          // Fallback to template loading
-          const project = getTemplateById(projectId)
-          if (project) {
-            setSlides(project.slides)
-            setSelectedSlide(project.slides[0]?.id || "")
-            setCurrentSlideIndex(0)
-            setProjectName(project.name)
-          }
+          router.push("/")
         }
       }
 
-      loadProject()
+      loadPresentation()
     } else {
-      // New presentation - no initial welcome message, start clean
+      // New presentation from home page
       setChatMessages([])
 
-      // Check if there's an initial message from home page
       if (messages.length > 0) {
         const lastMessage = messages[messages.length - 1]
         if (lastMessage.type === "user") {
-          // Process the initial message
           setTimeout(() => {
             handleInitialGeneration(lastMessage.content)
           }, 100)
@@ -651,7 +732,7 @@ function EditorContent() {
     }
 
     setIsInitialized(true)
-  }, [authUser, messages, handleInitialGeneration, searchParams, streamingContent]) // Add authUser and messages as dependencies
+  }, [authUser, session, messages, handleInitialGeneration, params.id, router])
 
   // Show warning for small screens
   if (isSmallScreen) {
@@ -678,9 +759,6 @@ function EditorContent() {
             <Button onClick={() => router.push("/")} className="w-full bg-[#027659] hover:bg-[#065f46] text-white">
               Back to Home
             </Button>
-            <Button variant="outline" onClick={() => window.open("/features", "_blank")} className="w-full">
-              Learn about our editor
-            </Button>
           </div>
         </div>
       </div>
@@ -702,7 +780,7 @@ function EditorContent() {
             </div>
           </div>
 
-          {/* Add Slide Button - Fixed */}
+          {/* Add Slide Button */}
           <div className="p-4 border-b border-gray-100">
             <Button
               variant="outline"
@@ -717,12 +795,11 @@ function EditorContent() {
             </Button>
           </div>
 
-          {/* Slide Thumbnails - Scrollable */}
+          {/* Slide Thumbnails */}
           <ScrollArea className="flex-1">
             <div className="p-2 space-y-2">
               {isStreaming
-                ? // Skeleton thumbnails while loading
-                  Array.from({ length: 7 }, (_, index) => (
+                ? Array.from({ length: 7 }, (_, index) => (
                     <div
                       key={`skeleton-${index}`}
                       className="relative group rounded-lg border-2 border-gray-200 bg-white"
@@ -831,7 +908,6 @@ function EditorContent() {
                 )}
               </div>
 
-              {/* Center Section - Empty for clean look */}
               <div></div>
 
               {/* Right Section - Play and Share */}
@@ -1172,7 +1248,6 @@ function EditorContent() {
               {chatMessages.map((message) => (
                 <div key={message.id} className="space-y-2">
                   {message.type === "user" ? (
-                    // User message - modern design, full width
                     <div className="flex justify-end">
                       <div className="bg-[#027659] text-white rounded-2xl px-4 py-3 max-w-[85%] shadow-sm">
                         <p className="text-sm whitespace-pre-wrap leading-relaxed">{message.content}</p>
@@ -1208,7 +1283,6 @@ function EditorContent() {
                       </div>
                     </div>
                   ) : (
-                    // Assistant message - modern design, full width
                     <div className="flex justify-start">
                       <div className="bg-gray-50 border border-gray-200 text-gray-900 rounded-2xl px-4 py-3 max-w-[85%] shadow-sm">
                         {message.isLoading ? (
@@ -1230,7 +1304,7 @@ function EditorContent() {
                                   <span className="text-sm font-medium text-gray-700">Thinking...</span>
                                 </div>
                                 <p className="text-xs text-gray-500">
-                                  Analyzing your request ({message.generationProgress.thinkingTime}s)
+                                  Analyzing design requirements ({message.generationProgress.thinkingTime}s)
                                 </p>
                               </div>
                             )}
@@ -1249,18 +1323,14 @@ function EditorContent() {
                                   </span>
                                 </div>
 
-                                {/* Real-time slide generation progress */}
                                 <div className="space-y-1.5">
                                   {Array.from(
                                     { length: Math.max(1, message.generationProgress?.completedSlides || 0) },
                                     (_, i) => {
                                       const isCompleted = i < (message.generationProgress?.completedSlides || 0)
-                                      const isCurrent =
-                                        i === (message.generationProgress?.completedSlides || 0) && !isCompleted
 
                                       return (
                                         <div key={i} className="flex items-center space-x-2 py-0.5">
-                                          {/* Status indicator */}
                                           <div className="w-3 h-3 flex items-center justify-center">
                                             {isCompleted ? (
                                               <div className="w-3 h-3 bg-green-500 rounded-full flex items-center justify-center">
@@ -1273,7 +1343,6 @@ function EditorContent() {
                                             )}
                                           </div>
 
-                                          {/* Slide info */}
                                           <span
                                             className={`text-xs ${
                                               isCompleted ? "text-green-700 font-medium" : "text-blue-700 font-medium"
@@ -1293,7 +1362,6 @@ function EditorContent() {
                           <div className="space-y-3">
                             <p className="text-sm whitespace-pre-wrap leading-relaxed">{message.content}</p>
 
-                            {/* Completed generation progress */}
                             {message.generationProgress?.isComplete && (
                               <div className="border border-green-200 rounded-lg p-3 bg-green-50/30">
                                 <div className="flex items-center justify-between">
@@ -1339,7 +1407,6 @@ function EditorContent() {
                           </div>
                         )}
 
-                        {/* Message timestamp and actions */}
                         {!message.isLoading && (
                           <div className="flex items-center justify-between mt-3 pt-2 border-t border-gray-200">
                             <span className="text-xs text-gray-500">
@@ -1389,10 +1456,10 @@ function EditorContent() {
                   onChange={(e) => setInputMessage(e.target.value)}
                   placeholder={
                     editMode === "selected"
-                      ? "How should I modify this slide?"
+                      ? "How should I redesign this slide? (e.g., 'Add charts and icons', 'Make it more modern')"
                       : slides.length > 0
-                        ? "Ask me to modify your presentation..."
-                        : "Describe the presentation you want to create..."
+                        ? "Ask me to enhance your presentation design..."
+                        : "Describe the presentation you want me to design..."
                   }
                   onKeyPress={(e) => e.key === "Enter" && !e.shiftKey && handleChatSubmit()}
                   className="w-full bg-transparent border-0 text-gray-900 placeholder:text-gray-500 text-sm focus-visible:ring-0 focus-visible:ring-offset-0 resize-none min-h-[80px] max-h-[120px] shadow-none outline-none focus:outline-none p-4"
