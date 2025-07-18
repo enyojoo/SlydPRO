@@ -288,7 +288,7 @@ function EditorContent({ params }: EditorContentProps) {
               }
             }
 
-            // Update to completion state
+            // Update to completion state with proper completion message
             const completedMessages = chatMessages.map((msg) =>
               msg.isLoading
                 ? {
@@ -614,7 +614,10 @@ function EditorContent({ params }: EditorContentProps) {
 
   const handleNameSave = () => {
     setIsEditingName(false)
-    // Auto-save logic can be added here
+    // Trigger auto-save when name changes
+    if (currentPresentationId && authUser) {
+      autoSave()
+    }
   }
 
   const handlePresentationMode = () => {
@@ -914,7 +917,7 @@ function EditorContent({ params }: EditorContentProps) {
                   style={{ width: `${Math.max(200, projectName.length * 8 + 24)}px` }}
                 />
                 {isSaving && (
-                  <div className="flex items-center space-x-2 text-sm text-muted-foreground">
+                  <div className="flex items-center space-x-2 text-sm text-muted-foreground mt-1">
                     <Loader2 className="h-3 w-3 animate-spin" />
                     <span>Saving...</span>
                   </div>
@@ -1395,7 +1398,7 @@ function EditorContent({ params }: EditorContentProps) {
                                   </div>
                                   <div className="flex items-center space-x-2">
                                     <span className="text-xs text-green-600 font-medium px-2 py-0.5 bg-green-100 rounded-md">
-                                      Complete
+                                      Designed
                                     </span>
                                     <Button
                                       size="sm"
