@@ -2,25 +2,44 @@
 
 import { useAuth } from "@/lib/auth-context"
 import { ChatProvider } from "@/lib/chat-context"
-import EditorContent from "./editor-content"
+import { EditorContent } from "./editor-content"
+import { useRouter } from "next/navigation"
+import { useEffect } from "react"
 
-export default function EditorWrapper() {
-  const { isLoading } = useAuth()
+interface EditorWrapperProps {
+  presentationId: string
+  slug: string
+  file?: string
+}
+
+export function EditorWrapper({ presentationId, slug, file }: EditorWrapperProps) {
+  const { isAuthenticated, isLoading } = useAuth()
+  const router = useRouter()
+
+  useEffect(() => {
+    if (!isLoading && !isAuthenticated) {
+      router.push("/")
+    }
+  }, [isAuthenticated, isLoading, router])
 
   if (isLoading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="text-center">
-          <div className="w-8 h-8 border-4 border-[#027659] border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#027659] mx-auto mb-4"></div>
           <p className="text-muted-foreground">Loading...</p>
         </div>
       </div>
     )
   }
 
+  if (!isAuthenticated) {
+    return null
+  }
+
   return (
     <ChatProvider>
-      <EditorContent />
+      <EditorContent presentationId={presentationId} slug={slug} file={file} />
     </ChatProvider>
   )
 }

@@ -1,103 +1,49 @@
-import type { NextRequest } from "next/server"
+import { type NextRequest, NextResponse } from "next/server"
 
 export async function POST(request: NextRequest) {
   try {
-    const { message } = await request.json()
+    const body = await request.json()
+    const { messages, chatId } = body
 
-    console.log("V0 streaming request:", { message: message?.substring(0, 100) + "..." })
-
-    const apiKey = process.env.V0_API_KEY
-    if (!apiKey) {
-      console.error("V0 API key not configured")
-      return new Response("V0 API key not configured", { status: 500 })
+    // Get V0 API key from environment
+    const v0ApiKey = process.env.V0_API_KEY
+    if (!v0ApiKey) {
+      return NextResponse.json({ error: "V0 API key not configured" }, { status: 500 })
     }
 
-    // Create a streaming response
-    const stream = new ReadableStream({
-      async start(controller) {
-        try {
-          console.log("Starting V0 streaming request...")
-
-          const response = await fetch("https://api.v0.dev/v1/chats", {
-            method: "POST",
-            headers: {
-              Authorization: `Bearer ${apiKey}`,
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({
-              message,
-              stream: true,
-            }),
-          })
-
-          console.log("V0 streaming response status:", response.status)
-
-          if (!response.ok) {
-            const errorText = await response.text()
-            console.error("V0 streaming error:", response.status, errorText)
-            controller.error(new Error(`V0 API error: ${response.status} - ${errorText}`))
-            return
-          }
-
-          if (!response.body) {
-            controller.error(new Error("No response body"))
-            return
-          }
-
-          const reader = response.body.getReader()
-          const decoder = new TextDecoder()
-
-          try {
-            while (true) {
-              const { done, value } = await reader.read()
-
-              if (done) {
-                break
-              }
-
-              const chunk = decoder.decode(value, { stream: true })
-              const lines = chunk.split("\n")
-
-              for (const line of lines) {
-                if (line.startsWith("data: ")) {
-                  const data = line.slice(6)
-                  if (data === "[DONE]") {
-                    controller.close()
-                    return
-                  }
-
-                  try {
-                    const parsed = JSON.parse(data)
-                    const streamData = `data: ${JSON.stringify({ chunk: parsed.content || parsed.delta?.content || "" })}\n\n`
-                    controller.enqueue(new TextEncoder().encode(streamData))
-                  } catch (parseError) {
-                    // Skip invalid JSON
-                    continue
-                  }
-                }
-              }
-            }
-          } finally {
-            reader.releaseLock()
-          }
-
-          controller.close()
-        } catch (error) {
-          console.error("V0 streaming error:", error)
-          controller.error(error)
-        }
+    // Make request to V0 API
+    const response = await fetch("https://api.v0.dev/chat/completions", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${v0ApiKey}`,
       },
+      body: JSON.stringify({
+        messages,
+        model: "v0-1",
+        stream: true,
+      }),
     })
 
-    return new Response(stream, {
+    if (!response.ok) {
+      console.error("V0 API error:", response.status, response.statusText)
+      return NextResponse.json({ error: "V0 API request failed" }, { status: response.status })
+    }
+
+    // Return the streaming response
+    return new Response(response.body, {
       headers: {
-        "Content-Type": "text/event-stream",
+        "Content-Type": "text/plain; charset=utf-8",
         "Cache-Control": "no-cache",
         Connection: "keep-alive",
       },
     })
   } catch (error) {
-    console.error("Streaming error:", error)
-    return new Response("Streaming failed", { status: 500 })
+    console.error("Stream error:", error)
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 })
   }
+}
+
+export async function GET() {
+  return NextResponse.json({ error: "Method not allowed" }, { status: 405 })
 }
