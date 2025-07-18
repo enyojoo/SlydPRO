@@ -75,7 +75,6 @@ const colorThemes = [
 interface EditorContentProps {
   params: {
     id: string
-    slug: string
   }
 }
 
@@ -126,28 +125,19 @@ function EditorContent({ params }: EditorContentProps) {
   // Save chat history to database
   const saveChatHistory = useCallback(
     async (messages: ChatMessage[]) => {
-      if (!currentPresentationId || !authUser) {
-        console.log("Cannot save chat history: missing presentation ID or user")
-        return
-      }
+      if (!currentPresentationId || !authUser) return
 
       try {
-        console.log("Saving chat history:", messages.length, "messages")
-
-        const chatHistoryData = messages.map((msg) => ({
-          id: msg.id,
-          type: msg.type,
-          content: msg.content,
-          timestamp: msg.timestamp.toISOString(),
-          isLoading: msg.isLoading || false,
-          generationProgress: msg.generationProgress || null,
-        }))
-
         await presentationsAPI.updatePresentation(currentPresentationId, {
-          chat_history: chatHistoryData,
+          chat_history: messages.map((msg) => ({
+            id: msg.id,
+            type: msg.type,
+            content: msg.content,
+            timestamp: msg.timestamp.toISOString(),
+            isLoading: msg.isLoading,
+            generationProgress: msg.generationProgress,
+          })),
         })
-
-        console.log("Chat history saved successfully")
       } catch (error) {
         console.error("Failed to save chat history:", error)
       }
@@ -276,8 +266,6 @@ function EditorContent({ params }: EditorContentProps) {
             // Save to database and redirect to new URL
             if (authUser) {
               try {
-                console.log("Creating new presentation with slides:", themedSlides.length)
-
                 const presentation = await presentationsAPI.createPresentation({
                   name: projectName,
                   slides: themedSlides,
@@ -286,22 +274,14 @@ function EditorContent({ params }: EditorContentProps) {
                 })
                 setCurrentPresentationId(presentation.id)
 
-                // Generate slug from project name
-                const slug = projectName
-                  .toLowerCase()
-                  .replace(/[^a-z0-9]+/g, "-")
-                  .replace(/(^-|-$)/g, "")
-
                 // Update URL without page reload
-                window.history.replaceState(null, "", `/editor/${presentation.id}/${slug}`)
-
-                console.log("Presentation created successfully:", presentation.id)
+                window.history.replaceState(null, "", `/editor/${presentation.id}`)
               } catch (error) {
                 console.error("Failed to save presentation:", error)
               }
             }
 
-            // Update to completion state with proper completion message
+            // Update to completion state
             const completedMessages = chatMessages.map((msg) =>
               msg.isLoading
                 ? {
@@ -322,13 +302,10 @@ function EditorContent({ params }: EditorContentProps) {
 
             setChatMessages(completedMessages)
 
-            // Save chat history after completion with delay to ensure presentation is created
-            setTimeout(async () => {
-              if (currentPresentationId || authUser) {
-                console.log("Saving initial chat history")
-                await saveChatHistory(completedMessages)
-              }
-            }, 2000)
+            // Save chat history after completion
+            setTimeout(() => {
+              saveChatHistory(completedMessages)
+            }, 1000)
           }
         },
         // onError
@@ -372,78 +349,39 @@ function EditorContent({ params }: EditorContentProps) {
   }
 
   const autoSave = useCallback(async () => {
-    if (!currentPresentationId || !authUser) return
+    if (!currentPresentationId || !authUser || slides.length === 0) return
 
     setIsSaving(true)
     try {
-      // Prepare the update data
-      const updateData: any = {
+      await presentationsAPI.updatePresentation(currentPresentationId, {
         name: projectName,
-      }
-
-      // Only include slides if we have them
-      if (slides.length > 0) {
-        updateData.slides = slides
-        // Generate thumbnail from first slide if available
-        if (slides[0]) {
-          updateData.thumbnail = slides[0].background // Simple thumbnail for now
-        }
-      }
-
-      // Only include chat history if we have messages
-      if (chatMessages.length > 0) {
-        updateData.chat_history = chatMessages.map((msg) => ({
+        slides,
+        thumbnail: slides[0]?.background,
+        chat_history: chatMessages.map((msg) => ({
           id: msg.id,
           type: msg.type,
           content: msg.content,
           timestamp: msg.timestamp.toISOString(),
-          isLoading: msg.isLoading || false,
-          generationProgress: msg.generationProgress || null,
-        }))
-      }
-
-      console.log("Auto-saving data:", {
-        presentationId: currentPresentationId,
-        slidesCount: slides.length,
-        messagesCount: chatMessages.length,
-        updateData: Object.keys(updateData),
+          isLoading: msg.isLoading,
+          generationProgress: msg.generationProgress,
+        })),
       })
-
-      await presentationsAPI.updatePresentation(currentPresentationId, updateData)
-
-      // Update URL slug if name changed
-      const currentSlug = params.slug
-      const newSlug = projectName
-        .toLowerCase()
-        .replace(/[^a-z0-9]+/g, "-")
-        .replace(/(^-|-$)/g, "")
-
-      if (currentSlug !== newSlug) {
-        window.history.replaceState(null, "", `/editor/${currentPresentationId}/${newSlug}`)
-      }
-
-      console.log("Auto-save completed successfully")
     } catch (error) {
       console.error("Auto-save failed:", error)
     } finally {
       setIsSaving(false)
     }
-  }, [currentPresentationId, authUser, slides, projectName, params.slug, chatMessages])
+  }, [currentPresentationId, authUser, slides, projectName, chatMessages])
 
-  // Update the useEffect for auto-save to trigger more reliably
   useEffect(() => {
-    if (!isInitialized || !currentPresentationId || !authUser) return
-
     const saveTimer = setTimeout(() => {
-      // Save if we have slides OR chat messages OR name changes
-      if (slides.length > 0 || chatMessages.length > 0 || projectName !== "Untitled Presentation") {
-        console.log("Triggering auto-save due to changes")
+      if (slides.length > 0 || chatMessages.length > 0) {
         autoSave()
       }
-    }, 3000) // Increased to 3 seconds to avoid too frequent saves
+    }, 2000) // Auto-save after 2 seconds of inactivity
 
     return () => clearTimeout(saveTimer)
-  }, [slides, projectName, chatMessages, autoSave, isInitialized, currentPresentationId, authUser])
+  }, [slides, projectName, chatMessages, autoSave])
 
   const handleChatSubmit = async () => {
     if (!inputMessage.trim() || v0.isLoading) return
@@ -656,33 +594,9 @@ function EditorContent({ params }: EditorContentProps) {
     saveChatHistory(updatedMessages)
   }
 
-  const handleNameSave = async () => {
+  const handleNameSave = () => {
     setIsEditingName(false)
-    // Immediately trigger save when name changes
-    if (currentPresentationId && authUser && projectName.trim()) {
-      setIsSaving(true)
-      try {
-        console.log("Saving name change:", projectName)
-
-        await presentationsAPI.updatePresentation(currentPresentationId, {
-          name: projectName.trim(),
-        })
-
-        // Update URL slug if name changed
-        const newSlug = projectName
-          .toLowerCase()
-          .replace(/[^a-z0-9]+/g, "-")
-          .replace(/(^-|-$)/g, "")
-
-        window.history.replaceState(null, "", `/editor/${currentPresentationId}/${newSlug}`)
-
-        console.log("Name saved successfully")
-      } catch (error) {
-        console.error("Failed to save name:", error)
-      } finally {
-        setIsSaving(false)
-      }
-    }
+    // Auto-save logic can be added here
   }
 
   const handlePresentationMode = () => {
@@ -973,16 +887,7 @@ function EditorContent({ params }: EditorContentProps) {
                 <Input
                   ref={nameInputRef}
                   value={projectName}
-                  onChange={(e) => {
-                    setProjectName(e.target.value)
-                    // Trigger save after user stops typing
-                    clearTimeout(nameInputRef.current?.dataset.timeout)
-                    nameInputRef.current.dataset.timeout = setTimeout(() => {
-                      if (e.target.value.trim() && currentPresentationId && authUser) {
-                        handleNameSave()
-                      }
-                    }, 1000)
-                  }}
+                  onChange={(e) => setProjectName(e.target.value)}
                   onFocus={handleNameInputFocus}
                   onBlur={handleNameInputBlur}
                   onKeyPress={handleNameInputKeyPress}
@@ -991,7 +896,7 @@ function EditorContent({ params }: EditorContentProps) {
                   style={{ width: `${Math.max(200, projectName.length * 8 + 24)}px` }}
                 />
                 {isSaving && (
-                  <div className="flex items-center space-x-2 text-sm text-muted-foreground mt-1">
+                  <div className="flex items-center space-x-2 text-sm text-muted-foreground">
                     <Loader2 className="h-3 w-3 animate-spin" />
                     <span>Saving...</span>
                   </div>
@@ -1472,7 +1377,7 @@ function EditorContent({ params }: EditorContentProps) {
                                   </div>
                                   <div className="flex items-center space-x-2">
                                     <span className="text-xs text-green-600 font-medium px-2 py-0.5 bg-green-100 rounded-md">
-                                      Designed
+                                      Complete
                                     </span>
                                     <Button
                                       size="sm"
@@ -1620,14 +1525,3 @@ function EditorContent({ params }: EditorContentProps) {
 }
 
 export default EditorContent
-
-// Auto-save name changes
-useEffect(() => {
-  if (projectName && currentPresentationId && authUser && isInitialized) {
-    const timeoutId = setTimeout(() => {
-      handleNameSave()
-    }, 2000)
-
-    return () => clearTimeout(timeoutId)
-  }
-}, [projectName, currentPresentationId, authUser, isInitialized])

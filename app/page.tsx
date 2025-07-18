@@ -126,7 +126,7 @@ export default function SlydPROHome() {
         addMessage(userMessage)
 
         // Redirect to new editor URL
-        router.push(`/editor/${presentation.id}/${slug}`)
+        router.push(`/editor/${presentation.id}`)
       } else {
         console.error("Failed to create presentation")
       }
@@ -176,7 +176,7 @@ export default function SlydPROHome() {
             addMessage(userMessage)
 
             // Redirect to new editor URL
-            router.push(`/editor/${presentation.id}/${slug}?file=${encodeURIComponent(file.name)}`)
+            router.push(`/editor/${presentation.id}?file=${encodeURIComponent(file.name)}`)
           }
         } catch (error) {
           console.error("Error creating presentation:", error)
@@ -275,6 +275,10 @@ export default function SlydPROHome() {
     }
   }
 
+  const handleOpenPresentation = (presentation: Presentation) => {
+    router.push(`/editor/${presentation.id}`)
+  }
+
   // Show only first 6 presentations on home page
   const recentPresentations = presentations.slice(0, 6)
 
@@ -368,11 +372,7 @@ export default function SlydPROHome() {
                     key={presentation.id}
                     className="cursor-pointer hover:shadow-lg transition-all duration-200 border border-border hover:border-muted-foreground bg-card overflow-hidden"
                     onClick={() => {
-                      const slug = presentation.name
-                        .toLowerCase()
-                        .replace(/[^a-z0-9]+/g, "-")
-                        .replace(/(^-|-$)/g, "")
-                      router.push(`/editor/${presentation.id}/${slug}`)
+                      router.push(`/editor/${presentation.id}`)
                     }}
                   >
                     {/* Actual Slide Thumbnail */}

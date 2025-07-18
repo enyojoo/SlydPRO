@@ -17,7 +17,6 @@ const EditorContent = dynamic(() => import("./editor-content"), {
 interface EditorWrapperProps {
   params: {
     id: string
-    slug: string
   }
 }
 

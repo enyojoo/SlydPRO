@@ -10,7 +10,6 @@ export const metadata: Metadata = {
 interface EditorPageProps {
   params: {
     id: string
-    slug: string
   }
 }
 

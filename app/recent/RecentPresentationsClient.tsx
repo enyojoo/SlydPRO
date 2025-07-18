@@ -54,12 +54,7 @@ export default function RecentPresentationsClient() {
   }
 
   const handleOpenPresentation = (presentation: Presentation) => {
-    const slug = presentation.name
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, "-")
-      .replace(/(^-|-$)/g, "")
-
-    router.push(`/editor/${presentation.id}/${slug}`)
+    router.push(`/editor/${presentation.id}`)
   }
 
   if (authLoading || isLoading) {
