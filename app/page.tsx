@@ -98,11 +98,16 @@ export default function SlydPROHome() {
 
     // Create new presentation first
     try {
-      const response = await fetch("/api/presentations/create-new", {
+      const response = await fetch("/api/presentations", {
         method: "POST",
         headers: {
+          "Content-Type": "application/json",
           Authorization: `Bearer ${session?.access_token}`,
         },
+        body: JSON.stringify({
+          name: "Untitled Presentation",
+          slides: [],
+        }),
       })
 
       if (response.ok) {
@@ -141,11 +146,16 @@ export default function SlydPROHome() {
       // Create new presentation and redirect
       const createAndRedirect = async () => {
         try {
-          const response = await fetch("/api/presentations/create-new", {
+          const response = await fetch("/api/presentations", {
             method: "POST",
             headers: {
+              "Content-Type": "application/json",
               Authorization: `Bearer ${session?.access_token}`,
             },
+            body: JSON.stringify({
+              name: "Untitled Presentation",
+              slides: [],
+            }),
           })
 
           if (response.ok) {

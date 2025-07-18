@@ -74,9 +74,6 @@ export async function POST(request: NextRequest) {
           name,
           slides: slides || [],
           thumbnail,
-          category,
-          is_starred: false,
-          views: 0,
         },
       ])
       .select()
