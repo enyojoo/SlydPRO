@@ -720,87 +720,180 @@ function EditorContent() {
           {/* Slide Thumbnails - Scrollable */}
           <ScrollArea className="flex-1">
             <div className="p-2 space-y-2">
-              {isStreaming
-                ? // Skeleton thumbnails while loading
-                  Array.from({ length: 7 }, (_, index) => (
-                    <div
-                      key={`skeleton-${index}`}
-                      className="relative group rounded-lg border-2 border-gray-200 bg-white"
-                    >
-                      <div className="absolute -left-2 top-2 z-10">
-                        <div className="w-6 h-6 rounded-full bg-gray-200 animate-pulse"></div>
+              {isStreaming ? (
+                // Skeleton thumbnails while loading
+                <div className="relative">
+                  {/* Design-focused Skeleton Slide */}
+                  <div className="lg:w-[632px] lg:h-[355px] xl:w-[732px] xl:h-[412px] 2xl:w-[816px] 2xl:h-[459px] 3xl:w-[980px] 3xl:h-[551px] shadow-2xl rounded-lg overflow-hidden border-4 border-white bg-gradient-to-br from-gray-100 to-gray-200 relative">
+                    <div className="h-full p-12 flex flex-col justify-center items-center relative overflow-hidden">
+                      {/* Animated paint strokes in background */}
+                      <div className="absolute inset-0 opacity-20">
+                        <div
+                          className="absolute top-8 left-8 w-32 h-1 bg-[#027659] rounded-full animate-pulse"
+                          style={{ animationDelay: "0s" }}
+                        ></div>
+                        <div
+                          className="absolute top-16 left-12 w-24 h-1 bg-[#10b981] rounded-full animate-pulse"
+                          style={{ animationDelay: "0.5s" }}
+                        ></div>
+                        <div
+                          className="absolute top-24 left-16 w-40 h-1 bg-[#027659] rounded-full animate-pulse"
+                          style={{ animationDelay: "1s" }}
+                        ></div>
+
+                        <div
+                          className="absolute bottom-20 right-8 w-28 h-1 bg-[#10b981] rounded-full animate-pulse"
+                          style={{ animationDelay: "1.5s" }}
+                        ></div>
+                        <div
+                          className="absolute bottom-12 right-12 w-36 h-1 bg-[#027659] rounded-full animate-pulse"
+                          style={{ animationDelay: "2s" }}
+                        ></div>
+
+                        <div
+                          className="absolute top-1/2 left-1/4 w-20 h-1 bg-[#10b981] rounded-full animate-pulse"
+                          style={{ animationDelay: "0.8s" }}
+                        ></div>
+                        <div
+                          className="absolute top-1/2 right-1/4 w-32 h-1 bg-[#027659] rounded-full animate-pulse"
+                          style={{ animationDelay: "1.3s" }}
+                        ></div>
                       </div>
-                      <div className="p-3 pt-4">
-                        <div className="w-full aspect-video rounded border overflow-hidden bg-gray-200 animate-pulse">
-                          <div className="p-2 h-full flex flex-col space-y-2">
-                            <div className="h-2 bg-gray-300 rounded animate-pulse"></div>
-                            <div className="h-1 bg-gray-300 rounded animate-pulse w-3/4"></div>
-                            <div className="h-1 bg-gray-300 rounded animate-pulse w-1/2"></div>
+
+                      <div className="text-center space-y-6 z-10">
+                        <div className="flex items-center justify-center space-x-3">
+                          {/* Design brush icon with animation */}
+                          <div className="relative">
+                            <svg
+                              className="w-8 h-8 text-[#027659] animate-pulse"
+                              fill="currentColor"
+                              viewBox="0 0 24 24"
+                            >
+                              <path d="M9.4 16.6L4.8 12l4.6-4.6L8 6l-6 6 6 6 1.4-1.4zm5.2 0L19.2 12l-4.6-4.6L16 6l6 6-6 6-1.4-1.4z" />
+                            </svg>
+                            <div className="absolute -top-1 -right-1 w-3 h-3 bg-[#10b981] rounded-full animate-ping"></div>
+                          </div>
+                          <h2 className="text-4xl font-bold text-[#027659]">SlydPRO Designing</h2>
+                        </div>
+
+                        {/* Animated design elements */}
+                        <div className="flex justify-center items-center space-x-4">
+                          <div className="flex space-x-2">
+                            <div className="w-3 h-3 bg-[#027659] rounded-full animate-bounce"></div>
+                            <div
+                              className="w-3 h-3 bg-[#10b981] rounded-full animate-bounce"
+                              style={{ animationDelay: "0.1s" }}
+                            ></div>
+                            <div
+                              className="w-3 h-3 bg-[#027659] rounded-full animate-bounce"
+                              style={{ animationDelay: "0.2s" }}
+                            ></div>
+                          </div>
+                        </div>
+
+                        {/* Design progress indicators */}
+                        <div className="flex justify-center space-x-2 mt-4">
+                          <div
+                            className="w-2 h-8 bg-[#027659] rounded-full animate-pulse"
+                            style={{ animationDelay: "0s" }}
+                          ></div>
+                          <div
+                            className="w-2 h-6 bg-[#10b981] rounded-full animate-pulse"
+                            style={{ animationDelay: "0.2s" }}
+                          ></div>
+                          <div
+                            className="w-2 h-10 bg-[#027659] rounded-full animate-pulse"
+                            style={{ animationDelay: "0.4s" }}
+                          ></div>
+                          <div
+                            className="w-2 h-7 bg-[#10b981] rounded-full animate-pulse"
+                            style={{ animationDelay: "0.6s" }}
+                          ></div>
+                          <div
+                            className="w-2 h-9 bg-[#027659] rounded-full animate-pulse"
+                            style={{ animationDelay: "0.8s" }}
+                          ></div>
+                        </div>
+                      </div>
+
+                      {/* Floating design elements */}
+                      <div
+                        className="absolute top-4 right-4 w-4 h-4 bg-[#10b981] rounded-full animate-ping"
+                        style={{ animationDelay: "1s" }}
+                      ></div>
+                      <div
+                        className="absolute bottom-4 left-4 w-3 h-3 bg-[#027659] rounded-full animate-ping"
+                        style={{ animationDelay: "1.5s" }}
+                      ></div>
+                      <div
+                        className="absolute top-1/3 right-8 w-2 h-2 bg-[#10b981] rounded-full animate-ping"
+                        style={{ animationDelay: "2s" }}
+                      ></div>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                slides.map((slide, index) => (
+                  <div
+                    key={slide.id}
+                    className={`relative group cursor-pointer rounded-lg border-2 transition-all ${
+                      selectedSlide === slide.id
+                        ? "border-[#027659] bg-[#027659]/5"
+                        : "border-gray-200 hover:border-gray-300 bg-white"
+                    }`}
+                    onClick={() => handleSlideSelect(slide.id, index)}
+                  >
+                    {/* Slide Number */}
+                    <div className="absolute -left-2 top-2 z-10">
+                      <div
+                        className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-medium ${
+                          selectedSlide === slide.id
+                            ? "bg-[#027659] text-white"
+                            : "bg-gray-100 text-gray-600 group-hover:bg-gray-200"
+                        }`}
+                      >
+                        {index + 1}
+                      </div>
+                    </div>
+
+                    {/* Slide Preview */}
+                    <div className="p-3 pt-4">
+                      <div
+                        className="w-full aspect-video rounded border overflow-hidden text-xs relative"
+                        style={{
+                          backgroundColor: slide.background,
+                          color: slide.textColor,
+                        }}
+                      >
+                        <div className="absolute inset-0 p-1.5 lg:p-2 flex flex-col">
+                          <div className="font-bold text-[7px] lg:text-[8px] xl:text-[9px] 2xl:text-[10px] mb-1 truncate leading-tight">
+                            {slide.title}
+                          </div>
+                          <div className="text-[6px] lg:text-[7px] xl:text-[8px] 2xl:text-[9px] opacity-80 line-clamp-3 leading-tight overflow-hidden">
+                            {slide.content.substring(0, 50)}...
                           </div>
                         </div>
                       </div>
                     </div>
-                  ))
-                : slides.map((slide, index) => (
-                    <div
-                      key={slide.id}
-                      className={`relative group cursor-pointer rounded-lg border-2 transition-all ${
-                        selectedSlide === slide.id
-                          ? "border-[#027659] bg-[#027659]/5"
-                          : "border-gray-200 hover:border-gray-300 bg-white"
-                      }`}
-                      onClick={() => handleSlideSelect(slide.id, index)}
-                    >
-                      {/* Slide Number */}
-                      <div className="absolute -left-2 top-2 z-10">
-                        <div
-                          className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-medium ${
-                            selectedSlide === slide.id
-                              ? "bg-[#027659] text-white"
-                              : "bg-gray-100 text-gray-600 group-hover:bg-gray-200"
-                          }`}
-                        >
-                          {index + 1}
-                        </div>
-                      </div>
 
-                      {/* Slide Preview */}
-                      <div className="p-3 pt-4">
-                        <div
-                          className="w-full aspect-video rounded border overflow-hidden text-xs relative"
-                          style={{
-                            backgroundColor: slide.background,
-                            color: slide.textColor,
-                          }}
+                    {/* Hover Actions */}
+                    <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <div className="flex space-x-1">
+                        <Button size="icon" variant="ghost" className="h-6 w-6 bg-white/80 hover:bg-white">
+                          <Copy className="h-3 w-3" />
+                        </Button>
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          className="h-6 w-6 bg-white/80 hover:bg-white text-red-500 hover:text-red-600"
                         >
-                          <div className="absolute inset-0 p-1.5 lg:p-2 flex flex-col">
-                            <div className="font-bold text-[7px] lg:text-[8px] xl:text-[9px] 2xl:text-[10px] mb-1 truncate leading-tight">
-                              {slide.title}
-                            </div>
-                            <div className="text-[6px] lg:text-[7px] xl:text-[8px] 2xl:text-[9px] opacity-80 line-clamp-3 leading-tight overflow-hidden">
-                              {slide.content.substring(0, 50)}...
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Hover Actions */}
-                      <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <div className="flex space-x-1">
-                          <Button size="icon" variant="ghost" className="h-6 w-6 bg-white/80 hover:bg-white">
-                            <Copy className="h-3 w-3" />
-                          </Button>
-                          <Button
-                            size="icon"
-                            variant="ghost"
-                            className="h-6 w-6 bg-white/80 hover:bg-white text-red-500 hover:text-red-600"
-                          >
-                            <Trash2 className="h-3 w-3" />
-                          </Button>
-                        </div>
+                          <Trash2 className="h-3 w-3" />
+                        </Button>
                       </div>
                     </div>
-                  ))}
+                  </div>
+                ))
+              )}
             </div>
           </ScrollArea>
         </div>
@@ -935,24 +1028,108 @@ function EditorContent() {
             )}
             {isStreaming ? (
               <div className="relative">
-                {/* Skeleton Slide - Removed first spinner, kept only the main one */}
-                <div className="lg:w-[632px] lg:h-[355px] xl:w-[732px] xl:h-[412px] 2xl:w-[816px] 2xl:h-[459px] 3xl:w-[980px] 3xl:h-[551px] shadow-2xl rounded-lg overflow-hidden border-4 border-white bg-gradient-to-br from-gray-200 to-gray-300 animate-pulse">
-                  <div className="h-full p-12 flex flex-col justify-center items-center">
-                    <div className="text-center space-y-6">
-                      <h2 className="text-4xl font-bold text-gray-600">SlydPRO Designing</h2>
-                      <p className="text-xl text-gray-500">Creating your presentation slides...</p>
-                      <div className="flex space-x-2 justify-center">
-                        <div className="w-3 h-3 bg-[#027659] rounded-full animate-bounce"></div>
+                {/* Design-focused Skeleton Slide */}
+                <div className="lg:w-[632px] lg:h-[355px] xl:w-[732px] xl:h-[412px] 2xl:w-[816px] 2xl:h-[459px] 3xl:w-[980px] 3xl:h-[551px] shadow-2xl rounded-lg overflow-hidden border-4 border-white bg-gradient-to-br from-gray-100 to-gray-200 relative">
+                  <div className="h-full p-12 flex flex-col justify-center items-center relative overflow-hidden">
+                    {/* Animated paint strokes in background */}
+                    <div className="absolute inset-0 opacity-20">
+                      <div
+                        className="absolute top-8 left-8 w-32 h-1 bg-[#027659] rounded-full animate-pulse"
+                        style={{ animationDelay: "0s" }}
+                      ></div>
+                      <div
+                        className="absolute top-16 left-12 w-24 h-1 bg-[#10b981] rounded-full animate-pulse"
+                        style={{ animationDelay: "0.5s" }}
+                      ></div>
+                      <div
+                        className="absolute top-24 left-16 w-40 h-1 bg-[#027659] rounded-full animate-pulse"
+                        style={{ animationDelay: "1s" }}
+                      ></div>
+
+                      <div
+                        className="absolute bottom-20 right-8 w-28 h-1 bg-[#10b981] rounded-full animate-pulse"
+                        style={{ animationDelay: "1.5s" }}
+                      ></div>
+                      <div
+                        className="absolute bottom-12 right-12 w-36 h-1 bg-[#027659] rounded-full animate-pulse"
+                        style={{ animationDelay: "2s" }}
+                      ></div>
+
+                      <div
+                        className="absolute top-1/2 left-1/4 w-20 h-1 bg-[#10b981] rounded-full animate-pulse"
+                        style={{ animationDelay: "0.8s" }}
+                      ></div>
+                      <div
+                        className="absolute top-1/2 right-1/4 w-32 h-1 bg-[#027659] rounded-full animate-pulse"
+                        style={{ animationDelay: "1.3s" }}
+                      ></div>
+                    </div>
+
+                    <div className="text-center space-y-6 z-10">
+                      <div className="flex items-center justify-center space-x-3">
+                        {/* Design brush icon with animation */}
+                        <div className="relative">
+                          <svg className="w-8 h-8 text-[#027659] animate-pulse" fill="currentColor" viewBox="0 0 24 24">
+                            <path d="M9.4 16.6L4.8 12l4.6-4.6L8 6l-6 6 6 6 1.4-1.4zm5.2 0L19.2 12l-4.6-4.6L16 6l6 6-6 6-1.4-1.4z" />
+                          </svg>
+                          <div className="absolute -top-1 -right-1 w-3 h-3 bg-[#10b981] rounded-full animate-ping"></div>
+                        </div>
+                        <h2 className="text-4xl font-bold text-[#027659]">SlydPRO Designing</h2>
+                      </div>
+
+                      {/* Animated design elements */}
+                      <div className="flex justify-center items-center space-x-4">
+                        <div className="flex space-x-2">
+                          <div className="w-3 h-3 bg-[#027659] rounded-full animate-bounce"></div>
+                          <div
+                            className="w-3 h-3 bg-[#10b981] rounded-full animate-bounce"
+                            style={{ animationDelay: "0.1s" }}
+                          ></div>
+                          <div
+                            className="w-3 h-3 bg-[#027659] rounded-full animate-bounce"
+                            style={{ animationDelay: "0.2s" }}
+                          ></div>
+                        </div>
+                      </div>
+
+                      {/* Design progress indicators */}
+                      <div className="flex justify-center space-x-2 mt-4">
                         <div
-                          className="w-3 h-3 bg-[#027659] rounded-full animate-bounce"
-                          style={{ animationDelay: "0.1s" }}
+                          className="w-2 h-8 bg-[#027659] rounded-full animate-pulse"
+                          style={{ animationDelay: "0s" }}
                         ></div>
                         <div
-                          className="w-3 h-3 bg-[#027659] rounded-full animate-bounce"
+                          className="w-2 h-6 bg-[#10b981] rounded-full animate-pulse"
                           style={{ animationDelay: "0.2s" }}
+                        ></div>
+                        <div
+                          className="w-2 h-10 bg-[#027659] rounded-full animate-pulse"
+                          style={{ animationDelay: "0.4s" }}
+                        ></div>
+                        <div
+                          className="w-2 h-7 bg-[#10b981] rounded-full animate-pulse"
+                          style={{ animationDelay: "0.6s" }}
+                        ></div>
+                        <div
+                          className="w-2 h-9 bg-[#027659] rounded-full animate-pulse"
+                          style={{ animationDelay: "0.8s" }}
                         ></div>
                       </div>
                     </div>
+
+                    {/* Floating design elements */}
+                    <div
+                      className="absolute top-4 right-4 w-4 h-4 bg-[#10b981] rounded-full animate-ping"
+                      style={{ animationDelay: "1s" }}
+                    ></div>
+                    <div
+                      className="absolute bottom-4 left-4 w-3 h-3 bg-[#027659] rounded-full animate-ping"
+                      style={{ animationDelay: "1.5s" }}
+                    ></div>
+                    <div
+                      className="absolute top-1/3 right-8 w-2 h-2 bg-[#10b981] rounded-full animate-ping"
+                      style={{ animationDelay: "2s" }}
+                    ></div>
                   </div>
                 </div>
               </div>
