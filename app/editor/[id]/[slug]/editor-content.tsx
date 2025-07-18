@@ -177,45 +177,39 @@ function EditorContent({ params }: EditorContentProps) {
         uploadedFile,
         // onChunk - real-time content streaming
         (chunk: string) => {
-          setStreamingContent((prev) => prev + chunk)
+          setStreamingContent((prev) => {
+            const newContent = prev + chunk
 
-          // Transition to designing stage when we start getting content
-          setChatMessages((prev) =>
-            prev.map((msg) =>
-              msg.isLoading && msg.generationProgress?.stage === "thinking"
-                ? {
+            // Parse slides from streaming content to update progress in real-time
+            const slideMatches = newContent.match(/(?:##|###)\s*(?:Slide\s*\d+:?\s*)?(.+?)(?=(?:##|###)|$)/gs)
+            const completedSlides = slideMatches ? slideMatches.length : 0
+
+            // Update progress state immediately
+            setChatMessages((prevMessages) =>
+              prevMessages.map((msg) => {
+                if (msg.isLoading) {
+                  const currentStage = msg.generationProgress?.stage || "thinking"
+
+                  // Transition from thinking to designing when we get first content
+                  const newStage = newContent.length > 10 && currentStage === "thinking" ? "designing" : currentStage
+
+                  return {
                     ...msg,
                     generationProgress: {
-                      ...msg.generationProgress,
-                      stage: "designing",
-                      currentSlide: "slide content",
+                      ...msg.generationProgress!,
+                      stage: newStage,
+                      currentSlide: completedSlides > 0 ? `slide ${completedSlides}` : "content",
+                      completedSlides,
+                      totalSlides: Math.max(completedSlides, msg.generationProgress?.totalSlides || 0),
                     },
                   }
-                : msg,
-            ),
-          )
-
-          // Parse slides from streaming content to update progress
-          const slideMatches = (streamingContent + chunk).match(
-            /(?:##|###)\s*(?:Slide\s*\d+:?\s*)?(.+?)(?=(?:##|###)|$)/gs,
-          )
-          if (slideMatches) {
-            const completedSlides = slideMatches.length
-            setChatMessages((prev) =>
-              prev.map((msg) =>
-                msg.isLoading
-                  ? {
-                      ...msg,
-                      generationProgress: {
-                        ...msg.generationProgress!,
-                        completedSlides,
-                        totalSlides: Math.max(completedSlides, msg.generationProgress?.totalSlides || 0),
-                      },
-                    }
-                  : msg,
-              ),
+                }
+                return msg
+              }),
             )
-          }
+
+            return newContent
+          })
         },
         // onComplete
         async (result) => {
@@ -448,6 +442,18 @@ function EditorContent({ params }: EditorContentProps) {
           setCurrentSlideIndex(0)
         }
 
+        // Auto-save the updated slides
+        if (currentPresentationId && authUser) {
+          try {
+            await presentationsAPI.updatePresentation(currentPresentationId, {
+              name: projectName,
+              slides: themedSlides,
+            })
+          } catch (error) {
+            console.error("Failed to auto-save after regeneration:", error)
+          }
+        }
+
         const assistantMessage: ChatMessage = {
           id: (Date.now() + 2).toString(),
           type: "assistant",
@@ -551,9 +557,21 @@ function EditorContent({ params }: EditorContentProps) {
     setChatMessages((prev) => [...prev, themeMessage])
   }
 
-  const handleNameSave = () => {
+  const handleNameSave = async () => {
     setIsEditingName(false)
-    // Auto-save logic can be added here
+
+    // Update URL slug when name changes
+    if (currentPresentationId) {
+      const newSlug = projectName
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, "-")
+        .replace(/(^-|-$)/g, "")
+
+      const currentSlug = params.slug
+      if (currentSlug !== newSlug) {
+        window.history.replaceState(null, "", `/editor/${currentPresentationId}/${newSlug}`)
+      }
+    }
   }
 
   const handlePresentationMode = () => {
