@@ -12,6 +12,16 @@ import { ModernHeader } from "@/components/modern-header"
 import { Footer } from "@/components/footer"
 import { slideTemplates } from "@/lib/slide-templates"
 
+// Helper function to create URL-friendly slug
+function createSlug(text: string): string {
+  return text
+    .toLowerCase()
+    .replace(/[^a-z0-9 -]/g, "")
+    .replace(/\s+/g, "-")
+    .replace(/-+/g, "-")
+    .trim()
+}
+
 // Helper function to get user initials
 function getInitials(name: string): string {
   if (!name) return "U"
@@ -156,7 +166,7 @@ export default function RecentPresentationsClient() {
               <Card
                 key={project.id}
                 className="cursor-pointer hover:shadow-lg transition-all duration-200 border border-border hover:border-muted-foreground bg-card overflow-hidden"
-                onClick={() => router.push(`/editor?project=${project.id}`)}
+                onClick={() => router.push(`/editor/${project.id}/${createSlug(project.name)}`)}
               >
                 {/* Actual Slide Thumbnail */}
                 <div

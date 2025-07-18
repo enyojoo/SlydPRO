@@ -27,7 +27,7 @@ import {
   Check,
   Square,
 } from "lucide-react"
-import { useRouter, useSearchParams } from "next/navigation"
+import { useRouter, useParams } from "next/navigation"
 import { useV0Integration } from "@/hooks/useV0Integration"
 import { useChatContext } from "@/lib/chat-context"
 import { ExportDialog } from "@/components/export-dialog"
@@ -73,6 +73,16 @@ const colorThemes = [
   { name: "Dark", primary: "#1f2937", secondary: "#374151", text: "#ffffff" },
 ]
 
+// Helper function to create URL-friendly slug
+function createSlug(text: string): string {
+  return text
+    .toLowerCase()
+    .replace(/[^a-z0-9 -]/g, "")
+    .replace(/\s+/g, "-")
+    .replace(/-+/g, "-")
+    .trim()
+}
+
 function EditorContent() {
   const [isSmallScreen, setIsSmallScreen] = useState(false)
   const [slides, setSlides] = useState<Slide[]>([])
@@ -95,13 +105,17 @@ function EditorContent() {
   const [copiedMessageId, setCopiedMessageId] = useState<string | null>(null)
 
   const router = useRouter()
-  const searchParams = useSearchParams()
+  const params = useParams()
   const v0 = useV0Integration()
   const fileInputRef = useRef<HTMLInputElement>(null)
   const chatEndRef = useRef<HTMLDivElement>(null)
   const nameInputRef = useRef<HTMLInputElement>(null)
   const { messages } = useChatContext()
   const { user: authUser, isLoading: authLoading } = useAuth()
+
+  // Get current presentation ID and slug from URL params
+  const presentationId = params.id as string
+  const currentSlug = params.slug as string
 
   const checkScreenSize = () => {
     setIsSmallScreen(window.innerWidth < 1024)
@@ -117,7 +131,65 @@ function EditorContent() {
     }
   }
 
-  // Update the handleInitialGeneration function to provide real-time streaming:
+  // Update URL when project name changes
+  const updateURL = useCallback(
+    (newName: string) => {
+      if (presentationId && newName) {
+        const newSlug = createSlug(newName)
+        if (newSlug !== currentSlug) {
+          router.replace(`/editor/${presentationId}/${newSlug}`, { scroll: false })
+        }
+      }
+    },
+    [presentationId, currentSlug, router],
+  )
+
+  // Auto-save function with URL update
+  const autoSave = useCallback(async () => {
+    if (!currentPresentationId || !authUser || slides.length === 0) return
+
+    setIsSaving(true)
+    try {
+      await presentationsAPI.updatePresentation(currentPresentationId, {
+        name: projectName,
+        slides,
+        thumbnail: slides[0]?.background,
+      })
+
+      // Update URL with new slug if name changed
+      updateURL(projectName)
+    } catch (error) {
+      console.error("Auto-save failed:", error)
+    } finally {
+      setIsSaving(false)
+    }
+  }, [currentPresentationId, authUser, slides, projectName, updateURL])
+
+  // Create new presentation and redirect to new URL
+  const createNewPresentation = useCallback(
+    async (name: string, slidesData: Slide[]) => {
+      if (!authUser) return null
+
+      try {
+        const presentation = await presentationsAPI.createPresentation({
+          name,
+          slides: slidesData,
+          category: "ai-generated",
+        })
+
+        const slug = createSlug(name)
+        router.replace(`/editor/${presentation.id}/${slug}`)
+        setCurrentPresentationId(presentation.id)
+        return presentation
+      } catch (error) {
+        console.error("Failed to create presentation:", error)
+        return null
+      }
+    },
+    [authUser, router],
+  )
+
+  // Update the handleInitialGeneration function to create new presentation:
   const handleInitialGeneration = useCallback(
     async (prompt: string) => {
       const userMessage: ChatMessage = {
@@ -227,19 +299,8 @@ function EditorContent() {
             setSelectedSlide(themedSlides[0]?.id || "")
             setCurrentSlideIndex(0)
 
-            // Save to database
-            if (authUser) {
-              try {
-                const presentation = await presentationsAPI.createPresentation({
-                  name: projectName,
-                  slides: themedSlides,
-                  category: "ai-generated",
-                })
-                setCurrentPresentationId(presentation.id)
-              } catch (error) {
-                console.error("Failed to save presentation:", error)
-              }
-            }
+            // Create new presentation and redirect to new URL
+            const presentation = await createNewPresentation(projectName, themedSlides)
 
             // Update to completion state
             setChatMessages((prev) =>
@@ -279,7 +340,7 @@ function EditorContent() {
         },
       )
     },
-    [v0, uploadedFile, selectedTheme, projectName, authUser, streamingContent],
+    [v0, uploadedFile, selectedTheme, projectName, createNewPresentation, streamingContent],
   )
 
   // Add function to toggle progress minimization
@@ -299,32 +360,15 @@ function EditorContent() {
     )
   }
 
-  const autoSave = useCallback(async () => {
-    if (!currentPresentationId || !authUser || slides.length === 0) return
-
-    setIsSaving(true)
-    try {
-      await presentationsAPI.updatePresentation(currentPresentationId, {
-        name: projectName,
-        slides,
-        thumbnail: slides[0]?.background,
-      })
-    } catch (error) {
-      console.error("Auto-save failed:", error)
-    } finally {
-      setIsSaving(false)
-    }
-  }, [currentPresentationId, authUser, slides, projectName])
-
   useEffect(() => {
     const saveTimer = setTimeout(() => {
-      if (slides.length > 0) {
+      if (slides.length > 0 && currentPresentationId) {
         autoSave()
       }
     }, 2000) // Auto-save after 2 seconds of inactivity
 
     return () => clearTimeout(saveTimer)
-  }, [slides, projectName, autoSave])
+  }, [slides, projectName, autoSave, currentPresentationId])
 
   const handleChatSubmit = async () => {
     if (!inputMessage.trim() || v0.isLoading) return
@@ -527,7 +571,7 @@ function EditorContent() {
 
   const handleNameSave = () => {
     setIsEditingName(false)
-    // Auto-save logic can be added here
+    // Auto-save will be triggered by useEffect
   }
 
   const handlePresentationMode = () => {
@@ -589,14 +633,12 @@ function EditorContent() {
   useEffect(() => {
     if (isInitialized) return
 
-    const projectId = searchParams.get("project")
-
-    if (projectId) {
-      // Load existing project from database
+    // Load existing presentation from URL params
+    if (presentationId && presentationId !== "new") {
       const loadProject = async () => {
         try {
           if (authUser) {
-            const presentation = await presentationsAPI.getPresentation(projectId)
+            const presentation = await presentationsAPI.getPresentation(presentationId)
             setSlides(presentation.slides)
             setSelectedSlide(presentation.slides[0]?.id || "")
             setCurrentSlideIndex(0)
@@ -612,7 +654,7 @@ function EditorContent() {
             setChatMessages([welcomeMessage])
           } else {
             // Fallback to template loading if not authenticated
-            const project = getTemplateById(projectId)
+            const project = getTemplateById(presentationId)
             if (project) {
               setSlides(project.slides)
               setSelectedSlide(project.slides[0]?.id || "")
@@ -623,7 +665,7 @@ function EditorContent() {
         } catch (error) {
           console.error("Failed to load presentation:", error)
           // Fallback to template loading
-          const project = getTemplateById(projectId)
+          const project = getTemplateById(presentationId)
           if (project) {
             setSlides(project.slides)
             setSelectedSlide(project.slides[0]?.id || "")
@@ -635,10 +677,9 @@ function EditorContent() {
 
       loadProject()
     } else {
-      // New presentation - no initial welcome message, start clean
+      // New presentation - check if there's an initial message from home page
       setChatMessages([])
 
-      // Check if there's an initial message from home page
       if (messages.length > 0) {
         const lastMessage = messages[messages.length - 1]
         if (lastMessage.type === "user") {
@@ -651,7 +692,7 @@ function EditorContent() {
     }
 
     setIsInitialized(true)
-  }, [authUser, messages, handleInitialGeneration, searchParams, streamingContent]) // Add authUser and messages as dependencies
+  }, [authUser, messages, handleInitialGeneration, presentationId, streamingContent])
 
   // Show warning for small screens
   if (isSmallScreen) {

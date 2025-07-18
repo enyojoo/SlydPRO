@@ -19,6 +19,16 @@ import { PLATFORM_CONFIG } from "@/lib/constants"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { Edit2, Trash2 } from "lucide-react"
 
+// Helper function to create URL-friendly slug
+function createSlug(text: string): string {
+  return text
+    .toLowerCase()
+    .replace(/[^a-z0-9 -]/g, "")
+    .replace(/\s+/g, "-")
+    .replace(/-+/g, "-")
+    .trim()
+}
+
 interface Presentation {
   id: string
   name: string
@@ -106,7 +116,9 @@ export default function SlydPROHome() {
 
     clearMessages()
     addMessage(userMessage)
-    router.push("/editor")
+
+    // Redirect to new editor URL structure with 'new' as placeholder
+    router.push("/editor/new/untitled-presentation")
   }
 
   const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -126,7 +138,9 @@ export default function SlydPROHome() {
 
       clearMessages()
       addMessage(userMessage)
-      router.push(`/editor?file=${encodeURIComponent(file.name)}`)
+
+      // Redirect to new editor URL structure
+      router.push(`/editor/new/untitled-presentation?file=${encodeURIComponent(file.name)}`)
     }
   }
 
@@ -231,13 +245,13 @@ export default function SlydPROHome() {
         {/* Hero Section */}
         <div className="text-center mb-12 sm:mb-16">
           <h1 className="font-bold text-foreground mb-4 sm:mb-6 leading-tight text-3xl sm:text-4xl lg:text-5xl">
-          Design something{" "}
+            Design something{" "}
             <span className="bg-gradient-to-r from-[#027659] to-[#10b981] bg-clip-text text-transparent">
               Presentable
             </span>
           </h1>
           <p className="text-lg sm:text-xl text-muted-foreground max-w-2xl mx-auto leading-relaxed px-4">
-          Create presentation slides by chatting with AI
+            Create presentation slides by chatting with AI
           </p>
         </div>
 
@@ -310,7 +324,7 @@ export default function SlydPROHome() {
                   <Card
                     key={presentation.id}
                     className="cursor-pointer hover:shadow-lg transition-all duration-200 border border-border hover:border-muted-foreground bg-card overflow-hidden"
-                    onClick={() => router.push(`/editor?project=${presentation.id}`)}
+                    onClick={() => router.push(`/editor/${presentation.id}/${createSlug(presentation.name)}`)}
                   >
                     {/* Actual Slide Thumbnail */}
                     <div className="w-full h-40 flex flex-col justify-center p-4 text-white relative overflow-hidden">
