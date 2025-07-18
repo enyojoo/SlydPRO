@@ -71,10 +71,10 @@ export async function POST(request: NextRequest) {
       .insert([
         {
           user_id: user.id,
-          name,
+          name: name || "Untitled Presentation",
           slides: slides || [],
           thumbnail,
-          category,
+          category: category || "ai-generated",
           is_starred: false,
           views: 0,
         },

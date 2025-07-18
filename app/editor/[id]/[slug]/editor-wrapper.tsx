@@ -1,10 +1,10 @@
 "use client"
 
 import { useAuth } from "@/lib/auth-context"
-import { ChatProvider } from "@/lib/chat-context"
-import { EditorContent } from "./editor-content"
 import { useRouter } from "next/navigation"
-import { useEffect } from "react"
+import { useEffect, useState } from "react"
+import { Loader2 } from "lucide-react"
+import { EditorContent } from "./editor-content"
 
 interface EditorWrapperProps {
   presentationId: string
@@ -13,33 +13,31 @@ interface EditorWrapperProps {
 }
 
 export function EditorWrapper({ presentationId, slug, file }: EditorWrapperProps) {
-  const { isAuthenticated, isLoading } = useAuth()
+  const { user, isLoading: authLoading } = useAuth()
   const router = useRouter()
+  const [isReady, setIsReady] = useState(false)
 
   useEffect(() => {
-    if (!isLoading && !isAuthenticated) {
-      router.push("/")
-    }
-  }, [isAuthenticated, isLoading, router])
+    if (authLoading) return
 
-  if (isLoading) {
+    if (!user) {
+      router.push("/")
+      return
+    }
+
+    setIsReady(true)
+  }, [user, authLoading, router])
+
+  if (authLoading || !isReady) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#027659] mx-auto mb-4"></div>
-          <p className="text-muted-foreground">Loading...</p>
+          <Loader2 className="w-8 h-8 animate-spin mx-auto mb-4 text-[#027659]" />
+          <p className="text-muted-foreground">Loading editor...</p>
         </div>
       </div>
     )
   }
 
-  if (!isAuthenticated) {
-    return null
-  }
-
-  return (
-    <ChatProvider>
-      <EditorContent presentationId={presentationId} slug={slug} file={file} />
-    </ChatProvider>
-  )
+  return <EditorContent presentationId={presentationId} slug={slug} file={file} />
 }

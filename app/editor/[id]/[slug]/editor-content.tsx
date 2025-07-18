@@ -17,14 +17,13 @@ import {
   Loader2,
   Square,
   StopCircle,
+  Home,
 } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { useChatContext } from "@/lib/chat-context"
 import { useAuth } from "@/lib/auth-context"
-import { ModernHeader } from "@/components/modern-header"
 import { ExportDialog } from "@/components/export-dialog"
 import { SettingsModal } from "@/components/settings-modal"
-import { presentationsAPI } from "@/lib/presentations-api"
 
 interface Slide {
   id: string
@@ -43,6 +42,13 @@ interface Presentation {
   thumbnail?: string
   created_at: string
   updated_at: string
+}
+
+interface ChatMessage {
+  id: string
+  type: "user" | "assistant"
+  content: string
+  timestamp: Date
 }
 
 interface EditorContentProps {
@@ -77,6 +83,7 @@ export function EditorContent({ presentationId, slug, file }: EditorContentProps
   const [showSettingsModal, setShowSettingsModal] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
+  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([])
 
   // Refs
   const chatEndRef = useRef<HTMLDivElement>(null)
@@ -90,24 +97,35 @@ export function EditorContent({ presentationId, slug, file }: EditorContentProps
       setIsLoading(true)
       try {
         if (presentationId === "new") {
-          // Create new presentation
-          const newPresentation = await presentationsAPI.createPresentation({
-            name: "Untitled Presentation",
-            slides: [],
-            category: "ai-generated",
-          })
-
-          // Redirect to the new presentation URL
-          const newSlug = createSlug(newPresentation.name)
-          router.replace(`/editor/${newPresentation.id}/${newSlug}`)
+          // This shouldn't happen anymore since we create the presentation on the home page
+          router.push("/")
           return
         }
 
         // Load existing presentation
-        const loadedPresentation = await presentationsAPI.getPresentation(presentationId)
-        setPresentation(loadedPresentation)
-        setSlides(loadedPresentation.slides || [])
-        setPresentationName(loadedPresentation.name)
+        const response = await fetch(`/api/presentations/${presentationId}`, {
+          headers: {
+            Authorization: `Bearer ${session.access_token}`,
+          },
+        })
+
+        if (response.ok) {
+          const loadedPresentation = await response.json()
+          setPresentation(loadedPresentation)
+          setSlides(loadedPresentation.slides || [])
+          setPresentationName(loadedPresentation.name)
+
+          // Add welcome message
+          const welcomeMessage: ChatMessage = {
+            id: Date.now().toString(),
+            type: "assistant",
+            content: `🎨 Welcome to "${loadedPresentation.name}"! I'm your AI presentation design expert. I can help you create professional slides with modern design principles.\n\nWhat would you like to create today?`,
+            timestamp: new Date(),
+          }
+          setChatMessages([welcomeMessage])
+        } else {
+          throw new Error("Failed to load presentation")
+        }
       } catch (error) {
         console.error("Failed to load presentation:", error)
         router.push("/")
@@ -119,15 +137,36 @@ export function EditorContent({ presentationId, slug, file }: EditorContentProps
     loadPresentation()
   }, [presentationId, session, router])
 
+  // Process initial message from home page
+  useEffect(() => {
+    if (messages.length > 0 && !isLoading && slides.length === 0) {
+      const lastMessage = messages[messages.length - 1]
+      if (lastMessage.type === "user") {
+        setInputMessage(lastMessage.content)
+        // Auto-submit after a short delay
+        setTimeout(() => {
+          handleChatSubmit(lastMessage.content)
+        }, 500)
+      }
+    }
+  }, [messages, isLoading, slides.length])
+
   // Auto-save presentation
   const savePresentation = useCallback(async () => {
     if (!presentation || !session || isSaving) return
 
     setIsSaving(true)
     try {
-      await presentationsAPI.updatePresentation(presentation.id, {
-        name: presentationName,
-        slides,
+      await fetch(`/api/presentations/${presentation.id}`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({
+          name: presentationName,
+          slides,
+        }),
       })
     } catch (error) {
       console.error("Failed to save presentation:", error)
@@ -166,20 +205,21 @@ export function EditorContent({ presentationId, slug, file }: EditorContentProps
   // Scroll to bottom of chat
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" })
-  }, [messages])
+  }, [chatMessages])
 
   // Handle chat submission
-  const handleChatSubmit = async () => {
-    if (!inputMessage.trim() || isGenerating) return
+  const handleChatSubmit = async (messageContent?: string) => {
+    const content = messageContent || inputMessage.trim()
+    if (!content || isGenerating) return
 
-    const userMessage = {
+    const userMessage: ChatMessage = {
       id: Date.now().toString(),
-      type: "user" as const,
-      content: inputMessage,
+      type: "user",
+      content,
       timestamp: new Date(),
     }
 
-    addMessage(userMessage)
+    setChatMessages((prev) => [...prev, userMessage])
     setInputMessage("")
     setIsGenerating(true)
 
@@ -206,19 +246,7 @@ export function EditorContent({ presentationId, slug, file }: EditorContentProps
    - Chart slides for data presentation
    - Image slides for visual impact
 
-4. DESIGN ELEMENTS:
-   - Use relevant icons from lucide-react
-   - Apply color psychology (blues for trust, greens for growth, etc.)
-   - Create visual consistency across slides
-   - Ensure readability and accessibility
-
-5. MODERN TRENDS:
-   - Minimalist design approach
-   - Bold typography and clear hierarchy
-   - Strategic use of white space
-   - Consistent brand colors and styling
-
-Based on the user's request: "${inputMessage}", create professional slides with appropriate design elements, colors, and layouts. Make each slide visually engaging and content-focused.`
+Based on the user's request: "${content}", create professional slides with appropriate design elements, colors, and layouts.`
 
       const response = await fetch("/api/v0/chats/stream", {
         method: "POST",
@@ -228,7 +256,7 @@ Based on the user's request: "${inputMessage}", create professional slides with 
         body: JSON.stringify({
           messages: [
             { role: "system", content: systemPrompt },
-            { role: "user", content: inputMessage },
+            { role: "user", content },
           ],
           chatId: presentation?.id,
         }),
@@ -242,41 +270,41 @@ Based on the user's request: "${inputMessage}", create professional slides with 
       if (!reader) throw new Error("No response body")
 
       let aiResponse = ""
-      const aiMessage = {
+      const aiMessage: ChatMessage = {
         id: (Date.now() + 1).toString(),
-        type: "assistant" as const,
+        type: "assistant",
         content: "",
         timestamp: new Date(),
       }
 
-      addMessage(aiMessage)
+      setChatMessages((prev) => [...prev, aiMessage])
 
       while (true) {
         const { done, value } = await reader.read()
         if (done) break
 
         const chunk = new TextDecoder().decode(value)
-        aiResponse += chunk
+        aiResponse = chunk // The mock API returns the full response
 
         // Update the AI message content
-        aiMessage.content = aiResponse
-        addMessage({ ...aiMessage })
+        setChatMessages((prev) => prev.map((msg) => (msg.id === aiMessage.id ? { ...msg, content: aiResponse } : msg)))
       }
 
       // Parse the AI response to extract slide data
       const newSlides = parseAIResponseToSlides(aiResponse)
       if (newSlides.length > 0) {
-        setSlides((prev) => [...prev, ...newSlides])
+        setSlides(newSlides)
+        setCurrentSlideIndex(0)
       }
     } catch (error) {
       console.error("Chat error:", error)
-      const errorMessage = {
+      const errorMessage: ChatMessage = {
         id: (Date.now() + 1).toString(),
-        type: "assistant" as const,
+        type: "assistant",
         content: "Sorry, I encountered an error while generating your slides. Please try again.",
         timestamp: new Date(),
       }
-      addMessage(errorMessage)
+      setChatMessages((prev) => [...prev, errorMessage])
     } finally {
       setIsGenerating(false)
     }
@@ -286,34 +314,35 @@ Based on the user's request: "${inputMessage}", create professional slides with 
   const parseAIResponseToSlides = (response: string): Slide[] => {
     const slides: Slide[] = []
 
-    // Simple parsing logic - in a real implementation, this would be more sophisticated
+    // Parse slides from the AI response
     const slideMatches = response.match(/SLIDE \d+:(.*?)(?=SLIDE \d+:|$)/gs)
 
     if (slideMatches) {
       slideMatches.forEach((match, index) => {
-        const titleMatch = match.match(/Title: (.*?)(?:\n|$)/)
-        const contentMatch = match.match(/Content: (.*?)(?:\n|$)/)
+        const lines = match.split("\n").filter((line) => line.trim())
+        let title = `Slide ${index + 1}`
+        let content = ""
+
+        // Extract title and content
+        for (const line of lines) {
+          if (line.includes("Title:")) {
+            title = line.replace(/.*Title:\s*/, "").trim()
+          } else if (line.includes("Content:")) {
+            content = line.replace(/.*Content:\s*/, "").trim()
+          } else if (line.startsWith("•") || line.startsWith("-")) {
+            content += (content ? "\n" : "") + line.trim()
+          }
+        }
 
         slides.push({
           id: `slide-${Date.now()}-${index}`,
-          title: titleMatch?.[1] || `Slide ${slides.length + 1}`,
-          content: contentMatch?.[1] || "Content goes here",
-          background: "#027659",
+          title,
+          content,
+          background: index === 0 ? "#027659" : "#10b981",
           textColor: "#ffffff",
-          layout: "content",
+          layout: index === 0 ? "title" : "content",
           elements: [],
         })
-      })
-    } else {
-      // Fallback: create a single slide from the response
-      slides.push({
-        id: `slide-${Date.now()}`,
-        title: "AI Generated Slide",
-        content: response.substring(0, 200) + "...",
-        background: "#027659",
-        textColor: "#ffffff",
-        layout: "content",
-        elements: [],
       })
     }
 
@@ -373,28 +402,49 @@ Based on the user's request: "${inputMessage}", create professional slides with 
   return (
     <div className="min-h-screen bg-background flex flex-col">
       {/* Header */}
-      <ModernHeader />
+      <div className="h-16 bg-card border-b border-border flex items-center justify-between px-6">
+        <div className="flex items-center space-x-4">
+          <Button variant="ghost" size="icon" onClick={() => router.push("/")} className="hover:bg-muted">
+            <Home className="h-4 w-4" />
+          </Button>
+          <Input
+            value={presentationName}
+            onChange={(e) => setPresentationName(e.target.value)}
+            className="font-semibold text-lg bg-transparent border-none p-0 focus-visible:ring-0 max-w-md"
+            placeholder="Presentation Name"
+          />
+          {isSaving && (
+            <div className="flex items-center text-xs text-muted-foreground">
+              <Loader2 className="w-3 h-3 animate-spin mr-1" />
+              Saving...
+            </div>
+          )}
+        </div>
+
+        <div className="flex items-center space-x-2">
+          <Button variant="outline" onClick={() => setShowExportDialog(true)}>
+            <Download className="h-4 w-4 mr-2" />
+            Export
+          </Button>
+          <Button variant="outline">
+            <Share2 className="h-4 w-4 mr-2" />
+            Share
+          </Button>
+          <Button variant="outline" onClick={() => setShowSettingsModal(true)}>
+            <Settings className="h-4 w-4 mr-2" />
+            Settings
+          </Button>
+        </div>
+      </div>
 
       <div className="flex-1 flex overflow-hidden">
         {/* Left Sidebar - Slides */}
         <div className="w-80 bg-card border-r border-border flex flex-col">
           <div className="p-4 border-b border-border">
-            <Input
-              value={presentationName}
-              onChange={(e) => setPresentationName(e.target.value)}
-              className="font-semibold text-lg bg-transparent border-none p-0 focus-visible:ring-0"
-              placeholder="Presentation Name"
-            />
-            <div className="flex items-center justify-between mt-2">
+            <div className="flex items-center justify-between">
               <span className="text-sm text-muted-foreground">
                 {slides.length} slide{slides.length !== 1 ? "s" : ""}
               </span>
-              {isSaving && (
-                <div className="flex items-center text-xs text-muted-foreground">
-                  <Loader2 className="w-3 h-3 animate-spin mr-1" />
-                  Saving...
-                </div>
-              )}
             </div>
           </div>
 
@@ -403,7 +453,7 @@ Based on the user's request: "${inputMessage}", create professional slides with 
               {slides.map((slide, index) => (
                 <Card
                   key={slide.id}
-                  className={`cursor-pointer transition-all duration-200 ${
+                  className={`cursor-pointer transition-all duration-200 group ${
                     index === currentSlideIndex
                       ? "ring-2 ring-[#027659] border-[#027659]"
                       : "hover:border-muted-foreground"
@@ -485,43 +535,26 @@ Based on the user's request: "${inputMessage}", create professional slides with 
           {/* Slide Navigation */}
           {slides.length > 0 && (
             <div className="p-4 border-t border-border bg-card">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-2">
-                  <Button
-                    size="icon"
-                    variant="outline"
-                    onClick={() => setCurrentSlideIndex(Math.max(0, currentSlideIndex - 1))}
-                    disabled={currentSlideIndex === 0}
-                  >
-                    <ArrowLeft className="h-4 w-4" />
-                  </Button>
-                  <span className="text-sm text-muted-foreground">
-                    {currentSlideIndex + 1} of {slides.length}
-                  </span>
-                  <Button
-                    size="icon"
-                    variant="outline"
-                    onClick={() => setCurrentSlideIndex(Math.min(slides.length - 1, currentSlideIndex + 1))}
-                    disabled={currentSlideIndex === slides.length - 1}
-                  >
-                    <ArrowRight className="h-4 w-4" />
-                  </Button>
-                </div>
-
-                <div className="flex items-center space-x-2">
-                  <Button variant="outline" onClick={() => setShowExportDialog(true)}>
-                    <Download className="h-4 w-4 mr-2" />
-                    Export
-                  </Button>
-                  <Button variant="outline">
-                    <Share2 className="h-4 w-4 mr-2" />
-                    Share
-                  </Button>
-                  <Button variant="outline" onClick={() => setShowSettingsModal(true)}>
-                    <Settings className="h-4 w-4 mr-2" />
-                    Settings
-                  </Button>
-                </div>
+              <div className="flex items-center justify-center space-x-4">
+                <Button
+                  size="icon"
+                  variant="outline"
+                  onClick={() => setCurrentSlideIndex(Math.max(0, currentSlideIndex - 1))}
+                  disabled={currentSlideIndex === 0}
+                >
+                  <ArrowLeft className="h-4 w-4" />
+                </Button>
+                <span className="text-sm text-muted-foreground">
+                  {currentSlideIndex + 1} of {slides.length}
+                </span>
+                <Button
+                  size="icon"
+                  variant="outline"
+                  onClick={() => setCurrentSlideIndex(Math.min(slides.length - 1, currentSlideIndex + 1))}
+                  disabled={currentSlideIndex === slides.length - 1}
+                >
+                  <ArrowRight className="h-4 w-4" />
+                </Button>
               </div>
             </div>
           )}
@@ -530,13 +563,13 @@ Based on the user's request: "${inputMessage}", create professional slides with 
         {/* Right Sidebar - Chat */}
         <div className="w-96 bg-card border-l border-border flex flex-col">
           <div className="p-4 border-b border-border">
-            <h3 className="font-semibold text-lg">AI Assistant</h3>
-            <p className="text-sm text-muted-foreground">Describe what you want to create or modify</p>
+            <h3 className="font-semibold text-lg">AI Design Expert</h3>
+            <p className="text-sm text-muted-foreground">Professional presentation designer</p>
           </div>
 
           <ScrollArea className="flex-1 p-4">
             <div className="space-y-4">
-              {messages.map((message) => (
+              {chatMessages.map((message) => (
                 <div key={message.id} className={`flex ${message.type === "user" ? "justify-end" : "justify-start"}`}>
                   <div
                     className={`max-w-[80%] rounded-lg p-3 ${
@@ -553,7 +586,7 @@ Based on the user's request: "${inputMessage}", create professional slides with 
                   <div className="bg-muted text-foreground rounded-lg p-3">
                     <div className="flex items-center space-x-2">
                       <Loader2 className="w-4 h-4 animate-spin" />
-                      <span className="text-sm">Generating slides...</span>
+                      <span className="text-sm">Designing your slides...</span>
                     </div>
                   </div>
                 </div>
@@ -585,7 +618,7 @@ Based on the user's request: "${inputMessage}", create professional slides with 
                 ) : (
                   <Button
                     size="icon"
-                    onClick={handleChatSubmit}
+                    onClick={() => handleChatSubmit()}
                     disabled={!inputMessage.trim()}
                     className="bg-[#027659] hover:bg-[#065f46] text-white"
                   >
@@ -603,7 +636,7 @@ Based on the user's request: "${inputMessage}", create professional slides with 
         open={showExportDialog}
         onOpenChange={setShowExportDialog}
         slides={slides}
-        presentationName={presentationName}
+        projectName={presentationName}
       />
 
       {/* Settings Modal */}

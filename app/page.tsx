@@ -18,7 +18,6 @@ import { Footer } from "@/components/footer"
 import { PLATFORM_CONFIG } from "@/lib/constants"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { Edit2, Trash2 } from "lucide-react"
-import { presentationsAPI } from "@/lib/presentations-api"
 
 interface Presentation {
   id: string
@@ -100,6 +99,28 @@ export default function SlydPROHome() {
     }
   }
 
+  const createPresentationAPI = async (data: { name: string; slides: any[]; category: string }) => {
+    if (!session) {
+      throw new Error("No session found")
+    }
+
+    const response = await fetch("/api/presentations", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${session.access_token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(data),
+    })
+
+    if (!response.ok) {
+      const error = await response.json()
+      throw new Error(error.error || "Failed to create presentation")
+    }
+
+    return await response.json()
+  }
+
   const handleChatSubmit = async () => {
     if (!inputMessage.trim() || isCreating) return
 
@@ -112,7 +133,7 @@ export default function SlydPROHome() {
 
     try {
       // Create new presentation in Supabase first
-      const presentation = await presentationsAPI.createPresentation({
+      const presentation = await createPresentationAPI({
         name: "Untitled Presentation",
         slides: [],
         category: "ai-generated",
@@ -135,6 +156,8 @@ export default function SlydPROHome() {
     } catch (error) {
       console.error("Failed to create presentation:", error)
       setIsCreating(false)
+      // Show error to user
+      alert("Failed to create presentation. Please try again.")
     }
   }
 
@@ -150,7 +173,7 @@ export default function SlydPROHome() {
 
       try {
         // Create new presentation in Supabase first
-        const presentation = await presentationsAPI.createPresentation({
+        const presentation = await createPresentationAPI({
           name: "Untitled Presentation",
           slides: [],
           category: "ai-generated",
@@ -172,6 +195,7 @@ export default function SlydPROHome() {
       } catch (error) {
         console.error("Failed to create presentation:", error)
         setIsCreating(false)
+        alert("Failed to create presentation. Please try again.")
       }
     }
   }
