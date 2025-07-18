@@ -41,7 +41,7 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const { name, slides } = await request.json()
+    const { name, slides, category } = await request.json()
 
     // Get the session from the request headers
     const authHeader = request.headers.get("authorization")
@@ -74,6 +74,9 @@ export async function POST(request: NextRequest) {
           name,
           slides: slides || [],
           thumbnail,
+          category,
+          is_starred: false,
+          views: 0,
         },
       ])
       .select()

@@ -230,54 +230,27 @@ class V0SlideGenerator {
         fileContent = await uploadedFile.text()
       }
 
-      const slidePrompt = `You are an expert pitch deck and presentation designer with deep knowledge of modern design principles, visual hierarchy, and effective storytelling through slides.
-
-Create a professional, visually stunning presentation with multiple slides based on the following:
+      const slidePrompt = `Create a professional pitch deck presentation with multiple slides based on the following:
 
 ${prompt}
 
 ${fileContent ? `Document content: ${fileContent}` : ""}
 
-DESIGN REQUIREMENTS:
-- Use modern, clean design principles with proper visual hierarchy
-- Include relevant icons, charts, and visual elements where appropriate
-- Apply color psychology and brand-appropriate color schemes
-- Ensure each slide has a clear purpose and visual focus
-- Use typography effectively with proper contrast and readability
-- Include data visualizations (charts, graphs) when presenting statistics or comparisons
-- Add icons and visual elements that support the content narrative
-- Design for impact and memorability
-
-CONTENT ANALYSIS:
-- Analyze the content to determine the best visual representation
-- For data/statistics: suggest charts, graphs, or infographics
-- For processes: suggest flowcharts or step-by-step visuals
-- For comparisons: suggest side-by-side layouts or comparison tables
-- For team/about sections: suggest profile layouts with photos
-- For product features: suggest feature highlight layouts with icons
-
-SLIDE STRUCTURE:
 Please structure the response with clear slide sections using ## headers. Each slide should have:
-- A compelling title that captures attention
-- Content optimized for visual presentation
-- Suggestions for visual elements (icons, charts, images)
+- A clear title
+- Relevant content for that slide
 - Logical flow for a pitch presentation
 
-Include slides for: Problem/Opportunity, Solution, Market Size, Business Model, Competition Analysis, Team, Traction/Metrics, Financial Projections, and Funding Ask (adjust based on content).
+Include slides for: Problem, Solution, Market, Business Model, Competition, Team, Financials, and Ask.
 
 Format each slide as:
-## Slide 1: [Compelling Title]
-[Visual-optimized content with design suggestions]
-[Icons: suggest relevant icons]
-[Visual elements: charts/graphs if applicable]
+## Slide 1: Title Here
+Content for this slide...
 
-## Slide 2: [Next Title]
-[Content optimized for presentation]
-[Design elements and visual suggestions]
+## Slide 2: Next Title
+Content for next slide...`
 
-Focus on creating slides that tell a compelling story and are visually engaging for investors, stakeholders, or audiences.`
-
-      console.log("Generating slides with enhanced design prompt length:", slidePrompt.length)
+      console.log("Generating slides with prompt length:", slidePrompt.length)
 
       // Use server-side API route
       const response = await this.makeV0Request("/chats", {
@@ -379,52 +352,25 @@ Focus on creating slides that tell a compelling story and are visually engaging 
         fileContent = await uploadedFile.text()
       }
 
-      const slidePrompt = `You are an expert pitch deck and presentation designer with deep knowledge of modern design principles, visual hierarchy, and effective storytelling through slides.
-
-Create a professional, visually stunning presentation with multiple slides based on the following:
+      const slidePrompt = `Create a professional pitch deck presentation with multiple slides based on the following:
 
 ${prompt}
 
 ${fileContent ? `Document content: ${fileContent}` : ""}
 
-DESIGN REQUIREMENTS:
-- Use modern, clean design principles with proper visual hierarchy
-- Include relevant icons, charts, and visual elements where appropriate
-- Apply color psychology and brand-appropriate color schemes
-- Ensure each slide has a clear purpose and visual focus
-- Use typography effectively with proper contrast and readability
-- Include data visualizations (charts, graphs) when presenting statistics or comparisons
-- Add icons and visual elements that support the content narrative
-- Design for impact and memorability
-
-CONTENT ANALYSIS:
-- Analyze the content to determine the best visual representation
-- For data/statistics: suggest charts, graphs, or infographics
-- For processes: suggest flowcharts or step-by-step visuals
-- For comparisons: suggest side-by-side layouts or comparison tables
-- For team/about sections: suggest profile layouts with photos
-- For product features: suggest feature highlight layouts with icons
-
-SLIDE STRUCTURE:
 Please structure the response with clear slide sections using ## headers. Each slide should have:
-- A compelling title that captures attention
-- Content optimized for visual presentation
-- Suggestions for visual elements (icons, charts, images)
+- A clear title
+- Relevant content for that slide
 - Logical flow for a pitch presentation
 
-Include slides for: Problem/Opportunity, Solution, Market Size, Business Model, Competition Analysis, Team, Traction/Metrics, Financial Projections, and Funding Ask (adjust based on content).
+Include slides for: Problem, Solution, Market, Business Model, Competition, Team, Financials, and Ask.
 
 Format each slide as:
-## Slide 1: [Compelling Title]
-[Visual-optimized content with design suggestions]
-[Icons: suggest relevant icons]
-[Visual elements: charts/graphs if applicable]
+## Slide 1: Title Here
+Content for this slide...
 
-## Slide 2: [Next Title]
-[Content optimized for presentation]
-[Design elements and visual suggestions]
-
-Focus on creating slides that tell a compelling story and are visually engaging for investors, stakeholders, or audiences.`
+## Slide 2: Next Title
+Content for next slide...`
 
       await this.createStreamingChat(
         slidePrompt,

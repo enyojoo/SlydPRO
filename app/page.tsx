@@ -20,21 +20,15 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { Edit2, Trash2 } from "lucide-react"
 import { presentationsAPI } from "@/lib/presentations-api"
 
-// Helper function to create URL-friendly slug
-function createSlug(text: string): string {
-  return text
-    .toLowerCase()
-    .replace(/[^a-z0-9 -]/g, "")
-    .replace(/\s+/g, "-")
-    .replace(/-+/g, "-")
-    .trim()
-}
-
 interface Presentation {
   id: string
   name: string
+  description?: string
   slides: any[]
   thumbnail?: string
+  is_starred: boolean
+  views: number
+  category?: string
   created_at: string
   updated_at: string
 }
@@ -48,7 +42,6 @@ export default function SlydPROHome() {
   const [authError, setAuthError] = useState("")
   const [presentations, setPresentations] = useState<Presentation[]>([])
   const [presentationsLoading, setPresentationsLoading] = useState(false)
-  const [isCreating, setIsCreating] = useState(false)
   const [formData, setFormData] = useState({
     name: "",
     email: "",
@@ -97,20 +90,19 @@ export default function SlydPROHome() {
   }
 
   const handleChatSubmit = async () => {
-    if (!inputMessage.trim() || isCreating) return
+    if (!inputMessage.trim()) return
 
     if (!isAuthenticated) {
       setShowAuthDialog(true)
       return
     }
 
-    setIsCreating(true)
-
+    // Create new presentation immediately and get the ID
     try {
-      // Create presentation immediately in Supabase
-      const presentation = await presentationsAPI.createPresentation({
+      const newPresentation = await presentationsAPI.createPresentation({
         name: "Untitled Presentation",
         slides: [],
+        category: "ai-generated",
       })
 
       // Add message to chat context
@@ -124,16 +116,26 @@ export default function SlydPROHome() {
       clearMessages()
       addMessage(userMessage)
 
-      // Redirect to editor with actual presentation ID
-      const slug = createSlug(presentation.name)
-      router.push(`/editor/${presentation.id}/${slug}`)
+      // Navigate to the new presentation with the actual ID
+      const slug = "untitled-presentation"
+      router.push(`/editor/${newPresentation.id}/${slug}`)
     } catch (error) {
       console.error("Failed to create presentation:", error)
-      setIsCreating(false)
+      // Fallback to the old behavior if creation fails
+      const userMessage = {
+        id: Date.now().toString(),
+        type: "user" as const,
+        content: inputMessage,
+        timestamp: new Date(),
+      }
+
+      clearMessages()
+      addMessage(userMessage)
+      router.push("/editor/new/untitled-presentation")
     }
   }
 
-  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
     if (file) {
       if (!isAuthenticated) {
@@ -141,32 +143,16 @@ export default function SlydPROHome() {
         return
       }
 
-      setIsCreating(true)
-
-      try {
-        // Create presentation immediately in Supabase
-        const presentation = await presentationsAPI.createPresentation({
-          name: "Untitled Presentation",
-          slides: [],
-        })
-
-        const userMessage = {
-          id: Date.now().toString(),
-          type: "user" as const,
-          content: `Uploaded: ${file.name}`,
-          timestamp: new Date(),
-        }
-
-        clearMessages()
-        addMessage(userMessage)
-
-        // Redirect to editor with actual presentation ID
-        const slug = createSlug(presentation.name)
-        router.push(`/editor/${presentation.id}/${slug}?file=${encodeURIComponent(file.name)}`)
-      } catch (error) {
-        console.error("Failed to create presentation:", error)
-        setIsCreating(false)
+      const userMessage = {
+        id: Date.now().toString(),
+        type: "user" as const,
+        content: `Uploaded: ${file.name}`,
+        timestamp: new Date(),
       }
+
+      clearMessages()
+      addMessage(userMessage)
+      router.push(`/editor?file=${encodeURIComponent(file.name)}`)
     }
   }
 
@@ -293,7 +279,6 @@ export default function SlydPROHome() {
                   onKeyPress={(e) => e.key === "Enter" && !e.shiftKey && handleChatSubmit()}
                   className="w-full bg-muted border-0 text-foreground placeholder:text-muted-foreground text-sm sm:text-base focus-visible:ring-0 focus-visible:ring-offset-0 resize-none min-h-[100px] sm:min-h-[120px] max-h-[200px] shadow-none outline-none focus:outline-none rounded-xl p-3 sm:p-4"
                   rows={4}
-                  disabled={isCreating}
                 />
               </div>
               <div className="flex items-center justify-between mt-3 sm:mt-4">
@@ -303,7 +288,6 @@ export default function SlydPROHome() {
                     size="sm"
                     onClick={() => fileInputRef.current?.click()}
                     className="text-muted-foreground hover:text-foreground hover:bg-muted rounded-lg px-2 sm:px-3 py-2"
-                    disabled={isCreating}
                   >
                     <Upload className="h-4 w-4 mr-1 sm:mr-2" />
                     <span className="hidden sm:inline">Upload</span>
@@ -312,19 +296,10 @@ export default function SlydPROHome() {
                 <Button
                   onClick={handleChatSubmit}
                   className="bg-[#027659] hover:bg-[#065f46] text-white rounded-lg px-4 sm:px-6 py-2 shadow-sm hover:shadow-md transition-all duration-200"
-                  disabled={!inputMessage.trim() || isCreating}
+                  disabled={!inputMessage.trim()}
                 >
-                  {isCreating ? (
-                    <>
-                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                      Creating...
-                    </>
-                  ) : (
-                    <>
-                      <span className="mr-2">Create</span>
-                      <ArrowUp className="h-4 w-4" />
-                    </>
-                  )}
+                  <span className="mr-2">Create</span>
+                  <ArrowUp className="h-4 w-4" />
                 </Button>
               </div>
             </div>
@@ -361,7 +336,14 @@ export default function SlydPROHome() {
                   <Card
                     key={presentation.id}
                     className="cursor-pointer hover:shadow-lg transition-all duration-200 border border-border hover:border-muted-foreground bg-card overflow-hidden"
-                    onClick={() => router.push(`/editor/${presentation.id}/${createSlug(presentation.name)}`)}
+                    onClick={() => {
+                      const slug = presentation.name
+                        .toLowerCase()
+                        .replace(/[^a-z0-9]+/g, "-")
+                        .replace(/(^-|-$)/g, "")
+                        .substring(0, 50)
+                      router.push(`/editor/${presentation.id}/${slug}`)
+                    }}
                   >
                     {/* Actual Slide Thumbnail */}
                     <div className="w-full h-40 flex flex-col justify-center p-4 text-white relative overflow-hidden">
