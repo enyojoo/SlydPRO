@@ -21,13 +21,10 @@ import { Edit2, Trash2 } from "lucide-react"
 
 interface Presentation {
   id: string
+  user_id: string
   name: string
-  description?: string
   slides: any[]
   thumbnail?: string
-  is_starred: boolean
-  views: number
-  category?: string
   created_at: string
   updated_at: string
 }
@@ -117,12 +114,13 @@ export default function SlydPROHome() {
         body: JSON.stringify({
           name: "Untitled Presentation",
           slides: [],
-          category: "ai-generated",
         }),
       })
 
       if (!response.ok) {
-        throw new Error("Failed to create presentation")
+        const errorData = await response.json()
+        console.error("API Error:", errorData)
+        throw new Error(errorData.error || "Failed to create presentation")
       }
 
       const presentation = await response.json()
@@ -163,12 +161,13 @@ export default function SlydPROHome() {
           body: JSON.stringify({
             name: `${file.name.split(".")[0]} Presentation`,
             slides: [],
-            category: "document-import",
           }),
         })
 
         if (!response.ok) {
-          throw new Error("Failed to create presentation")
+          const errorData = await response.json()
+          console.error("API Error:", errorData)
+          throw new Error(errorData.error || "Failed to create presentation")
         }
 
         const presentation = await response.json()

@@ -41,7 +41,7 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const { name, slides, category } = await request.json()
+    const { name, slides } = await request.json()
 
     // Get the session from the request headers
     const authHeader = request.headers.get("authorization")
@@ -65,7 +65,7 @@ export async function POST(request: NextRequest) {
       thumbnail = generateSVGThumbnail(slides[0])
     }
 
-    // Create new presentation
+    // Create new presentation - only use columns that exist in the table
     const { data: presentation, error } = await supabase
       .from("presentations")
       .insert([
@@ -74,7 +74,6 @@ export async function POST(request: NextRequest) {
           name,
           slides: slides || [],
           thumbnail,
-          category,
         },
       ])
       .select()
