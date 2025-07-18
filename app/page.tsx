@@ -112,7 +112,6 @@ export default function SlydPROHome() {
 
       if (response.ok) {
         const presentation = await response.json()
-        const slug = "untitled-presentation"
 
         // Add message to chat context
         const userMessage = {
@@ -160,10 +159,6 @@ export default function SlydPROHome() {
 
           if (response.ok) {
             const presentation = await response.json()
-            const slug = file.name
-              .toLowerCase()
-              .replace(/[^a-z0-9]+/g, "-")
-              .replace(/(^-|-$)/g, "")
 
             const userMessage = {
               id: Date.now().toString(),
@@ -366,7 +361,7 @@ export default function SlydPROHome() {
 
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6">
               {recentPresentations.map((presentation) => {
-                const firstSlide = presentation.slides[0]
+                const firstSlide = presentation.slides?.[0]
                 return (
                   <Card
                     key={presentation.id}
@@ -393,7 +388,7 @@ export default function SlydPROHome() {
                         >
                           <h3 className="text-lg font-bold mb-2 line-clamp-2 leading-tight">{firstSlide.title}</h3>
                           <p className="text-sm opacity-80 line-clamp-3 leading-relaxed">
-                            {firstSlide.content.substring(0, 120)}...
+                            {firstSlide.content ? firstSlide.content.substring(0, 120) + "..." : "No content"}
                           </p>
                         </div>
                       ) : (
