@@ -23,7 +23,7 @@ export async function GET(request: NextRequest) {
     // Fetch user's presentations
     const { data: presentations, error } = await supabase
       .from("presentations")
-      .select("*")
+      .select("id, name, slides, thumbnail, chat_history, created_at, updated_at")
       .eq("user_id", user.id)
       .order("updated_at", { ascending: false })
 
@@ -41,7 +41,7 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const { name, slides, category } = await request.json()
+    const { name, slides, category, chat_history = [] } = await request.json()
 
     // Get the session from the request headers
     const authHeader = request.headers.get("authorization")
@@ -60,22 +60,21 @@ export async function POST(request: NextRequest) {
     }
 
     // Generate thumbnail from first slide
-    let thumbnail = ""
+    let thumbnail = null
     if (slides && slides.length > 0) {
       thumbnail = generateSVGThumbnail(slides[0])
     }
 
-    // Create new presentation
+    // Create new presentation with chat history
     const { data: presentation, error } = await supabase
       .from("presentations")
-      .insert([
-        {
-          user_id: user.id,
-          name,
-          slides: slides || [],
-          thumbnail,
-        },
-      ])
+      .insert({
+        user_id: user.id,
+        name,
+        slides,
+        thumbnail,
+        chat_history,
+      })
       .select()
       .single()
 

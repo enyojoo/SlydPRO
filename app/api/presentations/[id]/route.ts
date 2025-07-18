@@ -22,10 +22,10 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
       return NextResponse.json({ error: "Invalid session" }, { status: 401 })
     }
 
-    // Fetch specific presentation
+    // Fetch specific presentation with all fields including chat_history
     const { data: presentation, error } = await supabase
       .from("presentations")
-      .select("*")
+      .select("id, user_id, name, slides, thumbnail, chat_history, created_at, updated_at")
       .eq("id", id)
       .eq("user_id", user.id)
       .single()
@@ -33,6 +33,31 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
     if (error) {
       console.error("Error fetching presentation:", error)
       return NextResponse.json({ error: "Presentation not found" }, { status: 404 })
+    }
+
+    // Ensure slides is parsed as JSON if it's stored as text
+    if (presentation.slides && typeof presentation.slides === "string") {
+      try {
+        presentation.slides = JSON.parse(presentation.slides)
+      } catch (parseError) {
+        console.error("Error parsing slides JSON:", parseError)
+        presentation.slides = []
+      }
+    }
+
+    // Ensure chat_history is parsed as JSON if it's stored as text
+    if (presentation.chat_history && typeof presentation.chat_history === "string") {
+      try {
+        presentation.chat_history = JSON.parse(presentation.chat_history)
+      } catch (parseError) {
+        console.error("Error parsing chat_history JSON:", parseError)
+        presentation.chat_history = []
+      }
+    }
+
+    // Ensure chat_history exists
+    if (!presentation.chat_history) {
+      presentation.chat_history = []
     }
 
     return NextResponse.json(presentation)
@@ -45,7 +70,7 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
 export async function PUT(request: NextRequest, { params }: { params: { id: string } }) {
   try {
     const { id } = params
-    const { name, slides } = await request.json()
+    const { name, slides, chat_history } = await request.json()
 
     // Get the session from the request headers
     const authHeader = request.headers.get("authorization")
@@ -70,8 +95,10 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
     }
 
     // Update presentation
-    const updateData: any = { name }
-    if (slides) updateData.slides = slides
+    const updateData: any = {}
+    if (name !== undefined) updateData.name = name
+    if (slides !== undefined) updateData.slides = slides
+    if (chat_history !== undefined) updateData.chat_history = chat_history
     if (thumbnail) updateData.thumbnail = thumbnail
 
     const { data: presentation, error } = await supabase

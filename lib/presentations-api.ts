@@ -14,6 +14,7 @@ export class PresentationsAPI {
     name: string
     slides: any[]
     category?: string
+    chat_history?: any[]
   }): Promise<Presentation> {
     const response = await fetch("/api/presentations", {
       method: "POST",

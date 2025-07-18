@@ -24,6 +24,7 @@ export interface Presentation {
   name: string
   slides: any[]
   thumbnail?: string
+  chat_history: any[]
   created_at: string
   updated_at: string
 }

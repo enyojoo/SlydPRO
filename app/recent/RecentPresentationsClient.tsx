@@ -1,310 +1,175 @@
 "use client"
-import { useState } from "react"
+
+import type React from "react"
+
+import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Card } from "@/components/ui/card"
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
-import { Search, Filter, Clock, MoreHorizontal, Edit2, Trash2, ArrowLeft } from "lucide-react"
+import { Card, CardContent } from "@/components/ui/card"
+import { Badge } from "@/components/ui/badge"
+import { Trash2, Calendar, FileText, MessageSquare } from "lucide-react"
 import { useRouter } from "next/navigation"
+import { presentationsAPI } from "@/lib/presentations-api"
 import { useAuth } from "@/lib/auth-context"
-import { ModernHeader } from "@/components/modern-header"
-import { Footer } from "@/components/footer"
-import { slideTemplates } from "@/lib/slide-templates"
-
-// Helper function to get user initials
-function getInitials(name: string): string {
-  if (!name) return "U"
-
-  // If it's an email, use the part before @
-  if (name.includes("@")) {
-    name = name.split("@")[0]
-  }
-
-  // Split by spaces and get first letter of each word
-  const words = name.trim().split(/\s+/)
-  if (words.length === 1) {
-    return words[0].charAt(0).toUpperCase()
-  }
-
-  // Return first letter of first and last word
-  return (words[0].charAt(0) + words[words.length - 1].charAt(0)).toUpperCase()
-}
-
-interface Project {
-  id: string
-  name: string
-  slides: any[]
-  createdAt: Date
-  updatedAt: Date
-  thumbnail?: string
-  isStarred?: boolean
-  views?: number
-  description?: string
-  category?: string
-}
+import type { Presentation } from "@/lib/supabase"
 
 export default function RecentPresentationsClient() {
-  const { user, isAuthenticated } = useAuth()
+  const [presentations, setPresentations] = useState<Presentation[]>([])
+  const [isLoading, setIsLoading] = useState(true)
+  const [deletingId, setDeletingId] = useState<string | null>(null)
   const router = useRouter()
-  const [searchQuery, setSearchQuery] = useState("")
-  const [showRenameDialog, setShowRenameDialog] = useState(false)
-  const [showDeleteDialog, setShowDeleteDialog] = useState(false)
-  const [selectedProject, setSelectedProject] = useState<Project | null>(null)
-  const [newName, setNewName] = useState("")
+  const { user, isLoading: authLoading } = useAuth()
 
-  const [projects, setProjects] = useState<Project[]>(
-    slideTemplates.map((template) => ({
-      id: template.id,
-      name: template.name,
-      slides: template.slides,
-      createdAt: template.createdAt,
-      updatedAt: template.updatedAt,
-      thumbnail: template.thumbnail,
-      isStarred: template.isStarred || false,
-      views: template.views || 0,
-      description: template.description,
-      category: template.category,
-    })),
-  )
+  useEffect(() => {
+    if (!authLoading && user) {
+      loadPresentations()
+    }
+  }, [user, authLoading])
 
-  const filteredProjects = projects.filter((project) => project.name.toLowerCase().includes(searchQuery.toLowerCase()))
-
-  const handleRename = (project: Project) => {
-    setSelectedProject(project)
-    setNewName(project.name)
-    setShowRenameDialog(true)
-  }
-
-  const handleDelete = (project: Project) => {
-    setSelectedProject(project)
-    setShowDeleteDialog(true)
-  }
-
-  const confirmRename = () => {
-    if (selectedProject && newName.trim()) {
-      setProjects(projects.map((p) => (p.id === selectedProject.id ? { ...p, name: newName.trim() } : p)))
-      setShowRenameDialog(false)
-      setSelectedProject(null)
-      setNewName("")
+  const loadPresentations = async () => {
+    try {
+      setIsLoading(true)
+      const data = await presentationsAPI.getUserPresentations()
+      setPresentations(data)
+    } catch (error) {
+      console.error("Failed to load presentations:", error)
+    } finally {
+      setIsLoading(false)
     }
   }
 
-  const confirmDelete = () => {
-    if (selectedProject) {
-      setProjects(projects.filter((p) => p.id !== selectedProject.id))
-      setShowDeleteDialog(false)
-      setSelectedProject(null)
+  const handleDelete = async (id: string, event: React.MouseEvent) => {
+    event.stopPropagation()
+    if (!confirm("Are you sure you want to delete this presentation?")) return
+
+    try {
+      setDeletingId(id)
+      await presentationsAPI.deletePresentation(id)
+      setPresentations((prev) => prev.filter((p) => p.id !== id))
+    } catch (error) {
+      console.error("Failed to delete presentation:", error)
+      alert("Failed to delete presentation")
+    } finally {
+      setDeletingId(null)
     }
   }
 
-  if (!isAuthenticated) {
-    router.push("/")
-    return null
+  const handleOpenPresentation = (presentation: Presentation) => {
+    const slug = presentation.name
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/(^-|-$)/g, "")
+
+    router.push(`/editor/${presentation.id}/${slug}`)
+  }
+
+  if (authLoading || isLoading) {
+    return (
+      <div className="space-y-4">
+        {Array.from({ length: 6 }, (_, i) => (
+          <Card key={i} className="animate-pulse">
+            <CardContent className="p-6">
+              <div className="flex items-start justify-between">
+                <div className="flex-1 space-y-3">
+                  <div className="h-6 bg-gray-200 rounded w-3/4"></div>
+                  <div className="h-4 bg-gray-200 rounded w-1/2"></div>
+                  <div className="flex space-x-4">
+                    <div className="h-4 bg-gray-200 rounded w-20"></div>
+                    <div className="h-4 bg-gray-200 rounded w-16"></div>
+                  </div>
+                </div>
+                <div className="w-24 h-16 bg-gray-200 rounded"></div>
+              </div>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+    )
+  }
+
+  if (presentations.length === 0) {
+    return (
+      <div className="text-center py-12">
+        <FileText className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+        <h3 className="text-lg font-medium text-gray-900 mb-2">No presentations yet</h3>
+        <p className="text-gray-500 mb-6">Create your first AI-powered presentation to get started.</p>
+        <Button onClick={() => router.push("/")} className="bg-[#027659] hover:bg-[#065f46] text-white">
+          Create Presentation
+        </Button>
+      </div>
+    )
   }
 
   return (
-    <div className="min-h-screen bg-background flex flex-col">
-      {/* Modern Header */}
-      <ModernHeader />
+    <div className="space-y-4">
+      {presentations.map((presentation) => (
+        <Card
+          key={presentation.id}
+          className="hover:shadow-md transition-shadow cursor-pointer group"
+          onClick={() => handleOpenPresentation(presentation)}
+        >
+          <CardContent className="p-6">
+            <div className="flex items-start justify-between">
+              <div className="flex-1 min-w-0">
+                <h3 className="text-lg font-semibold text-gray-900 mb-2 truncate group-hover:text-[#027659] transition-colors">
+                  {presentation.name}
+                </h3>
 
-      {/* Main Content */}
-      <main className="flex-1 container mx-auto px-4 sm:px-6 py-6 sm:py-8">
-        {/* Header */}
-        <div className="mb-6 sm:mb-8">
-          <div className="flex items-center mb-4">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => router.push("/")}
-              className="mr-2 sm:mr-4 text-muted-foreground hover:text-foreground"
-            >
-              <ArrowLeft className="h-4 w-4 mr-2" />
-              Back
-            </Button>
-            <h1 className="text-2xl sm:text-3xl font-bold text-foreground">Recent Presentations</h1>
-          </div>
+                <div className="flex items-center space-x-4 text-sm text-gray-500 mb-3">
+                  <div className="flex items-center space-x-1">
+                    <FileText className="h-4 w-4" />
+                    <span>{presentation.slides?.length || 0} slides</span>
+                  </div>
 
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between space-y-4 sm:space-y-0">
-            <p className="text-muted-foreground">
-              {filteredProjects.length} presentation{filteredProjects.length !== 1 ? "s" : ""}
-            </p>
+                  <div className="flex items-center space-x-1">
+                    <MessageSquare className="h-4 w-4" />
+                    <span>{presentation.chat_history?.length || 0} messages</span>
+                  </div>
 
-            <div className="flex items-center space-x-3 w-full sm:w-auto">
-              <div className="relative flex-1 sm:flex-none">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input
-                  placeholder="Search presentations..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-10 w-full sm:w-64 bg-background border-border"
-                />
+                  <div className="flex items-center space-x-1">
+                    <Calendar className="h-4 w-4" />
+                    <span>{new Date(presentation.updated_at).toLocaleDateString()}</span>
+                  </div>
+                </div>
+
+                <div className="flex items-center space-x-2">
+                  <Badge variant="secondary" className="text-xs">
+                    AI Generated
+                  </Badge>
+                  {presentation.chat_history && presentation.chat_history.length > 0 && (
+                    <Badge variant="outline" className="text-xs">
+                      Has Chat History
+                    </Badge>
+                  )}
+                </div>
               </div>
-              <Button variant="outline" size="sm" className="shrink-0 bg-transparent">
-                <Filter className="h-4 w-4 mr-2" />
-                <span className="hidden sm:inline">Filter</span>
-              </Button>
-            </div>
-          </div>
-        </div>
 
-        {/* Presentations Grid */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6">
-          {filteredProjects.map((project) => {
-            const firstSlide = project.slides[0]
-            return (
-              <Card
-                key={project.id}
-                className="cursor-pointer hover:shadow-lg transition-all duration-200 border border-border hover:border-muted-foreground bg-card overflow-hidden"
-                onClick={() => {
-                  const slug = project.name
-                    .toLowerCase()
-                    .replace(/[^a-z0-9]+/g, "-")
-                    .replace(/(^-|-$)/g, "")
-                  router.push(`/editor/${project.id}/${slug}`)
-                }}
-              >
-                {/* Actual Slide Thumbnail */}
-                <div
-                  className="w-full h-40 flex flex-col justify-center p-4 text-white relative overflow-hidden"
-                  style={{
-                    backgroundColor: firstSlide?.background || project.thumbnail,
-                    color: firstSlide?.textColor || "#ffffff",
-                  }}
-                >
-                  {firstSlide ? (
-                    <>
-                      <h3 className="text-lg font-bold mb-2 line-clamp-2 leading-tight">{firstSlide.title}</h3>
-                      <p className="text-sm opacity-80 line-clamp-3 leading-relaxed">
-                        {firstSlide.content.substring(0, 120)}...
-                      </p>
-                    </>
+              <div className="flex items-center space-x-3 ml-4">
+                {/* Thumbnail */}
+                <div className="w-24 h-16 rounded border overflow-hidden bg-gray-100 flex-shrink-0">
+                  {presentation.thumbnail ? (
+                    <div className="w-full h-full" dangerouslySetInnerHTML={{ __html: presentation.thumbnail }} />
                   ) : (
-                    <div className="text-center">
-                      <h3 className="text-lg font-bold">Empty Presentation</h3>
+                    <div className="w-full h-full bg-gradient-to-br from-[#027659] to-[#10b981] flex items-center justify-center">
+                      <FileText className="h-6 w-6 text-white" />
                     </div>
                   )}
                 </div>
 
-                {/* Content */}
-                <div className="p-4">
-                  <div className="flex items-start justify-between">
-                    <div className="flex-1 min-w-0">
-                      <h3 className="font-semibold text-foreground truncate mb-2">{project.name}</h3>
-                      <div className="flex items-center text-xs text-muted-foreground">
-                        <Clock className="h-3 w-3 mr-1" />
-                        <span>{project.createdAt.toLocaleDateString()}</span>
-                      </div>
-                    </div>
-
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button
-                          size="icon"
-                          variant="ghost"
-                          className="h-8 w-8 text-muted-foreground hover:text-foreground"
-                          onClick={(e) => e.stopPropagation()}
-                        >
-                          <MoreHorizontal className="h-4 w-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            handleRename(project)
-                          }}
-                        >
-                          <Edit2 className="h-4 w-4 mr-2" />
-                          Rename
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            handleDelete(project)
-                          }}
-                          className="text-red-600 focus:text-red-600"
-                        >
-                          <Trash2 className="h-4 w-4 mr-2" />
-                          Delete
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </div>
-                </div>
-              </Card>
-            )
-          })}
-        </div>
-
-        {/* Empty State */}
-        {filteredProjects.length === 0 && (
-          <div className="text-center py-12">
-            <div className="text-muted-foreground">
-              {searchQuery ? "No presentations found matching your search." : "No presentations yet."}
+                {/* Delete button */}
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={(e) => handleDelete(presentation.id, e)}
+                  disabled={deletingId === presentation.id}
+                  className="opacity-0 group-hover:opacity-100 transition-opacity text-red-500 hover:text-red-700 hover:bg-red-50"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              </div>
             </div>
-            {!searchQuery && (
-              <Button onClick={() => router.push("/")} className="mt-4 bg-[#027659] hover:bg-[#065f46] text-white">
-                Create your first presentation
-              </Button>
-            )}
-          </div>
-        )}
-      </main>
-
-      {/* Footer */}
-      <Footer />
-
-      {/* Rename Dialog */}
-      <Dialog open={showRenameDialog} onOpenChange={setShowRenameDialog}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>Rename Presentation</DialogTitle>
-          </DialogHeader>
-          <div className="py-4">
-            <Input
-              value={newName}
-              onChange={(e) => setNewName(e.target.value)}
-              placeholder="Enter new name"
-              onKeyPress={(e) => e.key === "Enter" && confirmRename()}
-            />
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowRenameDialog(false)}>
-              Cancel
-            </Button>
-            <Button
-              onClick={confirmRename}
-              disabled={!newName.trim()}
-              className="bg-[#027659] hover:bg-[#065f46] text-white"
-            >
-              Rename
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Delete Dialog */}
-      <Dialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>Delete Presentation</DialogTitle>
-          </DialogHeader>
-          <div className="py-4">
-            <p className="text-sm text-muted-foreground">
-              Are you sure you want to delete "{selectedProject?.name}"? This action cannot be undone.
-            </p>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowDeleteDialog(false)}>
-              Cancel
-            </Button>
-            <Button onClick={confirmDelete} variant="destructive">
-              Delete
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+          </CardContent>
+        </Card>
+      ))}
     </div>
   )
 }

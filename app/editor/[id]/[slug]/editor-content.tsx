@@ -123,6 +123,29 @@ function EditorContent({ params }: EditorContentProps) {
     }
   }
 
+  // Save chat history to database
+  const saveChatHistory = useCallback(
+    async (messages: ChatMessage[]) => {
+      if (!currentPresentationId || !authUser) return
+
+      try {
+        await presentationsAPI.updatePresentation(currentPresentationId, {
+          chat_history: messages.map((msg) => ({
+            id: msg.id,
+            type: msg.type,
+            content: msg.content,
+            timestamp: msg.timestamp.toISOString(),
+            isLoading: msg.isLoading,
+            generationProgress: msg.generationProgress,
+          })),
+        })
+      } catch (error) {
+        console.error("Failed to save chat history:", error)
+      }
+    },
+    [currentPresentationId, authUser],
+  )
+
   // Update the handleInitialGeneration function to provide real-time streaming:
   const handleInitialGeneration = useCallback(
     async (prompt: string) => {
@@ -148,7 +171,8 @@ function EditorContent({ params }: EditorContentProps) {
         },
       }
 
-      setChatMessages((prev) => [...prev, userMessage, loadingMessage])
+      const newMessages = [userMessage, loadingMessage]
+      setChatMessages((prev) => [...prev, ...newMessages])
       setIsStreaming(true)
       setStreamingContent("")
 
@@ -186,7 +210,7 @@ function EditorContent({ params }: EditorContentProps) {
             if (slideMatches) {
               const completedSlides = slideMatches.length
 
-              // Update progress immediately
+              // Update progress immediately with real-time feedback
               setChatMessages((prevMessages) =>
                 prevMessages.map((msg) =>
                   msg.isLoading
@@ -247,6 +271,7 @@ function EditorContent({ params }: EditorContentProps) {
                   name: projectName,
                   slides: themedSlides,
                   category: "ai-generated",
+                  chat_history: [],
                 })
                 setCurrentPresentationId(presentation.id)
 
@@ -264,25 +289,30 @@ function EditorContent({ params }: EditorContentProps) {
             }
 
             // Update to completion state
-            setChatMessages((prev) =>
-              prev.map((msg) =>
-                msg.isLoading
-                  ? {
-                      ...msg,
-                      isLoading: false,
-                      content: `I've successfully created your presentation with ${result.slides.length} slides. Each slide is designed to tell your story effectively. You can now edit individual slides or ask me to make changes to the entire presentation.`,
-                      generationProgress: {
-                        ...msg.generationProgress!,
-                        stage: "complete",
-                        isComplete: true,
-                        completedSlides: result.slides.length,
-                        totalSlides: result.slides.length,
-                        isMinimized: false,
-                      },
-                    }
-                  : msg,
-              ),
+            const completedMessages = chatMessages.map((msg) =>
+              msg.isLoading
+                ? {
+                    ...msg,
+                    isLoading: false,
+                    content: `I've successfully created your presentation with ${result.slides.length} slides. Each slide is designed to tell your story effectively. You can now edit individual slides or ask me to make changes to the entire presentation.`,
+                    generationProgress: {
+                      ...msg.generationProgress!,
+                      stage: "complete" as const,
+                      isComplete: true,
+                      completedSlides: result.slides.length,
+                      totalSlides: result.slides.length,
+                      isMinimized: false,
+                    },
+                  }
+                : msg,
             )
+
+            setChatMessages(completedMessages)
+
+            // Save chat history after completion
+            setTimeout(() => {
+              saveChatHistory(completedMessages)
+            }, 1000)
           }
         },
         // onError
@@ -297,17 +327,19 @@ function EditorContent({ params }: EditorContentProps) {
             content: `I encountered an error: ${error.message}\n\nPlease try again or describe your presentation differently.`,
             timestamp: new Date(),
           }
-          setChatMessages((prev) => [...prev, errorMessage])
+          const errorMessages = [...chatMessages.filter((msg) => !msg.isLoading), errorMessage]
+          setChatMessages(errorMessages)
+          saveChatHistory(errorMessages)
         },
       )
     },
-    [v0, uploadedFile, selectedTheme, projectName, authUser, streamingContent],
+    [v0, uploadedFile, selectedTheme, projectName, authUser, streamingContent, chatMessages, saveChatHistory],
   )
 
   // Add function to toggle progress minimization
   const toggleProgressMinimization = (messageId: string) => {
-    setChatMessages((prev) =>
-      prev.map((msg) =>
+    setChatMessages((prev) => {
+      const updated = prev.map((msg) =>
         msg.id === messageId && msg.generationProgress
           ? {
               ...msg,
@@ -317,8 +349,10 @@ function EditorContent({ params }: EditorContentProps) {
               },
             }
           : msg,
-      ),
-    )
+      )
+      saveChatHistory(updated)
+      return updated
+    })
   }
 
   const autoSave = useCallback(async () => {
@@ -330,6 +364,14 @@ function EditorContent({ params }: EditorContentProps) {
         name: projectName,
         slides,
         thumbnail: slides[0]?.background,
+        chat_history: chatMessages.map((msg) => ({
+          id: msg.id,
+          type: msg.type,
+          content: msg.content,
+          timestamp: msg.timestamp.toISOString(),
+          isLoading: msg.isLoading,
+          generationProgress: msg.generationProgress,
+        })),
       })
 
       // Update URL slug if name changed
@@ -347,17 +389,17 @@ function EditorContent({ params }: EditorContentProps) {
     } finally {
       setIsSaving(false)
     }
-  }, [currentPresentationId, authUser, slides, projectName, params.slug])
+  }, [currentPresentationId, authUser, slides, projectName, params.slug, chatMessages])
 
   useEffect(() => {
     const saveTimer = setTimeout(() => {
-      if (slides.length > 0) {
+      if (slides.length > 0 || chatMessages.length > 0) {
         autoSave()
       }
     }, 2000) // Auto-save after 2 seconds of inactivity
 
     return () => clearTimeout(saveTimer)
-  }, [slides, projectName, autoSave])
+  }, [slides, projectName, chatMessages, autoSave])
 
   const handleChatSubmit = async () => {
     if (!inputMessage.trim() || v0.isLoading) return
@@ -382,7 +424,8 @@ function EditorContent({ params }: EditorContentProps) {
       },
     }
 
-    setChatMessages((prev) => [...prev, userMessage, loadingMessage])
+    const newMessages = [...chatMessages, userMessage, loadingMessage]
+    setChatMessages(newMessages)
     const currentInput = inputMessage
     setInputMessage("")
 
@@ -428,7 +471,9 @@ function EditorContent({ params }: EditorContentProps) {
             content: `Great! I've updated the "${slide.title}" slide based on your request. The changes should now be visible in the preview.`,
             timestamp: new Date(),
           }
-          setChatMessages((prev) => [...prev, assistantMessage])
+          const updatedMessages = [...newMessages.filter((msg) => !msg.isLoading), assistantMessage]
+          setChatMessages(updatedMessages)
+          saveChatHistory(updatedMessages)
         }
       }
     } else {
@@ -464,7 +509,9 @@ function EditorContent({ params }: EditorContentProps) {
               : `Excellent! I've created ${result.slides.length} slides for your presentation. You can now review them, make edits, or ask for specific changes.`,
           timestamp: new Date(),
         }
-        setChatMessages((prev) => [...prev, assistantMessage])
+        const updatedMessages = [...newMessages.filter((msg) => !msg.isLoading), assistantMessage]
+        setChatMessages(updatedMessages)
+        saveChatHistory(updatedMessages)
       }
     }
 
@@ -478,7 +525,9 @@ function EditorContent({ params }: EditorContentProps) {
         content: `I encountered an error: ${v0.error}\n\nPlease try rephrasing your request or try again.`,
         timestamp: new Date(),
       }
-      setChatMessages((prev) => [...prev, errorMessage])
+      const errorMessages = [...newMessages.filter((msg) => !msg.isLoading), errorMessage]
+      setChatMessages(errorMessages)
+      saveChatHistory(errorMessages)
     }
   }
 
@@ -502,7 +551,8 @@ function EditorContent({ params }: EditorContentProps) {
         isLoading: true,
       }
 
-      setChatMessages((prev) => [...prev, userMessage, loadingMessage])
+      const newMessages = [...chatMessages, userMessage, loadingMessage]
+      setChatMessages(newMessages)
 
       const result = await v0.generateSlides("Create a presentation from this document", file)
 
@@ -525,7 +575,9 @@ function EditorContent({ params }: EditorContentProps) {
           content: `Great! I've analyzed your document and created ${result.slides.length} slides. The presentation covers the key points from your file. Feel free to ask me to adjust any content or styling.`,
           timestamp: new Date(),
         }
-        setChatMessages((prev) => [...prev, assistantMessage])
+        const updatedMessages = [...newMessages.filter((msg) => !msg.isLoading), assistantMessage]
+        setChatMessages(updatedMessages)
+        saveChatHistory(updatedMessages)
       }
     }
   }
@@ -555,7 +607,9 @@ function EditorContent({ params }: EditorContentProps) {
       content: `Perfect! I've applied the ${theme.name} theme to all your slides. The new color scheme gives your presentation a fresh look.`,
       timestamp: new Date(),
     }
-    setChatMessages((prev) => [...prev, themeMessage])
+    const updatedMessages = [...chatMessages, themeMessage]
+    setChatMessages(updatedMessages)
+    saveChatHistory(updatedMessages)
   }
 
   const handleNameSave = () => {
@@ -630,19 +684,35 @@ function EditorContent({ params }: EditorContentProps) {
         try {
           if (authUser) {
             const presentation = await presentationsAPI.getPresentation(presentationId)
-            setSlides(presentation.slides)
-            setSelectedSlide(presentation.slides[0]?.id || "")
-            setCurrentSlideIndex(0)
+
+            // Ensure slides data is properly loaded
+            if (presentation.slides && Array.isArray(presentation.slides)) {
+              setSlides(presentation.slides)
+              setSelectedSlide(presentation.slides[0]?.id || "")
+              setCurrentSlideIndex(0)
+            }
+
             setProjectName(presentation.name)
             setCurrentPresentationId(presentation.id)
 
-            const welcomeMessage: ChatMessage = {
-              id: Date.now().toString(),
-              type: "assistant",
-              content: `Welcome back to "${presentation.name}"! This presentation has ${presentation.slides.length} slides and was last updated ${new Date(presentation.updated_at).toLocaleDateString()}.\n\nYou can now:\n• Edit individual slides by selecting them\n• Regenerate content with new ideas\n• Change colors and themes\n• Ask me to modify specific aspects\n\nWhat would you like to work on?`,
-              timestamp: new Date(),
+            // Load chat history if it exists
+            if (presentation.chat_history && Array.isArray(presentation.chat_history)) {
+              const restoredMessages = presentation.chat_history.map((msg: any) => ({
+                ...msg,
+                timestamp: new Date(msg.timestamp),
+                isLoading: false, // Ensure no loading states on restore
+              }))
+              setChatMessages(restoredMessages)
+            } else {
+              // Default welcome message if no chat history
+              const welcomeMessage: ChatMessage = {
+                id: Date.now().toString(),
+                type: "assistant",
+                content: `Welcome back to "${presentation.name}"! This presentation has ${presentation.slides?.length || 0} slides and was last updated ${new Date(presentation.updated_at).toLocaleDateString()}.\n\nYou can now:\n• Edit individual slides by selecting them\n• Regenerate content with new ideas\n• Change colors and themes\n• Ask me to modify specific aspects\n\nWhat would you like to work on?`,
+                timestamp: new Date(),
+              }
+              setChatMessages([welcomeMessage])
             }
-            setChatMessages([welcomeMessage])
           }
         } catch (error) {
           console.error("Failed to load presentation:", error)
@@ -651,7 +721,9 @@ function EditorContent({ params }: EditorContentProps) {
         }
       }
 
-      loadPresentation()
+      if (!authLoading) {
+        loadPresentation()
+      }
     } else {
       // New presentation - no initial welcome message, start clean
       setChatMessages([])
@@ -669,7 +741,7 @@ function EditorContent({ params }: EditorContentProps) {
     }
 
     setIsInitialized(true)
-  }, [authUser, messages, handleInitialGeneration, params.id, streamingContent])
+  }, [authUser, authLoading, messages, handleInitialGeneration, params.id, router])
 
   // Show warning for small screens
   if (isSmallScreen) {
@@ -1216,7 +1288,9 @@ function EditorContent({ params }: EditorContentProps) {
                               variant="ghost"
                               className="h-6 w-6 p-0 text-white/70 hover:text-white hover:bg-red-200/20"
                               onClick={() => {
-                                setChatMessages((prev) => prev.filter((m) => m.id !== message.id))
+                                const updatedMessages = chatMessages.filter((m) => m.id !== message.id)
+                                setChatMessages(updatedMessages)
+                                saveChatHistory(updatedMessages)
                               }}
                             >
                               <Trash2 className="h-3 w-3" />
@@ -1273,8 +1347,6 @@ function EditorContent({ params }: EditorContentProps) {
                                     { length: Math.max(1, message.generationProgress?.completedSlides || 0) },
                                     (_, i) => {
                                       const isCompleted = i < (message.generationProgress?.completedSlides || 0)
-                                      const isCurrent =
-                                        i === (message.generationProgress?.completedSlides || 0) && !isCompleted
 
                                       return (
                                         <div key={i} className="flex items-center space-x-2 py-0.5">
@@ -1381,7 +1453,9 @@ function EditorContent({ params }: EditorContentProps) {
                                 variant="ghost"
                                 className="h-6 w-6 p-0 text-red-500 hover:text-red-700 hover:bg-red-50"
                                 onClick={() => {
-                                  setChatMessages((prev) => prev.filter((m) => m.id !== message.id))
+                                  const updatedMessages = chatMessages.filter((m) => m.id !== message.id)
+                                  setChatMessages(updatedMessages)
+                                  saveChatHistory(updatedMessages)
                                 }}
                               >
                                 <Trash2 className="h-3 w-3" />
