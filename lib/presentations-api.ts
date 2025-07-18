@@ -13,7 +13,6 @@ export class PresentationsAPI {
   async createPresentation(data: {
     name: string
     slides: any[]
-    category?: string
   }): Promise<Presentation> {
     const response = await fetch("/api/presentations", {
       method: "POST",

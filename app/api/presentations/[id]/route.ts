@@ -22,7 +22,7 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
       return NextResponse.json({ error: "Invalid session" }, { status: 401 })
     }
 
-    // Fetch specific presentation
+    // Fetch the specific presentation
     const { data: presentation, error } = await supabase
       .from("presentations")
       .select("*")
@@ -45,7 +45,7 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
 export async function PUT(request: NextRequest, { params }: { params: { id: string } }) {
   try {
     const { id } = params
-    const { name, slides } = await request.json()
+    const { name, slides, thumbnail } = await request.json()
 
     // Get the session from the request headers
     const authHeader = request.headers.get("authorization")
@@ -63,20 +63,21 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
       return NextResponse.json({ error: "Invalid session" }, { status: 401 })
     }
 
-    // Generate new thumbnail if slides are provided
-    let thumbnail = undefined
-    if (slides && slides.length > 0) {
-      thumbnail = generateSVGThumbnail(slides[0])
+    // Generate thumbnail if slides are provided
+    let updatedThumbnail = thumbnail
+    if (slides && slides.length > 0 && !thumbnail) {
+      updatedThumbnail = generateSVGThumbnail(slides[0])
     }
 
-    // Update presentation
-    const updateData: any = { name }
-    if (slides) updateData.slides = slides
-    if (thumbnail) updateData.thumbnail = thumbnail
-
+    // Update the presentation
     const { data: presentation, error } = await supabase
       .from("presentations")
-      .update(updateData)
+      .update({
+        name,
+        slides,
+        thumbnail: updatedThumbnail,
+        updated_at: new Date().toISOString(),
+      })
       .eq("id", id)
       .eq("user_id", user.id)
       .select()
@@ -114,7 +115,7 @@ export async function DELETE(request: NextRequest, { params }: { params: { id: s
       return NextResponse.json({ error: "Invalid session" }, { status: 401 })
     }
 
-    // Delete presentation
+    // Delete the presentation
     const { error } = await supabase.from("presentations").delete().eq("id", id).eq("user_id", user.id)
 
     if (error) {
