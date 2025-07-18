@@ -28,9 +28,6 @@ export async function POST(request: NextRequest) {
           name: "Untitled Presentation",
           slides: [],
           thumbnail: "",
-          category: "draft",
-          is_starred: false,
-          views: 0,
         },
       ])
       .select()
