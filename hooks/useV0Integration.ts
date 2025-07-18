@@ -188,6 +188,8 @@ export function useV0Integration() {
             // Deduct actual credits used
             await deductCredits(result.tokenUsage)
             setCurrentChatId(result.chatId)
+
+            // Call onComplete to trigger slide saving
             onComplete?.(result)
           },
           onError,

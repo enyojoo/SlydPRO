@@ -322,6 +322,7 @@ Content for next slide...`
               const data = JSON.parse(line.slice(6))
               if (data.chunk) {
                 fullResponse += data.chunk
+                // Call onChunk immediately for real-time updates
                 onChunk(data.chunk)
               }
               if (data.complete) {
