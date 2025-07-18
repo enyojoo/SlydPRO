@@ -189,17 +189,12 @@ function EditorContent() {
             ),
           )
 
-          // Parse slides from streaming content to update progress in real-time
+          // Parse slides from streaming content to update progress
           const slideMatches = (streamingContent + chunk).match(
             /(?:##|###)\s*(?:Slide\s*\d+:?\s*)?(.+?)(?=(?:##|###)|$)/gs,
           )
           if (slideMatches) {
-            const totalSlides = slideMatches.length
-            // Simulate progressive completion - each slide takes time to complete
-            const currentTime = Date.now()
-            const startTime = currentTime - totalSlides * 2000 // Assume 2 seconds per slide
-            const completedSlides = Math.min(totalSlides, Math.floor((currentTime - startTime) / 2000))
-
+            const completedSlides = slideMatches.length
             setChatMessages((prev) =>
               prev.map((msg) =>
                 msg.isLoading
@@ -208,8 +203,7 @@ function EditorContent() {
                       generationProgress: {
                         ...msg.generationProgress!,
                         completedSlides,
-                        totalSlides,
-                        currentSlide: completedSlides < totalSlides ? `slide ${completedSlides + 1}` : undefined,
+                        totalSlides: Math.max(completedSlides, msg.generationProgress?.totalSlides || 0),
                       },
                     }
                   : msg,
@@ -1242,85 +1236,55 @@ function EditorContent() {
                             )}
 
                             {message.generationProgress?.stage === "designing" && (
-                              <div className="border border-blue-200 rounded-lg p-4 bg-blue-50/50 w-full">
-                                <div className="flex items-center justify-between mb-4">
+                              <div className="border border-blue-200 rounded-lg p-3 bg-blue-50/50">
+                                <div className="flex items-center justify-between mb-3">
                                   <div className="flex items-center space-x-2">
-                                    <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse"></div>
-                                    <span className="text-sm font-semibold text-blue-900">
+                                    <div className="w-1.5 h-1.5 bg-blue-500 rounded-full animate-pulse"></div>
+                                    <span className="text-xs font-semibold text-blue-900">
                                       Version {message.generationProgress.version}
                                     </span>
                                   </div>
-                                  <span className="text-xs text-blue-600 font-medium px-3 py-1 bg-blue-100 rounded-full">
+                                  <span className="text-xs text-blue-600 font-medium px-2 py-0.5 bg-blue-100 rounded-md">
                                     Designing
                                   </span>
                                 </div>
 
                                 {/* Real-time slide generation progress */}
-                                <div className="space-y-2">
+                                <div className="space-y-1.5">
                                   {Array.from(
-                                    { length: Math.max(1, message.generationProgress?.totalSlides || 1) },
+                                    { length: Math.max(1, message.generationProgress?.completedSlides || 0) },
                                     (_, i) => {
                                       const isCompleted = i < (message.generationProgress?.completedSlides || 0)
                                       const isCurrent =
                                         i === (message.generationProgress?.completedSlides || 0) && !isCompleted
-                                      const isPending = i > (message.generationProgress?.completedSlides || 0)
 
                                       return (
-                                        <div key={i} className="flex items-center space-x-3 py-1">
+                                        <div key={i} className="flex items-center space-x-2 py-0.5">
                                           {/* Status indicator */}
-                                          <div className="w-4 h-4 flex items-center justify-center flex-shrink-0">
+                                          <div className="w-3 h-3 flex items-center justify-center">
                                             {isCompleted ? (
-                                              <div className="w-4 h-4 bg-green-500 rounded-full flex items-center justify-center">
-                                                <Check className="w-2.5 h-2.5 text-white" />
-                                              </div>
-                                            ) : isCurrent ? (
-                                              <div className="w-4 h-4 bg-blue-500 rounded-full flex items-center justify-center">
-                                                <Loader2 className="w-2.5 h-2.5 text-white animate-spin" />
+                                              <div className="w-3 h-3 bg-green-500 rounded-full flex items-center justify-center">
+                                                <Check className="w-2 h-2 text-white" />
                                               </div>
                                             ) : (
-                                              <div className="w-4 h-4 border-2 border-gray-300 rounded-full"></div>
+                                              <div className="w-3 h-3 bg-blue-500 rounded-full flex items-center justify-center">
+                                                <Loader2 className="w-2 h-2 text-white animate-spin" />
+                                              </div>
                                             )}
                                           </div>
 
                                           {/* Slide info */}
                                           <span
-                                            className={`text-sm flex-1 ${
-                                              isCompleted
-                                                ? "text-green-700 font-medium"
-                                                : isCurrent
-                                                  ? "text-blue-700 font-medium"
-                                                  : "text-gray-500"
+                                            className={`text-xs ${
+                                              isCompleted ? "text-green-700 font-medium" : "text-blue-700 font-medium"
                                             }`}
                                           >
-                                            {isCompleted
-                                              ? `✅ Designed slide ${i + 1}`
-                                              : isCurrent
-                                                ? `🔄 Designing slide ${i + 1}...`
-                                                : `⏳ Slide ${i + 1} pending`}
+                                            {isCompleted ? `Designed slide ${i + 1}` : `Designing slide ${i + 1}`}
                                           </span>
                                         </div>
                                       )
                                     },
                                   )}
-                                </div>
-
-                                {/* Progress bar */}
-                                <div className="mt-4 pt-3 border-t border-blue-200">
-                                  <div className="flex items-center justify-between text-xs text-blue-600 mb-2">
-                                    <span>Progress</span>
-                                    <span>
-                                      {message.generationProgress?.completedSlides || 0} of{" "}
-                                      {message.generationProgress?.totalSlides || 0} slides
-                                    </span>
-                                  </div>
-                                  <div className="w-full bg-blue-100 rounded-full h-2">
-                                    <div
-                                      className="bg-blue-500 h-2 rounded-full transition-all duration-500 ease-out"
-                                      style={{
-                                        width: `${((message.generationProgress?.completedSlides || 0) / Math.max(1, message.generationProgress?.totalSlides || 1)) * 100}%`,
-                                      }}
-                                    ></div>
-                                  </div>
                                 </div>
                               </div>
                             )}
@@ -1331,41 +1295,41 @@ function EditorContent() {
 
                             {/* Completed generation progress */}
                             {message.generationProgress?.isComplete && (
-                              <div className="border border-green-200 rounded-lg p-4 bg-green-50/30 w-full">
+                              <div className="border border-green-200 rounded-lg p-3 bg-green-50/30">
                                 <div className="flex items-center justify-between">
                                   <div className="flex items-center space-x-2">
-                                    <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                                    <span className="text-sm font-semibold text-green-900">
+                                    <div className="w-1.5 h-1.5 bg-green-500 rounded-full"></div>
+                                    <span className="text-xs font-semibold text-green-900">
                                       Version {message.generationProgress.version}
                                     </span>
                                   </div>
                                   <div className="flex items-center space-x-2">
-                                    <span className="text-xs text-green-600 font-medium px-3 py-1 bg-green-100 rounded-full">
+                                    <span className="text-xs text-green-600 font-medium px-2 py-0.5 bg-green-100 rounded-md">
                                       Complete
                                     </span>
                                     <Button
                                       size="sm"
                                       variant="ghost"
-                                      className="h-6 w-6 p-0 text-green-600 hover:text-green-700 hover:bg-green-100"
+                                      className="h-5 w-5 p-0 text-green-600 hover:text-green-700 hover:bg-green-100"
                                       onClick={() => toggleProgressMinimization(message.id)}
                                     >
                                       {message.generationProgress.isMinimized ? (
-                                        <Plus className="h-3 w-3" />
+                                        <Plus className="h-2.5 w-2.5" />
                                       ) : (
-                                        <Minimize className="h-3 w-3" />
+                                        <Minimize className="h-2.5 w-2.5" />
                                       )}
                                     </Button>
                                   </div>
                                 </div>
 
                                 {!message.generationProgress.isMinimized && (
-                                  <div className="mt-3 pt-3 border-t border-green-200 space-y-2">
+                                  <div className="mt-2 pt-2 border-t border-green-200 space-y-1">
                                     {Array.from({ length: message.generationProgress.completedSlides || 0 }, (_, i) => (
-                                      <div key={i} className="flex items-center space-x-3 py-1">
-                                        <div className="w-4 h-4 bg-green-500 rounded-full flex items-center justify-center flex-shrink-0">
-                                          <Check className="w-2.5 h-2.5 text-white" />
+                                      <div key={i} className="flex items-center space-x-2 py-0.5">
+                                        <div className="w-3 h-3 bg-green-500 rounded-full flex items-center justify-center">
+                                          <Check className="w-2 h-2 text-white" />
                                         </div>
-                                        <span className="text-sm text-green-700">✅ Designed slide {i + 1}</span>
+                                        <span className="text-xs text-green-700">Designed slide {i + 1}</span>
                                       </div>
                                     ))}
                                   </div>
