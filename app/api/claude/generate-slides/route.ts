@@ -149,9 +149,9 @@ ${fileContent ? `\nSOURCE CONTENT:\n${fileContent.substring(0, 1000)}...` : ""}
 CONTENT ANALYSIS: ${JSON.stringify(contentAnalysis)}
 
 ULTIMATE DESIGN CAPABILITIES:
-- Chart Types: ${designContext.visualContentCapabilities?.charts?.types?.join(", ") || "bar, line, pie, area"}
-- Table Styles: ${designContext.visualContentCapabilities?.tables?.styles?.join(", ") || "modern, minimal"} 
-- Business Icons: ${designContext.visualContentCapabilities?.icons?.business?.join(", ") || "📊💼🎯📈🚀💡"}
+- Chart Types: ${Array.isArray(designContext.visualContentCapabilities?.charts?.types) ? designContext.visualContentCapabilities.charts.types.join(", ") : "bar, line, pie, area"}
+- Table Styles: ${Array.isArray(designContext.visualContentCapabilities?.tables?.styles) ? designContext.visualContentCapabilities.tables.styles.join(", ") : "modern, minimal"} 
+- Business Icons: ${Array.isArray(designContext.visualContentCapabilities?.icons?.business) ? designContext.visualContentCapabilities.icons.business.join(", ") : "📊💼🎯📈🚀💡"}
 
 CRITICAL INSTRUCTIONS:
 1. When content has data/numbers → ALWAYS include chartData with realistic sample data
@@ -274,7 +274,7 @@ export async function POST(request: NextRequest) {
     console.log("🎨 Generating ultimate presentation with design context for:", requestData.prompt)
 
     const message = await anthropic.messages.create({
-      model: "claude-sonnet-4-20250514", // FIXED: Use correct model
+      model: "claude-3-5-sonnet-20241022",
       max_tokens: 12000, // Increased for complex visual content
       temperature: 0.85, // Higher creativity for design
       system: `You are SlydPRO AI, the ultimate presentation design system with advanced visual intelligence.
