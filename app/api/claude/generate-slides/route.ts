@@ -275,7 +275,7 @@ export async function POST(request: NextRequest) {
 
     const message = await anthropic.messages.create({
       model: "claude-3-5-sonnet-20241022",
-      max_tokens: 12000, // Increased for complex visual content
+      max_tokens: 8000, // Reduced from 12000
       temperature: 0.85, // Higher creativity for design
       system: `You are SlydPRO AI, the ultimate presentation design system with advanced visual intelligence.
 
