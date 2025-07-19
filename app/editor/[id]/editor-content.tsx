@@ -75,7 +75,7 @@ interface EditorContentProps {
 
 function EditorContent({ params }: EditorContentProps) {
   const [isSmallScreen, setIsSmallScreen] = useState(false)
-  const [slides, setSlides] = useState<UltimateSlide[]>([])
+  const [slides, setSlides] = useState<Slide[]>([])
   const [selectedSlide, setSelectedSlide] = useState<string>("")
   const [inputMessage, setInputMessage] = useState("")
   const [projectName, setProjectName] = useState("Untitled Presentation")
@@ -838,15 +838,13 @@ function EditorContent({ params }: EditorContentProps) {
                       </div>
 
                       {/* Slide Preview */}
-                      <div className="p-3 pt-4">
-                        <div className="w-full aspect-video rounded border overflow-hidden">
-                          <UltimateSlideRenderer
-                            slide={slide}
-                            isSelected={selectedSlide === slide.id}
-                            onClick={() => handleSlideSelect(slide.id, index)}
-                            className="scale-75 origin-top-left"
-                          />
-                        </div>
+                      <div className="w-full aspect-video rounded border overflow-hidden">
+                        <UltimateSlideRenderer
+                          slide={slide}
+                          isSelected={selectedSlide === slide.id}
+                          onClick={() => handleSlideSelect(slide.id, index)}
+                          className="scale-75 origin-top-left"
+                        />
                       </div>
 
                       {/* Hover Actions */}
