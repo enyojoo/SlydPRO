@@ -1,4 +1,5 @@
 export interface UltimateSlide {
+  // Keep existing properties (CRITICAL - don't break existing slides)
   id: string
   title: string
   content: string
@@ -6,7 +7,7 @@ export interface UltimateSlide {
   textColor: string
   layout: "title" | "content" | "two-column" | "image" | "chart" | "table" | "infographic"
 
-  // Advanced Design Properties
+  // Add new optional properties (won't break existing slides)
   titleFont?: string
   contentFont?: string
   titleSize?: string
@@ -18,9 +19,9 @@ export interface UltimateSlide {
   shadowEffect?: string
   borderRadius?: string
 
-  // Visual Content
+  // Visual content (optional - existing slides won't have these)
   chartData?: {
-    type: "bar" | "line" | "pie" | "donut" | "area" | "scatter" | "bubble"
+    type: "bar" | "line" | "pie" | "donut" | "area"
     data: any[]
     config: any
     style: string
@@ -31,12 +32,6 @@ export interface UltimateSlide {
     style: string
     interactive: boolean
   }
-  imageData?: {
-    src: string
-    alt: string
-    position: string
-    style: string
-  }
   icons?: Array<{
     icon: string
     position: string
@@ -44,11 +39,5 @@ export interface UltimateSlide {
     size: string
   }>
 
-  // Animation and Effects
-  animations?: {
-    entrance: string
-    emphasis: string[]
-  }
   glassmorphism?: boolean
-  customCSS?: string
 }

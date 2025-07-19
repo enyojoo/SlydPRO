@@ -18,44 +18,7 @@ interface SlideGenerationRequest {
   hasFile?: boolean
 }
 
-// CRITICAL: Load design context from environment variable
-const getUltimateDesignContext = () => {
-  if (process.env.SLYDPRO_DESIGN_CONTEXT) {
-    try {
-      return JSON.parse(process.env.SLYDPRO_DESIGN_CONTEXT)
-    } catch (error) {
-      console.warn("Failed to parse ultimate design context")
-    }
-  }
-
-  // Fallback to basic context if secure context not available
-  return {
-    version: "1.0.0",
-    designPhilosophy: "Create pixel-perfect, modern presentations with advanced visual capabilities",
-    visualContentCapabilities: {
-      charts: { types: ["bar", "line", "pie", "area"] },
-      tables: { styles: ["modern", "minimal"] },
-      icons: { business: ["📊", "💼", "🎯", "📈"] },
-    },
-    typographyMastery: {
-      fontStacks: {
-        premium_corporate: {
-          primary: "SF Pro Display, Inter, sans-serif",
-          secondary: "SF Pro Text, Inter, sans-serif",
-        },
-      },
-    },
-    visualEffects: {
-      shadows: {
-        pronounced: "0 15px 35px rgba(0,0,0,0.1)",
-      },
-    },
-  }
-}
-
-const createUltimatePrompt = (request: SlideGenerationRequest, fileContent?: string): string => {
-  const designContext = getUltimateDesignContext()
-
+const createAdvancedSlidePrompt = (request: SlideGenerationRequest, fileContent?: string): string => {
   const {
     prompt,
     slideCount = "auto",
@@ -70,7 +33,7 @@ const createUltimatePrompt = (request: SlideGenerationRequest, fileContent?: str
   } = request
 
   if (editMode === "selected" && selectedSlideId && selectedSlideTitle) {
-    return `You are SlydPRO AI, an expert presentation designer.
+    return `You are SlydPRO AI, an expert presentation designer with ultimate visual capabilities.
 
 CONTEXT: Editing slide "${selectedSlideTitle}" (ID: ${selectedSlideId})
 USER REQUEST: "${prompt}"
@@ -78,7 +41,15 @@ PRESENTATION TYPE: ${presentationType}
 AUDIENCE: ${audience}
 TONE: ${tone}
 
-TASK: Update ONLY this slide based on the user's request.
+TASK: Update ONLY this slide with ultimate visual enhancements.
+
+ULTIMATE VISUAL FEATURES:
+- Charts: bar, line, pie, donut, area with real data
+- Tables: interactive data tables with styling
+- Icons: trending-up, users, dollar-sign, target, zap, star, award, globe
+- Typography: custom fonts, sizes, colors
+- Effects: glassmorphism, shadows, gradients
+- Layouts: title, content, two-column, chart, table, infographic
 
 OUTPUT FORMAT (JSON):
 {
@@ -87,126 +58,148 @@ OUTPUT FORMAT (JSON):
       "id": "${selectedSlideId}",
       "title": "Updated title",
       "content": "Updated content\\n• Point 1\\n• Point 2\\n• Point 3",
-      "background": "linear-gradient(135deg, #1e3c72 0%, #2a5298 100%)",
+      "background": "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
       "textColor": "#ffffff",
-      "layout": "content",
-      "titleFont": "SF Pro Display, Inter, sans-serif",
-      "contentFont": "SF Pro Text, Inter, sans-serif",
-      "titleSize": "clamp(1.75rem, 3vw, 2.5rem)",
-      "contentSize": "clamp(1rem, 1.5vw, 1.125rem)",
-      "spacing": "comfortable",
-      "alignment": "left",
-      "titleColor": "#ffffff",
+      "layout": "chart",
+      "titleFont": "Inter",
+      "titleSize": "2.5rem",
       "accentColor": "#fbbf24",
-      "shadowEffect": "0 15px 35px rgba(0,0,0,0.1)",
-      "borderRadius": "20px",
-      "glassmorphism": false
-    }
-  ],
-  "message": "Updated the slide successfully."
-}`
-  }
-
-  const ultimatePrompt = `You are SlydPRO AI, the world's most advanced presentation design system with ultimate visual intelligence.
-
-DESIGN PHILOSOPHY: ${designContext.designPhilosophy}
-
-ULTIMATE CAPABILITIES FROM DESIGN CONTEXT:
-- Chart Types Available: ${designContext.visualContentCapabilities?.charts?.types?.join(", ") || "bar, line, pie, area"}
-- Table Styles: ${designContext.visualContentCapabilities?.tables?.styles?.join(", ") || "modern, minimal"}
-- Modern Typography: ${designContext.typographyMastery?.fontStacks?.premium_corporate?.primary || "SF Pro Display, Inter"}
-- Color Intelligence: Use gradients from design context for backgrounds
-- Visual Effects: Apply glassmorphism, shadows, and modern styling
-
-CONTENT ANALYSIS INSTRUCTIONS:
-1. Analyze the user's content for data patterns
-2. Automatically detect when charts/tables are needed
-3. Suggest relevant images and icons from design context
-4. Choose optimal layouts based on content type
-5. Apply advanced visual effects for modern appeal
-6. Ensure pixel-perfect design execution
-
-USER REQUEST: "${prompt}"
-PRESENTATION TYPE: ${presentationType}
-AUDIENCE: ${audience}
-${fileContent ? `FILE CONTENT: ${fileContent}` : ""}
-
-CRITICAL: Always include chartData when numbers/data are mentioned, tableData for comparisons, and icons from the design context.
-
-ADVANCED OUTPUT STRUCTURE - Generate slides with sophisticated visual elements:
-{
-  "slides": [
-    {
-      "id": "slide-1",
-      "title": "Compelling Title with Perfect Typography",
-      "content": "Strategic content that complements visuals",
-      "background": "linear-gradient(135deg, #1e3c72 0%, #2a5298 100%)",
-      "textColor": "#ffffff",
-      "layout": "title",
-      "titleFont": "SF Pro Display, Inter, sans-serif",
-      "contentFont": "SF Pro Text, Inter, sans-serif",
-      "titleSize": "clamp(2.5rem, 5vw, 4rem)",
-      "contentSize": "clamp(1rem, 1.5vw, 1.125rem)",
-      "spacing": "generous",
-      "alignment": "center",
-      "titleColor": "#ffffff",
-      "accentColor": "#fbbf24",
-      "shadowEffect": "0 20px 40px rgba(0,0,0,0.15)",
-      "borderRadius": "24px",
       "glassmorphism": true,
-      "animations": {
-        "entrance": "fadeIn",
-        "emphasis": ["pulse", "glow"]
-      },
-      "icons": [
-        {
-          "icon": "🚀",
-          "position": "top-right",
-          "color": "#fbbf24",
-          "size": "2rem"
-        }
-      ],
       "chartData": {
         "type": "bar",
         "data": [
           {"label": "Q1", "value": 65},
           {"label": "Q2", "value": 78},
-          {"label": "Q3", "value": 92},
-          {"label": "Q4", "value": 85}
+          {"label": "Q3", "value": 90},
+          {"label": "Q4", "value": 95}
         ],
         "config": {},
         "style": "modern"
-      }
+      },
+      "icons": [
+        {
+          "icon": "trending-up",
+          "position": "top-right",
+          "color": "#fbbf24",
+          "size": "32"
+        }
+      ]
     }
   ],
-  "message": "Created sophisticated slides using SlydPRO's ultimate design intelligence.",
-  "designNotes": "Applied design context intelligence with modern visual effects."
-}
-
-Generate pixel-perfect slides using the design context intelligence:`
-
-  return ultimatePrompt
-}
-
-const analyzeContentForVisuals = (content: string) => {
-  const analysis = {
-    hasData: /\d+%|\$\d+|(\d+,?\d*\s*(increase|decrease|growth|revenue|profit))/i.test(content),
-    hasComparisons: /(vs|versus|compared to|against|better than|worse than)/i.test(content),
-    hasTimeline:
-      /(january|february|march|april|may|june|july|august|september|october|november|december|q1|q2|q3|q4|2023|2024|2025)/i.test(
-        content,
-      ),
-    hasProcess: /(step|phase|stage|\d+\.|first|second|third|then|next|finally)/i.test(content),
-    needsChart: false,
-    needsTable: false,
-    needsInfographic: false,
+  "message": "Enhanced slide with ultimate visual capabilities."
+}`
   }
 
-  analysis.needsChart = analysis.hasData || analysis.hasTimeline
-  analysis.needsTable = analysis.hasComparisons
-  analysis.needsInfographic = analysis.hasProcess
+  return `You are SlydPRO AI, an expert presentation designer with ULTIMATE VISUAL CAPABILITIES.
 
-  return analysis
+USER REQUEST: "${prompt}"
+PRESENTATION TYPE: ${presentationType}
+AUDIENCE: ${audience}
+TONE: ${tone}
+SLIDE COUNT: ${slideCount === "auto" ? "5-10 slides" : slideCount}
+${fileContent ? `FILE CONTENT: ${fileContent}` : ""}
+
+ULTIMATE DESIGN SYSTEM:
+1. VISUAL LAYOUTS: title, content, two-column, chart, table, infographic
+2. CHARTS: Generate real data for bar, line, pie charts
+3. TABLES: Create structured data tables
+4. ICONS: Use trending-up, users, dollar-sign, target, zap, star, award, globe
+5. TYPOGRAPHY: Custom fonts (Inter, Roboto, Poppins), sizes, colors
+6. EFFECTS: Glassmorphism, gradients, shadows, accent colors
+7. SPACING: generous, comfortable, relaxed
+8. ALIGNMENT: left, center, right
+
+CHART DATA EXAMPLES:
+- Revenue: [{"label": "Q1", "value": 250000}, {"label": "Q2", "value": 320000}]
+- Growth: [{"label": "2022", "value": 45}, {"label": "2023", "value": 78}]
+- Market Share: [{"label": "Us", "value": 35}, {"label": "Competitor A", "value": 25}]
+
+TABLE DATA EXAMPLES:
+- Pricing: {"headers": ["Plan", "Price", "Features"], "rows": [["Basic", "$9", "5 users"], ["Pro", "$29", "50 users"]]}
+- Metrics: {"headers": ["Metric", "Current", "Target"], "rows": [["Revenue", "$2M", "$5M"], ["Users", "10K", "50K"]]}
+
+DESIGN PRINCIPLES:
+1. Use gradients for backgrounds: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)"
+2. Add glassmorphism for modern look
+3. Include relevant icons for visual appeal
+4. Use charts/tables for data-heavy slides
+5. Apply accent colors for highlights
+6. Ensure responsive typography
+
+OUTPUT FORMAT (JSON):
+{
+  "slides": [
+    {
+      "id": "slide-1",
+      "title": "Revolutionary Growth Strategy",
+      "content": "Transforming market presence\\n• 300% revenue increase\\n• 50K new customers\\n• Global expansion",
+      "background": "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
+      "textColor": "#ffffff",
+      "layout": "infographic",
+      "titleFont": "Inter",
+      "titleSize": "3rem",
+      "contentFont": "Inter",
+      "spacing": "comfortable",
+      "alignment": "left",
+      "titleColor": "#ffffff",
+      "accentColor": "#fbbf24",
+      "shadowEffect": "0 20px 40px rgba(0,0,0,0.2)",
+      "borderRadius": "20px",
+      "glassmorphism": true,
+      "chartData": {
+        "type": "bar",
+        "data": [
+          {"label": "Q1 2023", "value": 125000},
+          {"label": "Q2 2023", "value": 180000},
+          {"label": "Q3 2023", "value": 245000},
+          {"label": "Q4 2023", "value": 320000}
+        ],
+        "config": {"showGrid": true},
+        "style": "modern"
+      },
+      "icons": [
+        {
+          "icon": "trending-up",
+          "position": "top-right",
+          "color": "#fbbf24",
+          "size": "32"
+        }
+      ]
+    },
+    {
+      "id": "slide-2",
+      "title": "Market Analysis",
+      "content": "Comprehensive market breakdown and opportunities",
+      "background": "linear-gradient(135deg, #f093fb 0%, #f5576c 100%)",
+      "textColor": "#ffffff",
+      "layout": "table",
+      "titleFont": "Inter",
+      "titleSize": "2.5rem",
+      "accentColor": "#ff6b6b",
+      "glassmorphism": true,
+      "tableData": {
+        "headers": ["Segment", "Size ($M)", "Growth %", "Opportunity"],
+        "rows": [
+          ["Enterprise", "450", "15%", "High"],
+          ["SMB", "280", "22%", "Medium"],
+          ["Startup", "120", "35%", "High"]
+        ],
+        "style": "modern",
+        "interactive": true
+      },
+      "icons": [
+        {
+          "icon": "target",
+          "position": "top-right",
+          "color": "#ff6b6b",
+          "size": "28"
+        }
+      ]
+    }
+  ],
+  "message": "Created ultimate visual presentation with charts, tables, and modern design.",
+  "designNotes": "Enhanced with glassmorphism, gradients, and interactive elements for ${audience} audience."
+}`
 }
 
 const parseFileContent = async (file: File): Promise<string> => {
@@ -227,34 +220,19 @@ export async function POST(request: NextRequest) {
       fileContent = await parseFileContent(uploadedFile)
     }
 
-    // Analyze content for intelligent visual suggestions
-    const contentAnalysis = analyzeContentForVisuals(requestData.prompt + " " + fileContent)
-
-    const prompt = createUltimatePrompt(
+    const prompt = createAdvancedSlidePrompt(
       {
         ...requestData,
-        contentAnalysis,
         hasFile: !!uploadedFile,
       },
       fileContent,
     )
 
-    console.log("🎨 Generating ultimate presentation with design context for:", requestData.prompt)
-
     const message = await anthropic.messages.create({
       model: "claude-3-5-sonnet-20241022",
-      max_tokens: 12000,
-      temperature: 0.85,
-      system: `You are SlydPRO AI, the ultimate presentation design system with advanced visual intelligence powered by sophisticated design context.
-
-CRITICAL INSTRUCTIONS:
-- Always respond with valid JSON matching the exact structure requested
-- Use the design context to make intelligent design decisions
-- When data is detected, ALWAYS include chartData with realistic sample data
-- When comparisons are found, ALWAYS include tableData with proper formatting
-- ALWAYS add relevant icons and visual elements from the design context
-- Apply modern design trends from the context: gradients, shadows, glassmorphism, proper typography
-- Ensure every slide looks like it was designed by Apple's keynote team using the design intelligence provided`,
+      max_tokens: 8000,
+      temperature: 0.7,
+      system: "You are SlydPRO AI. Always respond with valid JSON matching the requested structure.",
       messages: [
         {
           role: "user",
@@ -267,103 +245,31 @@ CRITICAL INSTRUCTIONS:
 
     const jsonMatch = responseText.match(/\{[\s\S]*\}/)
     if (!jsonMatch) {
-      console.error("Claude response without JSON:", responseText.substring(0, 1000))
-      throw new Error("Claude did not return valid JSON format")
+      throw new Error("Claude did not return valid JSON")
     }
 
-    let result
-    try {
-      result = JSON.parse(jsonMatch[0])
-    } catch (parseError) {
-      console.error("JSON parse error:", parseError)
-      throw new Error("Invalid JSON structure from Claude")
-    }
+    const result = JSON.parse(jsonMatch[0])
 
     if (!result.slides || !Array.isArray(result.slides)) {
-      throw new Error("Invalid slides data structure from Claude")
+      throw new Error("Invalid slides data from Claude")
     }
 
-    // Enhanced validation with comprehensive defaults using design context
-    const designContext = getUltimateDesignContext()
-    const validatedSlides = result.slides.map((slide: any, index: number) => {
-      const baseSlide = {
-        id: slide.id || `slide-${Date.now()}-${index}`,
-        title: slide.title || `Slide ${index + 1}`,
-        content: slide.content || "",
-        background: slide.background || "linear-gradient(135deg, #1e3c72 0%, #2a5298 100%)",
-        textColor: slide.textColor || "#ffffff",
-        layout: slide.layout || (index === 0 ? "title" : "content"),
-
-        // Advanced design properties with design context defaults
-        titleFont:
-          slide.titleFont ||
-          designContext.typographyMastery?.fontStacks?.premium_corporate?.primary ||
-          "SF Pro Display, Inter, sans-serif",
-        contentFont:
-          slide.contentFont ||
-          designContext.typographyMastery?.fontStacks?.premium_corporate?.secondary ||
-          "SF Pro Text, Inter, sans-serif",
-        titleSize: slide.titleSize || (index === 0 ? "clamp(2.5rem, 5vw, 4rem)" : "clamp(1.75rem, 3vw, 2.5rem)"),
-        contentSize: slide.contentSize || "clamp(1rem, 1.5vw, 1.125rem)",
-        spacing: slide.spacing || "comfortable",
-        alignment: slide.alignment || (index === 0 ? "center" : "left"),
-        titleColor: slide.titleColor || "#ffffff",
-        accentColor: slide.accentColor || "#fbbf24",
-        shadowEffect:
-          slide.shadowEffect || designContext.visualEffects?.shadows?.pronounced || "0 15px 35px rgba(0,0,0,0.1)",
-        borderRadius: slide.borderRadius || "20px",
-        glassmorphism: slide.glassmorphism || false,
-
-        // Visual content with validation
-        chartData: slide.chartData
-          ? {
-              type: slide.chartData.type || "bar",
-              data: slide.chartData.data || [],
-              config: slide.chartData.config || {},
-              style: slide.chartData.style || "modern",
-            }
-          : null,
-
-        tableData: slide.tableData
-          ? {
-              headers: slide.tableData.headers || [],
-              rows: slide.tableData.rows || [],
-              style: slide.tableData.style || "modern",
-              interactive: slide.tableData.interactive || false,
-            }
-          : null,
-
-        imageData: slide.imageData
-          ? {
-              src: slide.imageData.src || "",
-              alt: slide.imageData.alt || "",
-              position: slide.imageData.position || "center",
-              style: slide.imageData.style || "modern",
-            }
-          : null,
-
-        icons: slide.icons || [],
-        animations: slide.animations || {
-          entrance: "fadeIn",
-          emphasis: [],
-        },
-        customCSS: slide.customCSS || "",
-      }
-
-      return baseSlide
-    })
-
-    console.log(`✅ Successfully generated ${validatedSlides.length} ultimate slides using design context`)
+    const validatedSlides = result.slides.map((slide: any, index: number) => ({
+      id: slide.id || `slide-${Date.now()}-${index}`,
+      title: slide.title || `Slide ${index + 1}`,
+      content: slide.content || "",
+      background: slide.background || "#1e40af",
+      textColor: slide.textColor || "#ffffff",
+      layout: slide.layout || "content",
+    }))
 
     return NextResponse.json({
       slides: validatedSlides,
-      message:
-        result.message || `Generated ${validatedSlides.length} pixel-perfect slides with ultimate design intelligence.`,
-      designNotes: result.designNotes || "Applied ultimate design context intelligence with modern visual effects.",
-      overallTheme: result.overallTheme,
+      message: result.message || `Generated ${validatedSlides.length} slides successfully.`,
+      designNotes: result.designNotes || "",
     })
   } catch (error) {
-    console.error("❌ Ultimate SlydPRO API Error:", error)
+    console.error("Claude API Error:", error)
 
     if (error instanceof Error) {
       if (error.message.includes("rate_limit")) {
@@ -379,7 +285,7 @@ CRITICAL INSTRUCTIONS:
       if (error.message.includes("invalid_api_key")) {
         return NextResponse.json(
           {
-            error: "API configuration error. Please check your Claude API key.",
+            error: "API configuration error. Please check your setup.",
             type: "auth_error",
           },
           { status: 401 },
@@ -388,7 +294,7 @@ CRITICAL INSTRUCTIONS:
 
       return NextResponse.json(
         {
-          error: `Ultimate generation failed: ${error.message}`,
+          error: `Generation failed: ${error.message}`,
           type: "generation_error",
         },
         { status: 500 },
@@ -397,7 +303,7 @@ CRITICAL INSTRUCTIONS:
 
     return NextResponse.json(
       {
-        error: "An unexpected error occurred in the ultimate design system.",
+        error: "An unexpected error occurred. Please try again.",
         type: "unknown_error",
       },
       { status: 500 },
