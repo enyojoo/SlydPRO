@@ -1,18 +1,10 @@
 "use client"
 
 import { useState, useCallback } from "react"
-
-interface Slide {
-  id: string
-  title: string
-  content: string
-  background: string
-  textColor: string
-  layout: "title" | "content" | "two-column" | "image"
-}
+import type { UltimateSlide } from "@/lib/types"
 
 interface GenerationResult {
-  slides: Slide[]
+  slides: UltimateSlide[]
   message?: string
   designNotes?: string
 }
