@@ -948,43 +948,38 @@ function EditorContent({ params }: EditorContentProps) {
                       {/* Slide Preview - Static Image Preview */}
                       <div className="p-3 pt-4">
                         <div className="w-full aspect-video rounded border overflow-hidden bg-gray-50 relative">
-                          {/* Static preview without interactive elements */}
+                          {/* Static thumbnail preview - no interactions */}
                           <div
-                            className="w-full h-full flex flex-col p-2 text-xs"
+                            className="w-full h-full flex flex-col p-2 text-xs pointer-events-none"
                             style={{
                               background: slide.background || "linear-gradient(135deg, #027659 0%, #065f46 100%)",
                               color: slide.textColor || "#ffffff",
                             }}
                           >
                             {/* Title preview */}
-                            <div className="font-bold mb-1 truncate" style={{ fontSize: "8px" }}>
-                              {slide.title}
-                            </div>
+                            <div className="font-semibold mb-1 truncate text-[8px] leading-tight">{slide.title}</div>
 
                             {/* Content preview */}
-                            <div className="flex-1 overflow-hidden" style={{ fontSize: "6px", opacity: 0.8 }}>
-                              {(slide.content || "")
-                                .toString()
-                                .split("\n")
-                                .slice(0, 3)
-                                .map((line, idx) => (
-                                  <div key={idx} className="truncate mb-0.5">
-                                    {line.startsWith("•") ? `• ${line.substring(1).trim()}` : line}
-                                  </div>
-                                ))}
+                            <div className="flex-1 text-[6px] leading-tight opacity-80">
+                              <div className="space-y-0.5">
+                                {(slide.content || "")
+                                  .toString()
+                                  .split("\n")
+                                  .slice(0, 4)
+                                  .map((line, idx) => (
+                                    <div key={idx} className="truncate">
+                                      {line.startsWith("•") ? `• ${line.substring(1).trim()}` : line}
+                                    </div>
+                                  ))}
+                              </div>
                             </div>
 
                             {/* Chart/Table indicator */}
                             {slide.chartData && (
-                              <div className="absolute bottom-1 right-1 w-3 h-2 bg-white/20 rounded" />
+                              <div className="absolute bottom-1 right-1 text-[8px] opacity-60">📊</div>
                             )}
                             {slide.tableData && (
-                              <div className="absolute bottom-1 right-1 w-3 h-2 border border-white/20 rounded" />
-                            )}
-
-                            {/* Single contextual icon if present */}
-                            {slide.icons && slide.icons.length > 0 && (
-                              <div className="absolute top-1 right-1 text-xs opacity-60">{slide.icons[0].icon}</div>
+                              <div className="absolute bottom-1 right-1 text-[8px] opacity-60">📋</div>
                             )}
                           </div>
                         </div>
