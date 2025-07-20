@@ -46,13 +46,13 @@ export const UltimateSlideRenderer: React.FC<UltimateSlideRendererProps> = ({
     "🏆": Award,
     "🌍": Globe,
     "trending-up": TrendingUp,
-    "users": Users,
+    users: Users,
     "dollar-sign": DollarSign,
-    "target": Target,
-    "zap": Zap,
-    "star": Star,
-    "award": Award,
-    "globe": Globe,
+    target: Target,
+    zap: Zap,
+    star: Star,
+    award: Award,
+    globe: Globe,
   }
 
   // Enhanced chart colors
@@ -61,15 +61,24 @@ export const UltimateSlideRenderer: React.FC<UltimateSlideRendererProps> = ({
   // Chart renderer with better styling
   const renderChart = () => {
     if (!slide.chartData || !slide.chartData.data || slide.chartData.data.length === 0) return null
-    
+
     const { type, data, config = {} } = slide.chartData
     const height = isPresentationMode ? 400 : 280
 
     // Ensure data has proper structure
     const chartData = data.map((item, index) => ({
       name: item.name || item.label || item.month || item.metric || item.region || `Item ${index + 1}`,
-      value: typeof item.value === 'number' ? item.value : typeof item.sales === 'number' ? item.sales : typeof item.score === 'number' ? item.score : typeof item.revenue === 'number' ? item.revenue : 0,
-      ...item
+      value:
+        typeof item.value === "number"
+          ? item.value
+          : typeof item.sales === "number"
+            ? item.sales
+            : typeof item.score === "number"
+              ? item.score
+              : typeof item.revenue === "number"
+                ? item.revenue
+                : 0,
+      ...item,
     }))
 
     switch (type) {
@@ -78,104 +87,88 @@ export const UltimateSlideRenderer: React.FC<UltimateSlideRendererProps> = ({
           <ResponsiveContainer width="100%" height={height}>
             <BarChart data={chartData} margin={{ top: 20, right: 30, left: 20, bottom: 20 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.2)" />
-              <XAxis 
-                dataKey="name" 
-                stroke="#ffffff" 
+              <XAxis
+                dataKey="name"
+                stroke="#ffffff"
                 fontSize={isPresentationMode ? 14 : 12}
-                tick={{ fill: '#ffffff' }}
+                tick={{ fill: "#ffffff" }}
               />
-              <YAxis 
-                stroke="#ffffff" 
-                fontSize={isPresentationMode ? 14 : 12}
-                tick={{ fill: '#ffffff' }}
-              />
-              <Tooltip 
-                contentStyle={{ 
-                  backgroundColor: "rgba(0,0,0,0.8)", 
-                  border: "none", 
+              <YAxis stroke="#ffffff" fontSize={isPresentationMode ? 14 : 12} tick={{ fill: "#ffffff" }} />
+              <Tooltip
+                contentStyle={{
+                  backgroundColor: "rgba(0,0,0,0.8)",
+                  border: "none",
                   borderRadius: "8px",
-                  color: '#ffffff'
-                }} 
+                  color: "#ffffff",
+                }}
               />
-              <Bar 
-                dataKey="value" 
-                fill={slide.accentColor || "#10b981"} 
-                radius={[4, 4, 0, 0]}
-              />
+              <Bar dataKey="value" fill={slide.accentColor || "#10b981"} radius={[4, 4, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
         )
-      
+
       case "line":
         return (
           <ResponsiveContainer width="100%" height={height}>
             <LineChart data={chartData} margin={{ top: 20, right: 30, left: 20, bottom: 20 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.2)" />
-              <XAxis 
-                dataKey="name" 
-                stroke="#ffffff" 
+              <XAxis
+                dataKey="name"
+                stroke="#ffffff"
                 fontSize={isPresentationMode ? 14 : 12}
-                tick={{ fill: '#ffffff' }}
+                tick={{ fill: "#ffffff" }}
               />
-              <YAxis 
-                stroke="#ffffff" 
-                fontSize={isPresentationMode ? 14 : 12}
-                tick={{ fill: '#ffffff' }}
-              />
-              <Tooltip 
-                contentStyle={{ 
-                  backgroundColor: "rgba(0,0,0,0.8)", 
-                  border: "none", 
+              <YAxis stroke="#ffffff" fontSize={isPresentationMode ? 14 : 12} tick={{ fill: "#ffffff" }} />
+              <Tooltip
+                contentStyle={{
+                  backgroundColor: "rgba(0,0,0,0.8)",
+                  border: "none",
                   borderRadius: "8px",
-                  color: '#ffffff'
-                }} 
+                  color: "#ffffff",
+                }}
               />
-              <Line 
-                type="monotone" 
-                dataKey="value" 
-                stroke={slide.accentColor || "#10b981"} 
+              <Line
+                type="monotone"
+                dataKey="value"
+                stroke={slide.accentColor || "#10b981"}
                 strokeWidth={3}
                 dot={{ fill: slide.accentColor || "#10b981", strokeWidth: 2, r: 4 }}
               />
             </LineChart>
           </ResponsiveContainer>
         )
-      
+
       case "area":
         return (
           <ResponsiveContainer width="100%" height={height}>
             <AreaChart data={chartData} margin={{ top: 20, right: 30, left: 20, bottom: 20 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.2)" />
-              <XAxis 
-                dataKey="name" 
-                stroke="#ffffff" 
+              <XAxis
+                dataKey="name"
+                stroke="#ffffff"
                 fontSize={isPresentationMode ? 14 : 12}
-                tick={{ fill: '#ffffff' }}
+                tick={{ fill: "#ffffff" }}
               />
-              <YAxis 
-                stroke="#ffffff" 
-                fontSize={isPresentationMode ? 14 : 12}
-                tick={{ fill: '#ffffff' }}
-              />
-              <Tooltip 
-                contentStyle={{ 
-                  backgroundColor: "rgba(0,0,0,0.8)", 
-                  border: "none", 
+              <YAxis stroke="#ffffff" fontSize={isPresentationMode ? 14 : 12} tick={{ fill: "#ffffff" }} />
+              <Tooltip
+                contentStyle={{
+                  backgroundColor: "rgba(0,0,0,0.8)",
+                  border: "none",
                   borderRadius: "8px",
-                  color: '#ffffff'
-                }} 
+                  color: "#ffffff",
+                }}
               />
-              <Area 
-                type="monotone" 
-                dataKey="value" 
-                stroke={slide.accentColor || "#10b981"} 
+              <Area
+                type="monotone"
+                dataKey="value"
+                stroke={slide.accentColor || "#10b981"}
                 fill={slide.accentColor || "#10b981"}
                 fillOpacity={0.3}
               />
             </AreaChart>
           </ResponsiveContainer>
         )
-      
+
       case "pie":
       case "donut":
         return (
@@ -194,18 +187,18 @@ export const UltimateSlideRenderer: React.FC<UltimateSlideRendererProps> = ({
                   <Cell key={`cell-${index}`} fill={chartColors[index % chartColors.length]} />
                 ))}
               </Pie>
-              <Tooltip 
-                contentStyle={{ 
-                  backgroundColor: "rgba(0,0,0,0.8)", 
-                  border: "none", 
+              <Tooltip
+                contentStyle={{
+                  backgroundColor: "rgba(0,0,0,0.8)",
+                  border: "none",
                   borderRadius: "8px",
-                  color: '#ffffff'
-                }} 
+                  color: "#ffffff",
+                }}
               />
             </PieChart>
           </ResponsiveContainer>
         )
-      
+
       default:
         return null
     }
@@ -214,7 +207,7 @@ export const UltimateSlideRenderer: React.FC<UltimateSlideRendererProps> = ({
   // Enhanced table renderer
   const renderTable = () => {
     if (!slide.tableData || !slide.tableData.headers || !slide.tableData.rows) return null
-    
+
     const { headers, rows } = slide.tableData
 
     return (
@@ -254,17 +247,21 @@ export const UltimateSlideRenderer: React.FC<UltimateSlideRendererProps> = ({
         {slide.icons.map((iconData, index) => {
           // Try to get React icon first
           const IconComponent = iconMap[iconData.icon]
-          
+
           if (IconComponent) {
             return (
               <div
                 key={index}
                 className={`absolute ${
-                  iconData.position === "top-right" ? "top-4 right-4" : 
-                  iconData.position === "top-left" ? "top-4 left-4" : 
-                  iconData.position === "bottom-right" ? "bottom-4 right-4" : 
-                  iconData.position === "bottom-left" ? "bottom-4 left-4" : 
-                  "top-4 right-4"
+                  iconData.position === "top-right"
+                    ? "top-4 right-4"
+                    : iconData.position === "top-left"
+                      ? "top-4 left-4"
+                      : iconData.position === "bottom-right"
+                        ? "bottom-4 right-4"
+                        : iconData.position === "bottom-left"
+                          ? "bottom-4 left-4"
+                          : "top-4 right-4"
                 } opacity-80`}
                 style={{ color: iconData.color || slide.accentColor || "#ffffff" }}
               >
@@ -272,17 +269,21 @@ export const UltimateSlideRenderer: React.FC<UltimateSlideRendererProps> = ({
               </div>
             )
           }
-          
+
           // Fallback to emoji
           return (
             <div
               key={index}
               className={`absolute ${
-                iconData.position === "top-right" ? "top-4 right-4" : 
-                iconData.position === "top-left" ? "top-4 left-4" : 
-                iconData.position === "bottom-right" ? "bottom-4 right-4" : 
-                iconData.position === "bottom-left" ? "bottom-4 left-4" : 
-                "top-4 right-4"
+                iconData.position === "top-right"
+                  ? "top-4 right-4"
+                  : iconData.position === "top-left"
+                    ? "top-4 left-4"
+                    : iconData.position === "bottom-right"
+                      ? "bottom-4 right-4"
+                      : iconData.position === "bottom-left"
+                        ? "bottom-4 left-4"
+                        : "top-4 right-4"
               } opacity-80 text-2xl`}
             >
               {iconData.icon}
@@ -297,7 +298,7 @@ export const UltimateSlideRenderer: React.FC<UltimateSlideRendererProps> = ({
   const getSlideBackground = () => {
     if (slide.background) {
       // Check if it's already a gradient
-      if (slide.background.includes('gradient')) {
+      if (slide.background.includes("gradient")) {
         return slide.background
       }
       // Create a beautiful gradient from the base color
@@ -310,14 +311,14 @@ export const UltimateSlideRenderer: React.FC<UltimateSlideRendererProps> = ({
   const adjustBrightness = (color: string, amount: number) => {
     const usePound = color[0] === "#"
     const col = usePound ? color.slice(1) : color
-    const num = parseInt(col, 16)
+    const num = Number.parseInt(col, 16)
     let r = (num >> 16) + amount
     let g = ((num >> 8) & 0x00ff) + amount
     let b = (num & 0x0000ff) + amount
     r = r > 255 ? 255 : r < 0 ? 0 : r
     g = g > 255 ? 255 : g < 0 ? 0 : g
     b = b > 255 ? 255 : b < 0 ? 0 : b
-    return (usePound ? "#" : "") + (r << 16 | g << 8 | b).toString(16).padStart(6, '0')
+    return (usePound ? "#" : "") + ((r << 16) | (g << 8) | b).toString(16).padStart(6, "0")
   }
 
   const slideStyle: React.CSSProperties = {
@@ -386,7 +387,7 @@ export const UltimateSlideRenderer: React.FC<UltimateSlideRendererProps> = ({
         <svg width="100%" height="100%" viewBox="0 0 100 100" preserveAspectRatio="none">
           <defs>
             <pattern id="grid" width="10" height="10" patternUnits="userSpaceOnUse">
-              <path d="M 10 0 L 0 0 0 10" fill="none" stroke="currentColor" strokeWidth="0.5"/>
+              <path d="M 10 0 L 0 0 0 10" fill="none" stroke="currentColor" strokeWidth="0.5" />
             </pattern>
           </defs>
           <rect width="100%" height="100%" fill="url(#grid)" />
@@ -400,9 +401,7 @@ export const UltimateSlideRenderer: React.FC<UltimateSlideRendererProps> = ({
           <div className="flex flex-col justify-center h-full">
             <h1 style={titleStyle}>{slide.title}</h1>
             {slide.content && (
-              <p className="text-xl opacity-90 max-w-4xl mx-auto leading-relaxed">
-                {slide.content}
-              </p>
+              <p className="text-xl opacity-90 max-w-4xl mx-auto leading-relaxed">{(slide.content || "").toString()}</p>
             )}
           </div>
         )}
@@ -410,11 +409,9 @@ export const UltimateSlideRenderer: React.FC<UltimateSlideRendererProps> = ({
         {slide.layout === "chart" && (
           <div className="h-full flex flex-col">
             <h2 style={titleStyle}>{slide.title}</h2>
-            <div className="flex-1 flex items-center justify-center min-h-0">
-              {renderChart()}
-            </div>
+            <div className="flex-1 flex items-center justify-center min-h-0">{renderChart()}</div>
             {slide.content && (
-              <p className="mt-6 opacity-90 text-lg leading-relaxed">{slide.content}</p>
+              <p className="mt-6 opacity-90 text-lg leading-relaxed">{(slide.content || "").toString()}</p>
             )}
           </div>
         )}
@@ -422,11 +419,9 @@ export const UltimateSlideRenderer: React.FC<UltimateSlideRendererProps> = ({
         {slide.layout === "table" && (
           <div className="h-full flex flex-col">
             <h2 style={titleStyle}>{slide.title}</h2>
-            <div className="flex-1 overflow-auto min-h-0">
-              {renderTable()}
-            </div>
+            <div className="flex-1 overflow-auto min-h-0">{renderTable()}</div>
             {slide.content && (
-              <p className="mt-6 opacity-90 text-lg leading-relaxed">{slide.content}</p>
+              <p className="mt-6 opacity-90 text-lg leading-relaxed">{(slide.content || "").toString()}</p>
             )}
           </div>
         )}
@@ -436,9 +431,10 @@ export const UltimateSlideRenderer: React.FC<UltimateSlideRendererProps> = ({
             <h2 style={titleStyle}>{slide.title}</h2>
             <div className="flex-1 grid grid-cols-1 lg:grid-cols-2 gap-8 items-center">
               <div className="space-y-4">
-                {slide.content
+                {(slide.content || "")
+                  .toString()
                   .split("\n")
-                  .slice(0, Math.ceil(slide.content.split("\n").length / 2))
+                  .slice(0, Math.ceil((slide.content || "").toString().split("\n").length / 2))
                   .map((line, index) => {
                     if (line.startsWith("•")) {
                       return (
@@ -452,16 +448,19 @@ export const UltimateSlideRenderer: React.FC<UltimateSlideRendererProps> = ({
                       )
                     }
                     return line ? (
-                      <p key={index} className="text-lg leading-relaxed">{line}</p>
+                      <p key={index} className="text-lg leading-relaxed">
+                        {line}
+                      </p>
                     ) : (
                       <div key={index} className="mb-2" />
                     )
                   })}
               </div>
               <div className="space-y-4">
-                {slide.content
+                {(slide.content || "")
+                  .toString()
                   .split("\n")
-                  .slice(Math.ceil(slide.content.split("\n").length / 2))
+                  .slice(Math.ceil((slide.content || "").toString().split("\n").length / 2))
                   .map((line, index) => {
                     if (line.startsWith("•")) {
                       return (
@@ -475,7 +474,9 @@ export const UltimateSlideRenderer: React.FC<UltimateSlideRendererProps> = ({
                       )
                     }
                     return line ? (
-                      <p key={index} className="text-lg leading-relaxed">{line}</p>
+                      <p key={index} className="text-lg leading-relaxed">
+                        {line}
+                      </p>
                     ) : (
                       <div key={index} className="mb-2" />
                     )
@@ -490,26 +491,29 @@ export const UltimateSlideRenderer: React.FC<UltimateSlideRendererProps> = ({
             <h2 style={titleStyle}>{slide.title}</h2>
             <div className="flex-1 flex flex-col justify-center">
               <div className="space-y-6">
-                {slide.content.split("\n").map((line, index) => {
-                  if (line.startsWith("•")) {
-                    return (
-                      <div key={index} className="flex items-start space-x-4">
-                        <div
-                          className="w-3 h-3 rounded-full mt-2 flex-shrink-0"
-                          style={{ backgroundColor: slide.accentColor || "#10b981" }}
-                        />
-                        <span className="text-lg leading-relaxed">{line.substring(1).trim()}</span>
-                      </div>
+                {(slide.content || "")
+                  .toString()
+                  .split("\n")
+                  .map((line, index) => {
+                    if (line.startsWith("•")) {
+                      return (
+                        <div key={index} className="flex items-start space-x-4">
+                          <div
+                            className="w-3 h-3 rounded-full mt-2 flex-shrink-0"
+                            style={{ backgroundColor: slide.accentColor || "#10b981" }}
+                          />
+                          <span className="text-lg leading-relaxed">{line.substring(1).trim()}</span>
+                        </div>
+                      )
+                    }
+                    return line ? (
+                      <p key={index} className="text-lg leading-relaxed mb-4">
+                        {line}
+                      </p>
+                    ) : (
+                      <div key={index} className="mb-2" />
                     )
-                  }
-                  return line ? (
-                    <p key={index} className="text-lg leading-relaxed mb-4">
-                      {line}
-                    </p>
-                  ) : (
-                    <div key={index} className="mb-2" />
-                  )
-                })}
+                  })}
               </div>
             </div>
           </div>
