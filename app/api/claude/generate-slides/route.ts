@@ -48,109 +48,49 @@ const analyzeContentForVisuals = (content: string) => {
   }
 }
 
-// Contextual icon selection based on content
+// Contextual icon selection based on content - only when truly needed
 const getContextualIcon = (content: string, title: string): { icon: string; shouldShow: boolean } => {
   const combinedText = (title + " " + content).toLowerCase()
 
-  // Data and analytics content
+  // Only add icons when content EXPLICITLY needs visual reinforcement
+  // Data and analytics content - only if numbers/metrics are prominent
   if (
-    combinedText.includes("data") ||
-    combinedText.includes("analytics") ||
-    combinedText.includes("metrics") ||
-    combinedText.includes("kpi") ||
-    combinedText.includes("performance") ||
-    combinedText.includes("results") ||
-    /\d+%/.test(combinedText) ||
-    /\$\d+/.test(combinedText)
+    (/\d+%/.test(combinedText) && combinedText.includes("performance")) ||
+    (/\$\d+/.test(combinedText) && combinedText.includes("revenue")) ||
+    (combinedText.includes("analytics") && combinedText.includes("data")) ||
+    (combinedText.includes("metrics") && combinedText.includes("kpi"))
   ) {
     return { icon: "📊", shouldShow: true }
   }
 
-  // Strategy and goals content
+  // Strategy content - only for explicit strategic planning
   if (
-    combinedText.includes("strategy") ||
-    combinedText.includes("goal") ||
-    combinedText.includes("target") ||
-    combinedText.includes("objective") ||
-    combinedText.includes("plan") ||
-    combinedText.includes("roadmap")
+    (combinedText.includes("strategy") && combinedText.includes("plan")) ||
+    (combinedText.includes("goal") && combinedText.includes("target")) ||
+    (combinedText.includes("objective") && combinedText.includes("roadmap"))
   ) {
     return { icon: "🎯", shouldShow: true }
   }
 
-  // Growth and success content
+  // Growth content - only for explicit growth/launch messaging
   if (
-    combinedText.includes("growth") ||
-    combinedText.includes("increase") ||
-    combinedText.includes("expansion") ||
-    combinedText.includes("scale") ||
-    combinedText.includes("launch") ||
-    combinedText.includes("innovation")
+    (combinedText.includes("growth") && combinedText.includes("expansion")) ||
+    (combinedText.includes("launch") && combinedText.includes("innovation")) ||
+    (combinedText.includes("scale") && combinedText.includes("increase"))
   ) {
     return { icon: "🚀", shouldShow: true }
   }
 
-  // Financial content
+  // Financial content - only for explicit financial focus
   if (
-    combinedText.includes("revenue") ||
-    combinedText.includes("profit") ||
-    combinedText.includes("financial") ||
-    combinedText.includes("investment") ||
-    combinedText.includes("funding") ||
-    combinedText.includes("cost")
+    (combinedText.includes("revenue") && combinedText.includes("profit")) ||
+    (combinedText.includes("financial") && combinedText.includes("investment")) ||
+    (combinedText.includes("funding") && combinedText.includes("cost"))
   ) {
     return { icon: "💰", shouldShow: true }
   }
 
-  // Market and competition content
-  if (
-    combinedText.includes("market") ||
-    combinedText.includes("competition") ||
-    combinedText.includes("industry") ||
-    combinedText.includes("sector") ||
-    combinedText.includes("global") ||
-    combinedText.includes("worldwide")
-  ) {
-    return { icon: "🌍", shouldShow: true }
-  }
-
-  // Team and people content
-  if (
-    combinedText.includes("team") ||
-    combinedText.includes("people") ||
-    combinedText.includes("employee") ||
-    combinedText.includes("staff") ||
-    combinedText.includes("culture") ||
-    combinedText.includes("talent")
-  ) {
-    return { icon: "👥", shouldShow: true }
-  }
-
-  // Success and achievement content
-  if (
-    combinedText.includes("success") ||
-    combinedText.includes("achievement") ||
-    combinedText.includes("award") ||
-    combinedText.includes("recognition") ||
-    combinedText.includes("milestone") ||
-    combinedText.includes("accomplishment")
-  ) {
-    return { icon: "🏆", shouldShow: true }
-  }
-
-  // Innovation and ideas content
-  if (
-    combinedText.includes("innovation") ||
-    combinedText.includes("idea") ||
-    combinedText.includes("creative") ||
-    combinedText.includes("solution") ||
-    combinedText.includes("breakthrough") ||
-    combinedText.includes("invention")
-  ) {
-    return { icon: "💡", shouldShow: true }
-  }
-
-  // No relevant icon found
+  // No icon needed for most content
   return { icon: "", shouldShow: false }
 }
 
@@ -232,16 +172,14 @@ DESIGN EXCELLENCE STANDARDS:
 📐 Balance whitespace and content for optimal readability
 
 ICON USAGE RULES:
-• Use ONLY ONE icon per slide, and only if contextually relevant
-• 📊 for data/analytics/metrics/performance content
-• 🎯 for strategy/goals/targets/objectives content  
-• 🚀 for growth/launch/innovation/scaling content
-• 💰 for financial/revenue/investment content
-• 🌍 for market/global/industry content
-• 👥 for team/people/culture content
-• 🏆 for success/achievement/awards content
-• 💡 for innovation/ideas/solutions content
-• NO ICON if content doesn't clearly match these categories
+• Use icons SPARINGLY - only when content explicitly needs visual reinforcement
+• Maximum ONE icon per slide, and ONLY if truly contextually relevant
+• 📊 ONLY for slides with explicit data/analytics/metrics focus
+• 🎯 ONLY for slides with explicit strategy/planning focus  
+• 🚀 ONLY for slides with explicit growth/launch focus
+• 💰 ONLY for slides with explicit financial focus
+• NO ICON for general content, introductions, or basic information
+• When in doubt, use NO ICON - clean design is better than unnecessary decoration
 
 PREMIUM VISUAL GUIDELINES:
 • Colors: Choose from sophisticated palettes: ${JSON.stringify(designContext.colorIntelligence?.advancedPalettes || [])}
@@ -321,19 +259,15 @@ DESIGN EXCELLENCE MANDATE:
 🔤 Perfect typography hierarchy with responsive scaling
 📐 Masterful composition with optimal white space and visual flow
 
-STRICT ICON USAGE RULES:
-• Maximum ONE icon per slide
-• Only use icons that are directly relevant to the content
-• 📊 for data/analytics/metrics/performance/results content
-• 🎯 for strategy/goals/targets/objectives/planning content  
-• 🚀 for growth/launch/innovation/scaling/expansion content
-• 💰 for financial/revenue/investment/profit content
-• 🌍 for market/global/industry/worldwide content
-• 👥 for team/people/culture/employee content
-• 🏆 for success/achievement/awards/milestone content
-• 💡 for innovation/ideas/solutions/breakthrough content
-• NO ICON if content doesn't clearly match these categories
-• Never use random or decorative icons
+ICON USAGE RULES:
+• Use icons SPARINGLY - only when content explicitly needs visual reinforcement
+• Maximum ONE icon per slide, and ONLY if truly contextually relevant
+• 📊 ONLY for slides with explicit data/analytics/metrics focus
+• 🎯 ONLY for slides with explicit strategy/planning focus  
+• 🚀 ONLY for slides with explicit growth/launch focus
+• 💰 ONLY for slides with explicit financial focus
+• NO ICON for general content, introductions, or basic information
+• When in doubt, use NO ICON - clean design is better than unnecessary decoration
 
 DESIGN CONTEXT FROM SLYDPRO:
 • Advanced Color Palettes: ${JSON.stringify(designContext.colorIntelligence?.advancedPalettes || [], null, 2)}
@@ -486,17 +420,15 @@ DESIGN MANDATES:
 • CREATE presentations that would impress Apple, Google, or Tesla executives
 
 STRICT ICON RULES:
-- Maximum ONE icon per slide
-- Only use if directly relevant to content
-- 📊 for data/analytics/metrics/performance
-- 🎯 for strategy/goals/targets/objectives  
-- 🚀 for growth/launch/innovation/scaling
-- 💰 for financial/revenue/investment
-- 🌍 for market/global/industry
-- 👥 for team/people/culture
-- 🏆 for success/achievement/awards
-- 💡 for innovation/ideas/solutions
-- NO ICON if content doesn't clearly match
+- Use icons VERY SPARINGLY - only when content explicitly needs visual reinforcement
+- Maximum ONE icon per slide, only if truly necessary
+- 📊 ONLY for explicit data/analytics/metrics content
+- 🎯 ONLY for explicit strategy/planning content  
+- 🚀 ONLY for explicit growth/launch content
+- 💰 ONLY for explicit financial content
+- NO ICON for general content, introductions, basic information
+- Default to NO ICON unless content clearly demands visual reinforcement
+- Clean, minimal design is preferred over decorative icons
 
 QUALITY STANDARDS:
 - Each slide is a visual masterpiece worthy of a $50K design agency
