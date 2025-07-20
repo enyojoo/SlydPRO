@@ -947,14 +947,15 @@ function EditorContent({ params }: EditorContentProps) {
                         </div>
                       </div>
 
-                      {/* Slide Preview */}
-                      <div className="w-full aspect-video rounded border overflow-hidden">
-                        <UltimateSlideRenderer
-                          slide={slide}
-                          isSelected={selectedSlide === slide.id}
-                          onClick={() => handleSlideSelect(slide.id, index)}
-                          className="scale-75 origin-top-left"
-                        />
+                      {/* Slide Preview - Fixed Container */}
+                      <div className="p-3 pt-4">
+                        <div className="w-full aspect-video rounded border overflow-hidden bg-gray-50 relative">
+                          <div className="absolute inset-0 transform scale-[0.25] origin-top-left">
+                            <div style={{ width: "400%", height: "400%" }}>
+                              <UltimateSlideRenderer slide={slide} isSelected={false} className="w-full h-full" />
+                            </div>
+                          </div>
+                        </div>
                       </div>
 
                       {/* Hover Actions */}
