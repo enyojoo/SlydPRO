@@ -32,7 +32,6 @@ import {
   BsShield as BsShieldOutline,
   BsPieChart as BsPieChartOutline,
   BsBarChart as BsBarChartOutline,
-  BsGraphDown as BsGraphDownOutline,
 } from "react-icons/bs"
 import {
   MdDashboard,
@@ -88,7 +87,6 @@ export const IconRenderer = ({ name, size = 24, className = "", style = "outline
     shield: BsShieldOutline,
     "pie-chart": BsPieChartOutline,
     "bar-chart": BsBarChartOutline,
-    "graph-down": BsGraphDownOutline,
   }
 
   // Material Design style icons

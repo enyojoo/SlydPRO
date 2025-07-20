@@ -57,7 +57,7 @@ ${
 }
 
 COLOR INTELLIGENCE from Design Context:
-Advanced Palettes: ${colorIntelligence.advancedPalettes?.map((p) => `${p.name} (${p.primary}, ${p.secondary})`).join(", ") || ""}
+Advanced Palettes: ${Array.isArray(colorIntelligence.advancedPalettes) ? colorIntelligence.advancedPalettes.map((p) => `${p.name} (${p.primary}, ${p.secondary})`).join(", ") : ""}
 Psychology Mapping: ${
     colorIntelligence.psychologyMapping
       ? Object.entries(colorIntelligence.psychologyMapping)
@@ -67,11 +67,11 @@ Psychology Mapping: ${
   }
 
 TYPOGRAPHY MASTERY from Design Context:
-Professional Fonts: ${typographyMastery.fontStacks?.map((f) => f.name).join(", ") || ""}
+Professional Fonts: ${Array.isArray(typographyMastery.fontStacks) ? typographyMastery.fontStacks.map((f) => f.name).join(", ") : ""}
 Hierarchy Rules: ${typographyMastery.hierarchy ? Object.keys(typographyMastery.hierarchy).join(", ") : ""}
 
 LAYOUT INTELLIGENCE from Design Context:
-${layoutMastery.gridSystems ? `Grid Systems: ${layoutMastery.gridSystems.join(", ")}` : ""}
+${Array.isArray(layoutMastery.gridSystems) ? `Grid Systems: ${layoutMastery.gridSystems.join(", ")}` : ""}
 ${layoutMastery.spacingRules ? `Spacing Rules: ${Object.keys(layoutMastery.spacingRules).join(", ")}` : ""}
 
 CRITICAL: Apply these design intelligence rules from the environment context, not basic defaults.
@@ -330,8 +330,11 @@ ${fileContent ? `\nSOURCE MATERIAL:\n${fileContent.substring(0, 800)}...` : ""}`
 
     // Validate and enhance slides using design context
     const validatedSlides = result.slides.map((slide: any, index: number) => {
-      // Use design context color palettes
-      const contextPalettes = designContext.colorIntelligence?.advancedPalettes || []
+      // Use design context color palettes with safe array handling
+      const contextPalettes = Array.isArray(designContext.colorIntelligence?.advancedPalettes)
+        ? designContext.colorIntelligence.advancedPalettes
+        : []
+
       const fallbackGradients = [
         "linear-gradient(135deg, #027659 0%, #065f46 100%)",
         "linear-gradient(135deg, #3b82f6 0%, #1e40af 100%)",
@@ -354,21 +357,27 @@ ${fileContent ? `\nSOURCE MATERIAL:\n${fileContent.substring(0, 800)}...` : ""}`
         textColor: slide.textColor || "#ffffff",
         layout: slide.layout || (index === 0 ? "title" : "content"),
 
-        // Advanced design properties using design context
+        // Advanced design properties using design context with safe access
         titleFont:
           slide.titleFont ||
-          designContext.typographyMastery?.fontStacks?.[0]?.name ||
+          (Array.isArray(designContext.typographyMastery?.fontStacks) &&
+            designContext.typographyMastery.fontStacks[0]?.name) ||
           "SF Pro Display, Inter, sans-serif",
         contentFont:
           slide.contentFont ||
-          designContext.typographyMastery?.fontStacks?.[1]?.name ||
+          (Array.isArray(designContext.typographyMastery?.fontStacks) &&
+            designContext.typographyMastery.fontStacks[1]?.name) ||
           "SF Pro Text, Inter, sans-serif",
         titleSize: slide.titleSize || (index === 0 ? "clamp(2.5rem, 5vw, 4rem)" : "clamp(1.75rem, 3vw, 2.5rem)"),
         contentSize: slide.contentSize || "clamp(1rem, 1.5vw, 1.125rem)",
         spacing: slide.spacing || designContext.layoutMastery?.spacingRules?.comfortable || "comfortable",
         alignment: slide.alignment || (index === 0 ? "center" : "left"),
         titleColor: slide.titleColor || "#ffffff",
-        accentColor: slide.accentColor || designContext.colorIntelligence?.accentColors?.[0] || "#fbbf24",
+        accentColor:
+          slide.accentColor ||
+          (Array.isArray(designContext.colorIntelligence?.accentColors)
+            ? designContext.colorIntelligence.accentColors[0]
+            : "#fbbf24"),
         shadowEffect:
           slide.shadowEffect || designContext.visualEffects?.shadows?.elegant || "0 15px 35px rgba(0,0,0,0.1)",
         borderRadius: slide.borderRadius || designContext.visualEffects?.borderRadius?.modern || "20px",
