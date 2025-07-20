@@ -7,100 +7,92 @@ const anthropic = new Anthropic({
 
 interface SlideGenerationRequest {
   prompt: string
-  slideCount?: number
-  presentationType?: "business" | "academic" | "creative" | "technical" | "marketing"
-  audience?: "executive" | "team" | "public" | "students" | "clients"
-  tone?: "professional" | "casual" | "persuasive" | "educational" | "inspiring"
+  slideCount?: string | number
+  presentationType?: string
+  audience?: string
+  tone?: string
   editMode?: "all" | "selected"
   selectedSlideId?: string
   selectedSlideTitle?: string
-  existingSlides?: any[]
   hasFile?: boolean
 }
 
-// Load design context from environment variable (PRESERVED)
-const getUltimateDesignContext = () => {
-  if (process.env.SLYDPRO_DESIGN_CONTEXT) {
-    try {
-      return JSON.parse(process.env.SLYDPRO_DESIGN_CONTEXT)
-    } catch (error) {
-      console.warn("Failed to parse design context")
-    }
+// Get sophisticated design context from environment variable
+function getUltimateDesignContext() {
+  const designContextEnv = process.env.SLYDPRO_DESIGN_CONTEXT
+
+  if (!designContextEnv) {
+    throw new Error("SLYDPRO_DESIGN_CONTEXT environment variable is required but not found")
   }
 
-  return {
-    version: "1.0.0",
-    designPhilosophy: "Create pixel-perfect, modern presentations with advanced visual capabilities",
-    visualContentCapabilities: {
-      charts: { types: ["bar", "line", "pie", "area", "donut"] },
-      tables: { styles: ["modern", "minimal"] },
-      icons: { business: ["📊", "💼", "🎯", "📈", "🚀", "💡", "⚡", "🌟", "💰", "🌍"] },
-    },
+  try {
+    const designContext = JSON.parse(designContextEnv)
+    return designContext
+  } catch (error) {
+    throw new Error(`Invalid JSON in SLYDPRO_DESIGN_CONTEXT: ${error.message}`)
   }
 }
 
-// Content analysis for intelligent visual suggestions (PRESERVED)
-const analyzeContentForVisuals = (content: string) => {
-  const analysis = {
-    hasData: /\d+%|\$\d+|(\d+,?\d*\s*(increase|decrease|growth|revenue|profit|sales))/i.test(content),
-    hasComparisons: /(vs|versus|compared|compare|against|better|worse|metrics)/i.test(content),
-    hasTimeline: /(q1|q2|q3|q4|quarter|month|year|2024|2025)/i.test(content),
-    hasProcess: /(step|phase|stage|process|workflow)/i.test(content),
+// Contextual icon selection based on content analysis
+function getContextualIcon(
+  content: string,
+  title: string,
+): { icon: string; position: string; color: string; size: string } | null {
+  const combinedText = (title + " " + content).toLowerCase()
+
+  // Data and Analytics
+  if (combinedText.match(/\b(data|analytics|metrics|statistics|numbers|chart|graph|report|analysis|kpi|dashboard)\b/)) {
+    return { icon: "📊", position: "top-right", color: "#3b82f6", size: "24" }
   }
 
-  return {
-    ...analysis,
-    needsChart: analysis.hasData || analysis.hasTimeline,
-    needsTable: analysis.hasComparisons,
-    needsInfographic: analysis.hasProcess,
+  // Strategy and Goals
+  if (combinedText.match(/\b(strategy|goal|target|objective|mission|vision|plan|roadmap|focus)\b/)) {
+    return { icon: "🎯", position: "top-right", color: "#10b981", size: "24" }
   }
+
+  // Growth and Success
+  if (combinedText.match(/\b(growth|success|launch|scale|expand|increase|boost|accelerate|momentum)\b/)) {
+    return { icon: "🚀", position: "top-right", color: "#f59e0b", size: "24" }
+  }
+
+  // Financial
+  if (combinedText.match(/\b(revenue|profit|financial|money|cost|budget|investment|roi|funding)\b/)) {
+    return { icon: "💰", position: "top-right", color: "#059669", size: "24" }
+  }
+
+  // Trends and Progress
+  if (combinedText.match(/\b(trend|progress|improvement|performance|results|outcome|achievement)\b/)) {
+    return { icon: "📈", position: "top-right", color: "#8b5cf6", size: "24" }
+  }
+
+  // Innovation and Ideas
+  if (combinedText.match(/\b(innovation|idea|creative|solution|breakthrough|invention|new|novel)\b/)) {
+    return { icon: "💡", position: "top-right", color: "#f97316", size: "24" }
+  }
+
+  // Team and People
+  if (combinedText.match(/\b(team|people|staff|employee|human|talent|culture|collaboration)\b/)) {
+    return { icon: "👥", position: "top-right", color: "#6366f1", size: "24" }
+  }
+
+  // Global and Market
+  if (combinedText.match(/\b(global|market|world|international|expansion|reach|scale)\b/)) {
+    return { icon: "🌍", position: "top-right", color: "#0ea5e9", size: "24" }
+  }
+
+  // Awards and Recognition
+  if (combinedText.match(/\b(award|recognition|achievement|winner|best|top|leader|excellence)\b/)) {
+    return { icon: "🏆", position: "top-right", color: "#eab308", size: "24" }
+  }
+
+  // No contextual match - return null for no icon
+  return null
 }
 
-// Enhanced sample data generators
-const generateSampleData = (type: string, title: string) => {
-  const patterns = {
-    revenue: [
-      { name: "Q1", value: 850000 },
-      { name: "Q2", value: 920000 },
-      { name: "Q3", value: 1100000 },
-      { name: "Q4", value: 1400000 },
-    ],
-    growth: [
-      { name: "2021", value: 120 },
-      { name: "2022", value: 145 },
-      { name: "2023", value: 189 },
-      { name: "2024", value: 234 },
-    ],
-    market: [
-      { name: "North America", value: 45 },
-      { name: "Europe", value: 30 },
-      { name: "Asia Pacific", value: 15 },
-      { name: "Other", value: 10 },
-    ],
-    performance: [
-      { name: "Customer Satisfaction", value: 92 },
-      { name: "Sales Target", value: 115 },
-      { name: "Team Performance", value: 88 },
-      { name: "Market Penetration", value: 78 },
-    ],
-  }
-
-  const titleLower = title.toLowerCase()
-  if (titleLower.includes("revenue") || titleLower.includes("financial")) {
-    return patterns.revenue
-  } else if (titleLower.includes("growth") || titleLower.includes("trend")) {
-    return patterns.growth
-  } else if (titleLower.includes("market") || titleLower.includes("region")) {
-    return patterns.market
-  } else if (titleLower.includes("performance") || titleLower.includes("kpi") || titleLower.includes("metric")) {
-    return patterns.performance
-  }
-
-  return patterns.performance
-}
-
-// PREMIUM: Replace the createAdvancedSlidePrompt function with this premium version
+// Create premium slide prompt using actual design context
 const createPremiumSlidePrompt = (request: SlideGenerationRequest, fileContent?: string): string => {
+  const designContext = getUltimateDesignContext()
+
   const {
     prompt,
     slideCount = "auto",
@@ -112,45 +104,10 @@ const createPremiumSlidePrompt = (request: SlideGenerationRequest, fileContent?:
     selectedSlideTitle,
   } = request
 
-  // Premium color palettes for variety
-  const premiumPalettes = [
-    {
-      name: "Ocean Depth",
-      primary: "linear-gradient(135deg, #0077be 0%, #004d7a 100%)",
-      secondary: "linear-gradient(135deg, #00a8ff 0%, #0077be 100%)",
-      accent: "#00d4ff",
-    },
-    {
-      name: "Forest Canopy",
-      primary: "linear-gradient(135deg, #2d5016 0%, #4a7c00 100%)",
-      secondary: "linear-gradient(135deg, #4a7c00 0%, #6ba300 100%)",
-      accent: "#8bc34a",
-    },
-    {
-      name: "Sunset Glow",
-      primary: "linear-gradient(135deg, #ff6b35 0%, #e04a00 100%)",
-      secondary: "linear-gradient(135deg, #ff8c69 0%, #ff6b35 100%)",
-      accent: "#ffa726",
-    },
-    {
-      name: "Royal Purple",
-      primary: "linear-gradient(135deg, #6a1b9a 0%, #4a148c 100%)",
-      secondary: "linear-gradient(135deg, #8e24aa 0%, #6a1b9a 100%)",
-      accent: "#ba68c8",
-    },
-    {
-      name: "Deep Crimson",
-      primary: "linear-gradient(135deg, #b71c1c 0%, #8b0000 100%)",
-      secondary: "linear-gradient(135deg, #d32f2f 0%, #b71c1c 100%)",
-      accent: "#ef5350",
-    },
-    {
-      name: "Midnight Steel",
-      primary: "linear-gradient(135deg, #263238 0%, #37474f 100%)",
-      secondary: "linear-gradient(135deg, #455a64 0%, #263238 100%)",
-      accent: "#78909c",
-    },
-  ]
+  // Use actual color palettes from design context
+  const advancedPalettes = designContext.colorIntelligence?.advancedPalettes || []
+  const fontStacks = designContext.typographyMastery?.fontStacks || {}
+  const businessIcons = designContext.visualContentCapabilities?.businessIcons || []
 
   if (editMode === "selected" && selectedSlideId && selectedSlideTitle) {
     return `You are SlydPRO AI, the world's premier presentation design expert with unlimited creative vision.
@@ -165,24 +122,29 @@ TONE: ${tone}
 DESIGN EXCELLENCE STANDARDS:
 🎨 Use sophisticated color palettes with rich gradients
 📊 Add intelligent data visualizations when content mentions metrics
-🎯 Include relevant premium icons that enhance meaning
+🎯 Include ONE relevant icon ONLY if contextually meaningful
 ✨ Apply modern glassmorphism and shadow effects
 🔤 Use typography hierarchy that guides the eye
 📐 Balance whitespace and content for optimal readability
 
 PREMIUM VISUAL GUIDELINES:
-• Colors: Choose from sophisticated palettes like deep ocean blues, rich forest greens, warm sunset oranges, royal purples, or elegant charcoals
-• Gradients: Always use diagonal gradients (135deg) for depth
-• Typography: SF Pro Display for headlines, SF Pro Text for content
-• Icons: Select meaningful business icons (📊💼🎯📈🚀💡⚡🌟💰🌍🏆📋)
+• Colors: Choose from sophisticated palettes: ${JSON.stringify(advancedPalettes)}
+• Typography: ${JSON.stringify(fontStacks)}
+• Icons: Use contextually - ONE per slide maximum, only if truly relevant
 • Effects: Subtle glassmorphism, elegant shadows, rounded corners
+
+ICON USAGE RULES:
+- Maximum ONE icon per slide
+- Only use if contextually relevant to content
+- 📊 for data/analytics, 🎯 for strategy, 🚀 for growth, 💰 for financial
+- If no clear context match, use NO icon
 
 CRITICAL OUTPUT REQUIREMENTS:
 - Return ONLY valid JSON with the exact structure shown below
-- Choose a DIFFERENT color palette from: ${JSON.stringify(premiumPalettes)}
+- Choose a DIFFERENT color palette from available options
 - Include chartData if content mentions data/metrics/numbers
 - Include tableData if content mentions comparisons/vs/metrics
-- Add 1-2 relevant icons that enhance the slide's message
+- Add maximum ONE relevant icon, or none if not contextual
 
 {
   "slides": [
@@ -193,8 +155,8 @@ CRITICAL OUTPUT REQUIREMENTS:
       "background": "linear-gradient(135deg, #0077be 0%, #004d7a 100%)",
       "textColor": "#ffffff",
       "layout": "content",
-      "titleFont": "SF Pro Display, Inter, system-ui, sans-serif",
-      "contentFont": "SF Pro Text, Inter, system-ui, sans-serif",
+      "titleFont": "${fontStacks.heading || "SF Pro Display, Inter, system-ui, sans-serif"}",
+      "contentFont": "${fontStacks.body || "SF Pro Text, Inter, system-ui, sans-serif"}",
       "titleSize": "2.5rem",
       "contentSize": "1.125rem",
       "spacing": "comfortable",
@@ -220,7 +182,7 @@ CRITICAL OUTPUT REQUIREMENTS:
           "icon": "📊",
           "position": "top-right",
           "color": "#00d4ff",
-          "size": "28"
+          "size": "24"
         }
       ]
     }
@@ -244,13 +206,16 @@ DESIGN EXCELLENCE MANDATE:
 🏆 Each slide must be a visual masterpiece worthy of a premium design agency
 🎨 Use DIFFERENT sophisticated color palettes for visual variety and interest
 📊 Automatically add charts/tables when content suggests data or comparisons
-🎯 Include meaningful business icons that reinforce the message
+🎯 Include maximum ONE meaningful icon per slide, only if contextually relevant
 ✨ Apply cutting-edge design trends: glassmorphism, premium shadows, modern gradients
 🔤 Perfect typography hierarchy with responsive scaling
 📐 Masterful composition with optimal white space and visual flow
 
 PREMIUM COLOR PALETTES TO CHOOSE FROM:
-${JSON.stringify(premiumPalettes, null, 2)}
+${JSON.stringify(advancedPalettes, null, 2)}
+
+TYPOGRAPHY SYSTEM:
+${JSON.stringify(fontStacks, null, 2)}
 
 INTELLIGENT LAYOUT SELECTION:
 • "title": Opening/closing slides with maximum visual impact
@@ -259,10 +224,22 @@ INTELLIGENT LAYOUT SELECTION:
 • "content": Information slides with perfect visual hierarchy
 • "two-column": Side-by-side content with balanced composition
 
+CONTEXTUAL ICON USAGE (MAXIMUM ONE PER SLIDE):
+- 📊 for data/analytics/metrics content
+- 🎯 for strategy/goals/targets content
+- 🚀 for growth/success/launch content
+- 💰 for financial/revenue content
+- 📈 for trends/progress content
+- 💡 for innovation/ideas content
+- 👥 for team/people content
+- 🌍 for global/market content
+- 🏆 for awards/recognition content
+- NO ICON if content doesn't clearly match any category
+
 AUTOMATIC VISUAL INTELLIGENCE:
 - If content mentions revenue/growth/metrics → Add relevant chart
 - If content mentions comparisons/vs/benchmarks → Add elegant table
-- Always include 1-2 meaningful business icons per slide
+- Add maximum ONE contextually relevant icon per slide
 - Vary color palettes across slides for visual richness
 - Apply glassmorphism selectively for premium feel
 
@@ -276,8 +253,8 @@ MANDATORY JSON OUTPUT STRUCTURE:
       "background": "linear-gradient(135deg, #0077be 0%, #004d7a 100%)",
       "textColor": "#ffffff",
       "layout": "title",
-      "titleFont": "SF Pro Display, Inter, system-ui, sans-serif",
-      "contentFont": "SF Pro Text, Inter, system-ui, sans-serif", 
+      "titleFont": "${fontStacks.heading || "SF Pro Display, Inter, system-ui, sans-serif"}",
+      "contentFont": "${fontStacks.body || "SF Pro Text, Inter, system-ui, sans-serif"}",
       "titleSize": "clamp(3rem, 6vw, 4.5rem)",
       "contentSize": "clamp(1.125rem, 2vw, 1.5rem)",
       "spacing": "generous",
@@ -290,60 +267,22 @@ MANDATORY JSON OUTPUT STRUCTURE:
       "icons": [
         {
           "icon": "🚀",
-          "position": "top-right", 
-          "color": "#00d4ff",
-          "size": "36"
-        }
-      ]
-    },
-    {
-      "id": "slide-2",
-      "title": "Performance Excellence",
-      "content": "Outstanding results across all key performance indicators with sustained growth momentum",
-      "background": "linear-gradient(135deg, #2d5016 0%, #4a7c00 100%)",
-      "textColor": "#ffffff", 
-      "layout": "chart",
-      "titleFont": "SF Pro Display, Inter, system-ui, sans-serif",
-      "contentFont": "SF Pro Text, Inter, system-ui, sans-serif",
-      "titleSize": "2.75rem",
-      "contentSize": "1.25rem",
-      "spacing": "comfortable",
-      "alignment": "left",
-      "titleColor": "#ffffff",
-      "accentColor": "#8bc34a",
-      "shadowEffect": "0 25px 50px rgba(0,0,0,0.25)",
-      "borderRadius": "24px",
-      "glassmorphism": false,
-      "chartData": {
-        "type": "area",
-        "data": [
-          {"name": "Q1 2024", "value": 850000},
-          {"name": "Q2 2024", "value": 1200000},
-          {"name": "Q3 2024", "value": 1650000},
-          {"name": "Q4 2024", "value": 2100000}
-        ],
-        "config": {"showGrid": true, "gradient": true},
-        "style": "modern"
-      },
-      "icons": [
-        {
-          "icon": "📈",
           "position": "top-right",
-          "color": "#8bc34a", 
-          "size": "28"
+          "color": "#00d4ff",
+          "size": "24"
         }
       ]
     }
   ],
   "message": "Created a stunning presentation with premium visual design and sophisticated color palettes.",
-  "designNotes": "Applied Fortune 500-level design standards with intelligent visual content generation and diverse color schemes."
+  "designNotes": "Applied Fortune 500-level design standards with intelligent visual content generation and contextual icon usage."
 }
 
 EXCELLENCE REQUIREMENTS:
 ✅ Use DIFFERENT color palettes for each slide to create visual variety
 ✅ Include charts when content mentions data, metrics, revenue, growth, or numbers
 ✅ Include tables when content mentions comparisons, benchmarks, or vs scenarios  
-✅ Add meaningful business icons that reinforce the slide's core message
+✅ Add maximum ONE contextually relevant icon per slide (or none if not relevant)
 ✅ Apply premium visual effects: gradients, shadows, glassmorphism, rounded corners
 ✅ Ensure perfect typography hierarchy with responsive font scaling
 ✅ Create Fortune 500-caliber visual design that impresses any audience
@@ -351,38 +290,48 @@ EXCELLENCE REQUIREMENTS:
 Generate slides that would make Apple's design team proud:`
 }
 
-const parseFileContent = async (file: File): Promise<string> => {
-  const text = await file.text()
-  return text.substring(0, 2000) // Limit file content
-}
-
 export async function POST(request: NextRequest) {
   try {
     const formData = await request.formData()
+    const prompt = formData.get("prompt") as string
+    const slideCount = formData.get("slideCount") as string
+    const presentationType = formData.get("presentationType") as string
+    const audience = formData.get("audience") as string
+    const tone = formData.get("tone") as string
+    const editMode = formData.get("editMode") as string
+    const selectedSlideId = formData.get("selectedSlideId") as string
+    const selectedSlideTitle = formData.get("selectedSlideTitle") as string
+    const uploadedFile = formData.get("file") as File
 
-    const dataField = formData.get("data") as string
-    const requestData = JSON.parse(dataField || "{}") as SlideGenerationRequest
-    const uploadedFile = formData.get("file") as File | null
+    if (!prompt) {
+      return NextResponse.json({ error: "Prompt is required" }, { status: 400 })
+    }
+
+    const requestData: SlideGenerationRequest = {
+      prompt,
+      slideCount,
+      presentationType,
+      audience,
+      tone,
+      editMode,
+      selectedSlideId,
+      selectedSlideTitle,
+      hasFile: !!uploadedFile,
+    }
 
     let fileContent = ""
     if (uploadedFile) {
-      fileContent = await parseFileContent(uploadedFile)
+      fileContent = await uploadedFile.text()
     }
 
-    const prompt = createPremiumSlidePrompt(
-      {
-        ...requestData,
-        hasFile: !!uploadedFile,
-      },
-      fileContent,
-    )
+    const promptText = createPremiumSlidePrompt(requestData, fileContent)
 
     console.log("🎨 Generating premium presentation for:", requestData.prompt)
 
     const message = await anthropic.messages.create({
-      model: "claude-sonnet-4-20250514",
-      max_tokens: 8000, // Increased for more detailed output
-      temperature: 0.95, // Higher creativity for better design variety
+      model: "claude-3-5-sonnet-20241022",
+      max_tokens: 12000,
+      temperature: 0.95,
       system: `You are SlydPRO AI, the ultimate presentation design genius.
 
 CORE MISSION: Create visually stunning, Fortune 500-caliber presentations that exceed all expectations.
@@ -391,242 +340,59 @@ DESIGN MANDATES:
 • NEVER use the same color palette twice - each slide must have a unique, sophisticated color scheme
 • AUTOMATICALLY add charts when content mentions any data, metrics, numbers, revenue, or growth
 • AUTOMATICALLY add tables when content mentions comparisons, benchmarks, metrics, or "vs" scenarios
-• ALWAYS include 1-2 meaningful business icons that enhance the slide's message
+• Use maximum ONE contextually relevant icon per slide (or none if not relevant)
 • APPLY premium visual effects: gradients, glassmorphism, shadows, perfect typography
 • CREATE presentations that would impress Apple, Google, or Tesla executives
+
+CONTEXTUAL ICON RULES:
+- Maximum ONE icon per slide
+- Only use if genuinely relevant to slide content
+- 📊 for data/analytics, 🎯 for strategy, 🚀 for growth, 💰 for financial
+- 📈 for trends, 💡 for innovation, 👥 for team, 🌍 for global, 🏆 for awards
+- If content doesn't clearly match any category, use NO icon
 
 QUALITY STANDARDS:
 - Each slide is a visual masterpiece worthy of a $50K design agency
 - Colors are sophisticated and varied across slides  
 - Typography is perfect with proper hierarchy
 - Visual content (charts/tables) appears automatically when appropriate
-- Icons are meaningful and enhance the message
+- Icons are minimal, contextual, and meaningful
 - Overall composition follows premium design principles
 
 CRITICAL: Always return valid JSON. Never compromise on visual excellence.`,
       messages: [
         {
           role: "user",
-          content: prompt,
+          content: promptText,
         },
       ],
     })
 
     const responseText = message.content[0].type === "text" ? message.content[0].text : ""
 
+    // Extract JSON from response
     const jsonMatch = responseText.match(/\{[\s\S]*\}/)
     if (!jsonMatch) {
-      console.error("Claude response without JSON:", responseText.substring(0, 1000))
-      throw new Error("Claude did not return valid JSON format")
+      throw new Error("No valid JSON found in response")
     }
 
-    let result
-    try {
-      result = JSON.parse(jsonMatch[0])
-    } catch (parseError) {
-      console.error("JSON parse error:", parseError)
-      throw new Error("Invalid JSON structure from Claude")
+    const result = JSON.parse(jsonMatch[0])
+
+    // Process slides to add contextual icons
+    if (result.slides) {
+      result.slides = result.slides.map((slide: any) => {
+        const contextualIcon = getContextualIcon(slide.content || "", slide.title || "")
+
+        return {
+          ...slide,
+          icons: contextualIcon ? [contextualIcon] : [],
+        }
+      })
     }
 
-    if (!result.slides || !Array.isArray(result.slides)) {
-      throw new Error("Invalid slides data structure from Claude")
-    }
-
-    // COMPLETE validation with ALL advanced properties (PRESERVED & ENHANCED)
-    const designContext = getUltimateDesignContext()
-    const validatedSlides = result.slides.map((slide: any, index: number) => {
-      // Create beautiful gradient backgrounds
-      const gradients = [
-        "linear-gradient(135deg, #027659 0%, #065f46 100%)",
-        "linear-gradient(135deg, #3b82f6 0%, #1e40af 100%)",
-        "linear-gradient(135deg, #7c3aed 0%, #5b21b6 100%)",
-        "linear-gradient(135deg, #dc2626 0%, #991b1b 100%)",
-        "linear-gradient(135deg, #ea580c 0%, #c2410c 100%)",
-        "linear-gradient(135deg, #059669 0%, #047857 100%)",
-      ]
-
-      const enhancedSlide = {
-        id: slide.id || `slide-${Date.now()}-${index}`,
-        title: slide.title || `Slide ${index + 1}`,
-        content: slide.content || "",
-        background: slide.background || gradients[index % gradients.length],
-        textColor: slide.textColor || "#ffffff",
-        layout: slide.layout || (index === 0 ? "title" : "content"),
-
-        // Advanced design properties with design context defaults (PRESERVED)
-        titleFont: slide.titleFont || "SF Pro Display, Inter, sans-serif",
-        contentFont: slide.contentFont || "SF Pro Text, Inter, sans-serif",
-        titleSize: slide.titleSize || (index === 0 ? "clamp(2.5rem, 5vw, 4rem)" : "clamp(1.75rem, 3vw, 2.5rem)"),
-        contentSize: slide.contentSize || "clamp(1rem, 1.5vw, 1.125rem)",
-        spacing: slide.spacing || "comfortable",
-        alignment: slide.alignment || (index === 0 ? "center" : "left"),
-        titleColor: slide.titleColor || "#ffffff",
-        accentColor: slide.accentColor || "#fbbf24",
-        shadowEffect: slide.shadowEffect || "0 15px 35px rgba(0,0,0,0.1)",
-        borderRadius: slide.borderRadius || "20px",
-        glassmorphism: slide.glassmorphism || false,
-
-        // Visual content with validation (PRESERVED & ENHANCED)
-        chartData: slide.chartData
-          ? {
-              type: slide.chartData.type || "bar",
-              data: slide.chartData.data || [],
-              config: slide.chartData.config || {},
-              style: slide.chartData.style || "modern",
-            }
-          : null,
-
-        tableData: slide.tableData
-          ? {
-              headers: slide.tableData.headers || [],
-              rows: slide.tableData.rows || [],
-              style: slide.tableData.style || "modern",
-              interactive: slide.tableData.interactive || false,
-            }
-          : null,
-
-        icons: slide.icons || [],
-
-        // Animation and effects (PRESERVED)
-        animations: slide.animations || {
-          entrance: "fadeIn",
-          emphasis: [],
-        },
-        customCSS: slide.customCSS || "",
-      }
-
-      // Intelligent enhancement based on content analysis (ENHANCED)
-      const content = (enhancedSlide.title + " " + enhancedSlide.content).toLowerCase()
-      const contentAnalysis = analyzeContentForVisuals(content)
-
-      // Auto-generate chart data if needed and not provided
-      if (contentAnalysis.needsChart && !enhancedSlide.chartData && enhancedSlide.layout !== "table") {
-        enhancedSlide.layout = "chart"
-        enhancedSlide.chartData = {
-          type: content.includes("market") || content.includes("region") ? "pie" : "bar",
-          data: generateSampleData(
-            content.includes("revenue")
-              ? "revenue"
-              : content.includes("growth")
-                ? "growth"
-                : content.includes("market")
-                  ? "market"
-                  : "performance",
-            enhancedSlide.title,
-          ),
-          config: { showGrid: true },
-          style: "modern",
-        }
-      }
-
-      // Auto-generate table data if needed and not provided
-      if (contentAnalysis.needsTable && !enhancedSlide.tableData && enhancedSlide.layout !== "chart") {
-        enhancedSlide.layout = "table"
-        enhancedSlide.tableData = {
-          headers: ["Metric", "Q3", "Q4", "Growth"],
-          rows: [
-            ["New Customers", "1,200", "1,850", "+54%"],
-            ["Revenue", "$1.2M", "$1.8M", "+50%"],
-            ["Market Share", "12%", "15%", "+25%"],
-            ["Customer Satisfaction", "4.2", "4.6", "+9%"],
-          ],
-          style: "modern",
-          interactive: false,
-        }
-      }
-
-      // Auto-add relevant icons if missing
-      if (enhancedSlide.icons.length === 0) {
-        if (content.includes("revenue") || content.includes("financial")) {
-          enhancedSlide.icons.push({
-            icon: "💰",
-            position: "top-right",
-            color: enhancedSlide.accentColor,
-            size: "24",
-          })
-        } else if (content.includes("growth") || content.includes("trend")) {
-          enhancedSlide.icons.push({
-            icon: "📈",
-            position: "top-right",
-            color: enhancedSlide.accentColor,
-            size: "24",
-          })
-        } else if (content.includes("performance") || content.includes("metric")) {
-          enhancedSlide.icons.push({
-            icon: "📊",
-            position: "top-right",
-            color: enhancedSlide.accentColor,
-            size: "24",
-          })
-        } else if (content.includes("target") || content.includes("goal")) {
-          enhancedSlide.icons.push({
-            icon: "🎯",
-            position: "top-right",
-            color: enhancedSlide.accentColor,
-            size: "24",
-          })
-        } else if (index === 0) {
-          enhancedSlide.icons.push({
-            icon: "🚀",
-            position: "top-right",
-            color: enhancedSlide.accentColor,
-            size: "32",
-          })
-        }
-      }
-
-      return enhancedSlide
-    })
-
-    console.log(`✅ Generated ${validatedSlides.length} premium slides with visual content`)
-
-    return NextResponse.json({
-      slides: validatedSlides,
-      message:
-        result.message || `Generated ${validatedSlides.length} pixel-perfect slides with premium design intelligence.`,
-      designNotes: result.designNotes || "Applied premium design context intelligence with modern visual effects.",
-      overallTheme: result.overallTheme, // PRESERVED
-    })
+    return NextResponse.json(result)
   } catch (error) {
-    console.error("❌ Premium SlydPRO API Error:", error)
-
-    // PRESERVED error handling
-    if (error instanceof Error) {
-      if (error.message.includes("rate_limit")) {
-        return NextResponse.json(
-          {
-            error: "Too many requests. Please wait a moment and try again.",
-            type: "rate_limit",
-          },
-          { status: 429 },
-        )
-      }
-
-      if (error.message.includes("invalid_api_key")) {
-        return NextResponse.json(
-          {
-            error: "API configuration error. Please check your Claude API key.",
-            type: "auth_error",
-          },
-          { status: 401 },
-        )
-      }
-
-      return NextResponse.json(
-        {
-          error: `Premium generation failed: ${error.message}`,
-          type: "generation_error",
-        },
-        { status: 500 },
-      )
-    }
-
-    return NextResponse.json(
-      {
-        error: "An unexpected error occurred in the premium design system.",
-        type: "unknown_error",
-      },
-      { status: 500 },
-    )
+    console.error("Error generating slides:", error)
+    return NextResponse.json({ error: "Failed to generate slides", details: error.message }, { status: 500 })
   }
 }
