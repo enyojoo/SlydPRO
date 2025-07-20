@@ -1,7 +1,6 @@
 "use client"
 
 import type React from "react"
-
 import { useState, useEffect, useRef } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -35,62 +34,120 @@ import { ExportDialog } from "@/components/export-dialog"
 import { SettingsModal } from "@/components/settings-modal"
 import type { UltimateSlide } from "@/types/ultimate-slide"
 import { useClaudeSlides } from "@/hooks/useClaudeSlides"
+import { presentationsAPI } from "@/lib/presentations-api"
+import { useRouter } from "next/navigation"
 
 interface EditorContentProps {
-  presentationId: string
-  initialSlides: UltimateSlide[]
-  presentationTitle: string
-  onSave: (slides: UltimateSlide[], title: string) => Promise<void>
+  params: {
+    id: string
+  }
 }
 
-export default function EditorContent({
-  presentationId,
-  initialSlides,
-  presentationTitle,
-  onSave,
-}: EditorContentProps) {
-  const [slides, setSlides] = useState<UltimateSlide[]>(initialSlides)
+export default function EditorContent({ params }: EditorContentProps) {
+  const router = useRouter()
+  const [slides, setSlides] = useState<UltimateSlide[]>([])
   const [currentSlideIndex, setCurrentSlideIndex] = useState(0)
   const [isPlaying, setIsPlaying] = useState(false)
   const [isPresentationMode, setIsPresentationMode] = useState(false)
   const [showExportDialog, setShowExportDialog] = useState(false)
   const [showSettingsModal, setShowSettingsModal] = useState(false)
-  const [title, setTitle] = useState(presentationTitle)
+  const [title, setTitle] = useState("Untitled Presentation")
   const [isSaving, setIsSaving] = useState(false)
-  const [selectedTool, setSelectedTool] = useState<string>("select")
-  const [editingSlide, setEditingSlide] = useState<UltimateSlide | null>(null)
+  const [isLoading, setIsLoading] = useState(true)
   const [showAIPanel, setShowAIPanel] = useState(false)
   const [aiPrompt, setAiPrompt] = useState("")
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
-  const {
-    generateSlides,
-    isGenerating,
-    error: aiError,
-    clearError,
-  } = useClaudeSlides({
-    onSlidesGenerated: (newSlides) => {
-      setSlides(newSlides)
-      setCurrentSlideIndex(0)
-      setShowAIPanel(false)
-      setAiPrompt("")
-      setSelectedFile(null)
-      toast({
-        title: "Slides Generated",
-        description: `Successfully generated ${newSlides.length} slides with AI.`,
-      })
-    },
-  })
+  const { generateSlides, editSlide, regenerateAllSlides, isLoading: isGenerating, error: aiError } = useClaudeSlides()
 
-  const currentSlide = slides[currentSlideIndex]
+  // Load presentation data
+  useEffect(() => {
+    const loadPresentation = async () => {
+      try {
+        setIsLoading(true)
+        const presentation = await presentationsAPI.getPresentation(params.id)
+
+        if (presentation.slides && presentation.slides.length > 0) {
+          // Convert slides to UltimateSlide format
+          const convertedSlides: UltimateSlide[] = presentation.slides.map((slide: any, index: number) => ({
+            id: slide.id || `slide-${index}`,
+            title: slide.title || `Slide ${index + 1}`,
+            content: slide.content || "",
+            background: slide.background || "linear-gradient(135deg, #027659 0%, #065f46 100%)",
+            textColor: slide.textColor || "#ffffff",
+            layout: slide.layout || "content",
+            titleFont: slide.titleFont || "SF Pro Display, Inter, sans-serif",
+            contentFont: slide.contentFont || "SF Pro Text, Inter, sans-serif",
+            titleSize: slide.titleSize || "2.5rem",
+            contentSize: slide.contentSize || "1.125rem",
+            spacing: slide.spacing || "comfortable",
+            alignment: slide.alignment || "left",
+            titleColor: slide.titleColor || "#ffffff",
+            accentColor: slide.accentColor || "#10b981",
+            shadowEffect: slide.shadowEffect || "0 15px 35px rgba(0,0,0,0.1)",
+            borderRadius: slide.borderRadius || "20px",
+            glassmorphism: slide.glassmorphism || false,
+            chartData: slide.chartData || null,
+            tableData: slide.tableData || null,
+            icons: slide.icons || [],
+          }))
+          setSlides(convertedSlides)
+        } else {
+          // Create default slide if no slides exist
+          const defaultSlide: UltimateSlide = {
+            id: "slide-1",
+            title: "Welcome to Your Presentation",
+            content: "Start by describing what you want to create using the AI Assistant.",
+            background: "linear-gradient(135deg, #027659 0%, #065f46 100%)",
+            textColor: "#ffffff",
+            layout: "title",
+            titleFont: "SF Pro Display, Inter, sans-serif",
+            contentFont: "SF Pro Text, Inter, sans-serif",
+            titleSize: "3rem",
+            contentSize: "1.25rem",
+            spacing: "generous",
+            alignment: "center",
+            titleColor: "#ffffff",
+            accentColor: "#10b981",
+            shadowEffect: "0 15px 35px rgba(0,0,0,0.1)",
+            borderRadius: "20px",
+            glassmorphism: false,
+            icons: [],
+          }
+          setSlides([defaultSlide])
+        }
+
+        setTitle(presentation.name || "Untitled Presentation")
+      } catch (error) {
+        console.error("Failed to load presentation:", error)
+        toast({
+          title: "Error",
+          description: "Failed to load presentation.",
+          variant: "destructive",
+        })
+        router.push("/")
+      } finally {
+        setIsLoading(false)
+      }
+    }
+
+    if (params.id) {
+      loadPresentation()
+    }
+  }, [params.id, router])
+
+  const currentSlide = slides[currentSlideIndex] || slides[0]
 
   // Auto-save functionality
   useEffect(() => {
     const autoSave = async () => {
-      if (slides.length > 0) {
+      if (slides.length > 0 && !isLoading) {
         try {
-          await onSave(slides, title)
+          await presentationsAPI.updatePresentation(params.id, {
+            name: title,
+            slides: slides,
+          })
         } catch (error) {
           console.error("Auto-save failed:", error)
         }
@@ -99,7 +156,7 @@ export default function EditorContent({
 
     const interval = setInterval(autoSave, 30000) // Auto-save every 30 seconds
     return () => clearInterval(interval)
-  }, [slides, title, onSave])
+  }, [slides, title, params.id, isLoading])
 
   // Presentation mode controls
   useEffect(() => {
@@ -149,7 +206,10 @@ export default function EditorContent({
   const handleSave = async () => {
     setIsSaving(true)
     try {
-      await onSave(slides, title)
+      await presentationsAPI.updatePresentation(params.id, {
+        name: title,
+        slides: slides,
+      })
       toast({
         title: "Saved",
         description: "Presentation saved successfully.",
@@ -185,11 +245,6 @@ export default function EditorContent({
       borderRadius: "20px",
       glassmorphism: false,
       icons: [],
-      animations: {
-        entrance: "fadeIn",
-        emphasis: [],
-      },
-      customCSS: "",
     }
 
     const newSlides = [...slides]
@@ -222,12 +277,6 @@ export default function EditorContent({
     setCurrentSlideIndex(currentSlideIndex + 1)
   }
 
-  const updateSlide = (updatedSlide: UltimateSlide) => {
-    const newSlides = [...slides]
-    newSlides[currentSlideIndex] = updatedSlide
-    setSlides(newSlides)
-  }
-
   const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
     if (file) {
@@ -250,20 +299,29 @@ export default function EditorContent({
     }
 
     try {
-      await generateSlides({
-        prompt: aiPrompt,
-        slideCount: 6,
-        presentationType: "business",
-        audience: "team",
-        tone: "professional",
-        file: selectedFile,
-      })
+      const result = await generateSlides(aiPrompt, selectedFile)
+      if (result && result.slides) {
+        setSlides(result.slides)
+        setCurrentSlideIndex(0)
+        setShowAIPanel(false)
+        setAiPrompt("")
+        setSelectedFile(null)
+        toast({
+          title: "Slides Generated",
+          description: `Successfully generated ${result.slides.length} slides with AI.`,
+        })
+      }
     } catch (error) {
       console.error("AI generation failed:", error)
+      toast({
+        title: "Error",
+        description: "Failed to generate slides. Please try again.",
+        variant: "destructive",
+      })
     }
   }
 
-  const handleEditSlide = async (slideId: string) => {
+  const handleEditSlide = async () => {
     if (!aiPrompt.trim()) {
       toast({
         title: "Error",
@@ -273,19 +331,23 @@ export default function EditorContent({
       return
     }
 
-    const slideToEdit = slides.find((s) => s.id === slideId)
-    if (!slideToEdit) return
-
     try {
-      await generateSlides({
-        prompt: aiPrompt,
-        editMode: "selected",
-        selectedSlideId: slideId,
-        selectedSlideTitle: slideToEdit.title,
-        existingSlides: slides,
-      })
+      const result = await editSlide(currentSlide.id, currentSlide.title, aiPrompt)
+      if (result && result.slides) {
+        setSlides(result.slides)
+        setAiPrompt("")
+        toast({
+          title: "Slide Updated",
+          description: "Successfully updated the slide with AI.",
+        })
+      }
     } catch (error) {
       console.error("Slide editing failed:", error)
+      toast({
+        title: "Error",
+        description: "Failed to edit slide. Please try again.",
+        variant: "destructive",
+      })
     }
   }
 
@@ -364,6 +426,28 @@ export default function EditorContent({
 
         {/* Slide number */}
         <div className="text-xs text-gray-500 text-center mt-1">{index + 1}</div>
+      </div>
+    )
+  }
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="text-center space-y-4">
+          <div className="w-8 h-8 border-4 border-[#027659] border-t-transparent rounded-full animate-spin mx-auto"></div>
+          <p className="text-muted-foreground">Loading presentation...</p>
+        </div>
+      </div>
+    )
+  }
+
+  if (!currentSlide) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="text-center space-y-4">
+          <p className="text-muted-foreground">No slides found. Please try refreshing the page.</p>
+          <Button onClick={() => router.push("/")}>Go Home</Button>
+        </div>
       </div>
     )
   }
@@ -555,10 +639,10 @@ export default function EditorContent({
                   </Button>
 
                   <Button
-                    onClick={() => handleEditSlide(currentSlide.id)}
+                    onClick={handleEditSlide}
                     disabled={isGenerating}
                     variant="outline"
-                    className="w-full"
+                    className="w-full bg-transparent"
                   >
                     <Edit3 className="w-4 h-4 mr-2" />
                     {isGenerating ? "Editing..." : "Edit Current Slide"}
@@ -568,9 +652,6 @@ export default function EditorContent({
                 {aiError && (
                   <div className="p-3 bg-red-50 border border-red-200 rounded-md">
                     <p className="text-sm text-red-600">{aiError}</p>
-                    <Button onClick={clearError} variant="ghost" size="sm" className="mt-2">
-                      Dismiss
-                    </Button>
                   </div>
                 )}
               </div>
@@ -580,7 +661,12 @@ export default function EditorContent({
       </div>
 
       {/* Export Dialog */}
-      <ExportDialog open={showExportDialog} onOpenChange={setShowExportDialog} slides={slides} title={title} />
+      <ExportDialog
+        open={showExportDialog}
+        onOpenChange={setShowExportDialog}
+        projectName={title}
+        slideCount={slides.length}
+      />
 
       {/* Settings Modal */}
       <SettingsModal open={showSettingsModal} onOpenChange={setShowSettingsModal} />
