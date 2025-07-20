@@ -668,10 +668,120 @@ function EditorContent({ params }: EditorContentProps) {
           if (authUser) {
             const presentation = await presentationsAPI.getPresentation(presentationId)
 
-            // Ensure slides data is properly loaded
+            // Enhanced slides data loading with validation
             if (presentation.slides && Array.isArray(presentation.slides)) {
-              setSlides(presentation.slides)
-              setSelectedSlide(presentation.slides[0]?.id || "")
+              const enhancedSlides = presentation.slides.map((slide: any, index: number) => {
+                // Ensure all required properties exist with fallbacks
+                const enhancedSlide = {
+                  // Core properties
+                  id: slide.id || `slide-${Date.now()}-${index}`,
+                  title: slide.title || `Slide ${index + 1}`,
+                  content: slide.content || "",
+                  background: slide.background || "linear-gradient(135deg, #027659 0%, #065f46 100%)",
+                  textColor: slide.textColor || "#ffffff",
+                  layout: slide.layout || (index === 0 ? "title" : "content"),
+
+                  // Enhanced design properties with defaults
+                  titleFont: slide.titleFont || "Inter, system-ui, sans-serif",
+                  contentFont: slide.contentFont || "Inter, system-ui, sans-serif",
+                  titleSize: slide.titleSize || (index === 0 ? "3.5rem" : "2.5rem"),
+                  contentSize: slide.contentSize || "1.125rem",
+                  spacing: slide.spacing || "comfortable",
+                  alignment: slide.alignment || (index === 0 ? "center" : "left"),
+                  titleColor: slide.titleColor || "#ffffff",
+                  accentColor: slide.accentColor || "#10b981",
+                  shadowEffect: slide.shadowEffect || "0 20px 40px rgba(0,0,0,0.15)",
+                  borderRadius: slide.borderRadius || "20px",
+                  glassmorphism: slide.glassmorphism || false,
+
+                  // Visual content - ensure proper structure
+                  chartData: slide.chartData
+                    ? {
+                        type: slide.chartData.type || "bar",
+                        data: Array.isArray(slide.chartData.data) ? slide.chartData.data : [],
+                        config: slide.chartData.config || { showGrid: true },
+                        style: slide.chartData.style || "modern",
+                      }
+                    : null,
+
+                  tableData: slide.tableData
+                    ? {
+                        headers: Array.isArray(slide.tableData.headers) ? slide.tableData.headers : [],
+                        rows: Array.isArray(slide.tableData.rows) ? slide.tableData.rows : [],
+                        style: slide.tableData.style || "modern",
+                        interactive: slide.tableData.interactive || false,
+                      }
+                    : null,
+
+                  icons: Array.isArray(slide.icons) ? slide.icons : [],
+
+                  // Animation and effects
+                  animations: slide.animations || {
+                    entrance: "fadeIn",
+                    emphasis: [],
+                  },
+                  customCSS: slide.customCSS || "",
+                }
+
+                // Auto-enhance old slides that might not have visual content
+                if (!enhancedSlide.chartData && !enhancedSlide.tableData) {
+                  const content = (enhancedSlide.title + " " + enhancedSlide.content).toLowerCase()
+
+                  // Add chart data if content suggests it
+                  if (
+                    content.includes("revenue") ||
+                    content.includes("growth") ||
+                    content.includes("metric") ||
+                    content.includes("performance") ||
+                    content.includes("quarter") ||
+                    content.includes("sales")
+                  ) {
+                    enhancedSlide.layout = "chart"
+                    enhancedSlide.chartData = {
+                      type: content.includes("market") ? "pie" : "bar",
+                      data: [
+                        { name: "Q1", value: 125000 },
+                        { name: "Q2", value: 180000 },
+                        { name: "Q3", value: 245000 },
+                        { name: "Q4", value: 320000 },
+                      ],
+                      config: { showGrid: true },
+                      style: "modern",
+                    }
+                  }
+
+                  // Add icons if missing
+                  if (enhancedSlide.icons.length === 0) {
+                    if (content.includes("revenue") || content.includes("financial")) {
+                      enhancedSlide.icons.push({
+                        icon: "💰",
+                        position: "top-right",
+                        color: enhancedSlide.accentColor,
+                        size: "24",
+                      })
+                    } else if (content.includes("growth") || content.includes("trend")) {
+                      enhancedSlide.icons.push({
+                        icon: "📈",
+                        position: "top-right",
+                        color: enhancedSlide.accentColor,
+                        size: "24",
+                      })
+                    } else if (index === 0) {
+                      enhancedSlide.icons.push({
+                        icon: "🚀",
+                        position: "top-right",
+                        color: enhancedSlide.accentColor,
+                        size: "24",
+                      })
+                    }
+                  }
+                }
+
+                return enhancedSlide
+              })
+
+              setSlides(enhancedSlides)
+              setSelectedSlide(enhancedSlides[0]?.id || "")
               setCurrentSlideIndex(0)
             }
 
@@ -691,7 +801,7 @@ function EditorContent({ params }: EditorContentProps) {
               const welcomeMessage: ChatMessage = {
                 id: Date.now().toString(),
                 type: "assistant",
-                content: `Welcome back to "${presentation.name}"! This presentation has ${presentation.slides?.length || 0} slides and was last updated ${new Date(presentation.updated_at).toLocaleDateString()}.\n\nYou can now:\n• Edit individual slides by selecting them\n• Regenerate content with new ideas\n• Change colors and themes\n• Ask me to modify specific aspects\n\nWhat would you like to work on?`,
+                content: `Welcome back to "${presentation.name}"! This presentation has ${presentation.slides?.length || 0} slides with enhanced visual design.\n\n✨ **Enhanced Features Available:**\n• Modern gradient backgrounds\n• Interactive charts and tables\n• Professional typography\n• Glassmorphism effects\n• Business icons\n\nYou can now:\n• Edit individual slides by selecting them\n• Regenerate content with new ideas\n• Add charts and tables automatically\n• Apply premium visual effects\n• Ask me to modify specific aspects\n\nWhat would you like to work on?`,
                 timestamp: new Date(),
               }
               setChatMessages([welcomeMessage])
