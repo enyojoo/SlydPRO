@@ -9,8 +9,9 @@ export function generateSlideThumbnail(slide: any): string {
   canvas.width = 320
   canvas.height = 180
 
-  // Fill background
-  ctx.fillStyle = slide.background || "#027659"
+  // Fill background with solid color (no gradients for thumbnails)
+  const bgColor = slide.background || "#027659"
+  ctx.fillStyle = bgColor.includes("gradient") ? "#027659" : bgColor
   ctx.fillRect(0, 0, canvas.width, canvas.height)
 
   // Set text properties
@@ -18,22 +19,24 @@ export function generateSlideThumbnail(slide: any): string {
   ctx.textAlign = "left"
   ctx.textBaseline = "top"
 
-  // Draw title
-  ctx.font = "bold 16px Arial, sans-serif"
-  const titleText = slide.title.substring(0, 30) + (slide.title.length > 30 ? "..." : "")
-  ctx.fillText(titleText, 20, 20)
+  // Draw title (static text only)
+  ctx.font = "bold 14px Arial, sans-serif"
+  const titleText = slide.title.substring(0, 35) + (slide.title.length > 35 ? "..." : "")
+  ctx.fillText(titleText, 15, 15)
 
-  // Draw content
-  ctx.font = "12px Arial, sans-serif"
+  // Draw content preview (static text only)
+  ctx.font = "11px Arial, sans-serif"
   ctx.globalAlpha = 0.8
-  const contentText = slide.content.substring(0, 50) + (slide.content.length > 50 ? "..." : "")
+  const contentText = slide.content
+    ? slide.content.toString().substring(0, 80) + (slide.content.toString().length > 80 ? "..." : "")
+    : ""
 
-  // Wrap text for content
+  // Simple text wrapping for content
   const words = contentText.split(" ")
   let line = ""
-  let y = 50
-  const lineHeight = 16
-  const maxLines = 6
+  let y = 40
+  const lineHeight = 14
+  const maxLines = 4
   let currentLine = 0
 
   for (let n = 0; n < words.length && currentLine < maxLines; n++) {
@@ -41,8 +44,8 @@ export function generateSlideThumbnail(slide: any): string {
     const metrics = ctx.measureText(testLine)
     const testWidth = metrics.width
 
-    if (testWidth > 280 && n > 0) {
-      ctx.fillText(line, 20, y)
+    if (testWidth > 290 && n > 0) {
+      ctx.fillText(line, 15, y)
       line = words[n] + " "
       y += lineHeight
       currentLine++
@@ -52,8 +55,30 @@ export function generateSlideThumbnail(slide: any): string {
   }
 
   if (currentLine < maxLines && line.trim()) {
-    ctx.fillText(line, 20, y)
+    ctx.fillText(line, 15, y)
   }
+
+  // Add simple chart representation for chart slides (static rectangles)
+  if (slide.layout === "chart" && slide.chartData) {
+    ctx.globalAlpha = 0.6
+    ctx.fillStyle = slide.accentColor || "#10b981"
+    // Draw simple bars to represent chart
+    const barWidth = 20
+    const barSpacing = 25
+    const startX = 15
+    const baseY = 160
+
+    for (let i = 0; i < Math.min(4, slide.chartData.data?.length || 3); i++) {
+      const barHeight = 20 + i * 10
+      ctx.fillRect(startX + i * barSpacing, baseY - barHeight, barWidth, barHeight)
+    }
+  }
+
+  // Add layout indicator
+  ctx.globalAlpha = 0.4
+  ctx.fillStyle = "#ffffff"
+  ctx.font = "8px Arial, sans-serif"
+  ctx.fillText(slide.layout || "content", 280, 165)
 
   // Convert to data URL
   return canvas.toDataURL("image/png", 0.8)
@@ -69,52 +94,58 @@ export function generatePresentationThumbnail(slides: any[]): string {
 // Server-side thumbnail generation using SVG (for API routes)
 export function generateSVGThumbnail(slide: any): string {
   const titleText = slide.title.substring(0, 40) + (slide.title.length > 40 ? "..." : "")
-  const contentText = slide.content.substring(0, 100) + (slide.content.length > 100 ? "..." : "")
+  const contentText = slide.content
+    ? slide.content.toString().substring(0, 100) + (slide.content.toString().length > 100 ? "..." : "")
+    : ""
+  const bgColor = slide.background && !slide.background.includes("gradient") ? slide.background : "#027659"
 
-  // Create a more detailed thumbnail
+  // Create a static thumbnail SVG
   const svg = `
     <svg width="320" height="180" xmlns="http://www.w3.org/2000/svg">
-      <defs>
-        <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
-          <stop offset="0%" style="stop-color:${slide.background || "#027659"};stop-opacity:1" />
-          <stop offset="100%" style="stop-color:${slide.background || "#027659"};stop-opacity:0.8" />
-        </linearGradient>
-      </defs>
-      <rect width="100%" height="100%" fill="url(#bg)"/>
+      <rect width="100%" height="100%" fill="${bgColor}"/>
       
-      <!-- Title -->
-      <text x="20" y="35" font-family="Arial, sans-serif" font-size="18" font-weight="bold" 
+      <!-- Title (static text) -->
+      <text x="20" y="30" font-family="Arial, sans-serif" font-size="16" font-weight="bold" 
             fill="${slide.textColor || "#ffffff"}" text-anchor="start">
         ${titleText.split(" ").slice(0, 4).join(" ")}
       </text>
       ${
         titleText.split(" ").length > 4
           ? `
-      <text x="20" y="55" font-family="Arial, sans-serif" font-size="18" font-weight="bold" 
+      <text x="20" y="50" font-family="Arial, sans-serif" font-size="16" font-weight="bold" 
             fill="${slide.textColor || "#ffffff"}" text-anchor="start">
         ${titleText.split(" ").slice(4).join(" ")}
       </text>`
           : ""
       }
       
-      <!-- Content preview -->
-      <text x="20" y="85" font-family="Arial, sans-serif" font-size="12" 
-            fill="${slide.textColor || "#ffffff"}" opacity="0.9" text-anchor="start">
+      <!-- Content preview (static text) -->
+      <text x="20" y="75" font-family="Arial, sans-serif" font-size="11" 
+            fill="${slide.textColor || "#ffffff"}" opacity="0.8" text-anchor="start">
         ${contentText.split(" ").slice(0, 8).join(" ")}
       </text>
-      <text x="20" y="105" font-family="Arial, sans-serif" font-size="12" 
-            fill="${slide.textColor || "#ffffff"}" opacity="0.9" text-anchor="start">
+      <text x="20" y="90" font-family="Arial, sans-serif" font-size="11" 
+            fill="${slide.textColor || "#ffffff"}" opacity="0.8" text-anchor="start">
         ${contentText.split(" ").slice(8, 16).join(" ")}
       </text>
-      <text x="20" y="125" font-family="Arial, sans-serif" font-size="12" 
-            fill="${slide.textColor || "#ffffff"}" opacity="0.9" text-anchor="start">
-        ${contentText.split(" ").slice(16, 24).join(" ")}
-      </text>
       
-      <!-- Slide indicator -->
-      <circle cx="290" cy="160" r="8" fill="${slide.textColor || "#ffffff"}" opacity="0.3"/>
-      <text x="290" y="165" font-family="Arial, sans-serif" font-size="10" font-weight="bold"
-            fill="${slide.background || "#027659"}" text-anchor="middle">1</text>
+      <!-- Simple chart representation for chart slides -->
+      ${
+        slide.layout === "chart"
+          ? `
+      <rect x="20" y="120" width="15" height="30" fill="${slide.accentColor || "#10b981"}" opacity="0.6"/>
+      <rect x="40" y="110" width="15" height="40" fill="${slide.accentColor || "#10b981"}" opacity="0.6"/>
+      <rect x="60" y="125" width="15" height="25" fill="${slide.accentColor || "#10b981"}" opacity="0.6"/>
+      <rect x="80" y="105" width="15" height="45" fill="${slide.accentColor || "#10b981"}" opacity="0.6"/>
+      `
+          : ""
+      }
+      
+      <!-- Layout indicator -->
+      <text x="280" y="170" font-family="Arial, sans-serif" font-size="8" 
+            fill="${slide.textColor || "#ffffff"}" opacity="0.4" text-anchor="start">
+        ${slide.layout || "content"}
+      </text>
     </svg>
   `
 
