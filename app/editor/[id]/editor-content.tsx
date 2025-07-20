@@ -140,7 +140,7 @@ function EditorContent({ params }: EditorContentProps) {
     [currentPresentationId, authUser],
   )
 
-  // Update the handleInitialGeneration function to provide real-time streaming:
+  // FIXED: Enhanced generation that preserves Claude's design
   const handleInitialGeneration = useCallback(
     async (prompt: string) => {
       const userMessage: ChatMessage = {
@@ -189,22 +189,17 @@ function EditorContent({ params }: EditorContentProps) {
         )
       }, 1000)
 
-      // Use streaming generation with real-time updates
+      // Enhanced generation with better prompt
       await claude.generateSlidesStreaming(
         prompt,
         uploadedFile,
-        // onChunk - real-time content streaming
+        // onChunk
         (chunk: string) => {
           setStreamingContent((prev) => {
             const newContent = prev + chunk
-
-            // Parse slides from streaming content to update progress in real-time
             const slideMatches = newContent.match(/(?:##|###)\s*(?:Slide\s*\d+:?\s*)?(.+?)(?=(?:##|###)|$)/gs)
-
             if (slideMatches) {
               const completedSlides = slideMatches.length
-
-              // Update progress immediately with real-time feedback
               setChatMessages((prevMessages) =>
                 prevMessages.map((msg) =>
                   msg.isLoading
@@ -222,11 +217,9 @@ function EditorContent({ params }: EditorContentProps) {
                 ),
               )
             }
-
             return newContent
           })
 
-          // Transition to designing stage when we start getting content
           setChatMessages((prev) =>
             prev.map((msg) =>
               msg.isLoading && msg.generationProgress?.stage === "thinking"
@@ -242,53 +235,50 @@ function EditorContent({ params }: EditorContentProps) {
             ),
           )
         },
-        // onComplete
+        // onComplete - PRESERVE Claude's design, don't override themes
         async (result) => {
           setIsStreaming(false)
           clearInterval(thinkingInterval)
 
           if (result) {
-            const themedSlides = result.slides.map((slide, index) => ({
+            // *** CRITICAL FIX: Don't override Claude's colors ***
+            // Use Claude's generated slides as-is with their designed colors
+            const enhancedSlides = result.slides.map((slide) => ({
               ...slide,
-              background: index === 0 ? selectedTheme.primary : selectedTheme.secondary,
-              textColor: selectedTheme.text,
+              // Only add missing properties, don't override existing design
+              titleFont: slide.titleFont || "Inter, system-ui, sans-serif",
+              contentFont: slide.contentFont || "Inter, system-ui, sans-serif",
+              shadowEffect: slide.shadowEffect || "0 20px 40px rgba(0,0,0,0.15)",
+              borderRadius: slide.borderRadius || "20px",
+              // Preserve Claude's background and textColor - DON'T OVERRIDE
             }))
 
-            setSlides(themedSlides)
-            setSelectedSlide(themedSlides[0]?.id || "")
+            setSlides(enhancedSlides)
+            setSelectedSlide(enhancedSlides[0]?.id || "")
             setCurrentSlideIndex(0)
 
-            // Save to database and redirect to new URL
+            // Save to database
             if (authUser) {
               try {
                 const presentation = await presentationsAPI.createPresentation({
                   name: projectName,
-                  slides: themedSlides,
+                  slides: enhancedSlides, // Save with Claude's original design
                   category: "ai-generated",
                   chat_history: [],
                 })
                 setCurrentPresentationId(presentation.id)
-
-                // Generate slug from project name
-                const slug = projectName
-                  .toLowerCase()
-                  .replace(/[^a-z0-9]+/g, "-")
-                  .replace(/(^-|-$)/g, "")
-
-                // Update URL without page reload
                 window.history.replaceState(null, "", `/editor/${presentation.id}`)
               } catch (error) {
                 console.error("Failed to save presentation:", error)
               }
             }
 
-            // Update to completion state
             const completedMessages = chatMessages.map((msg) =>
               msg.isLoading
                 ? {
                     ...msg,
                     isLoading: false,
-                    content: `I've successfully created your presentation with ${result.slides.length} slides. Each slide is designed to tell your story effectively. You can now edit individual slides or ask me to make changes to the entire presentation.`,
+                    content: `I've created your presentation with ${result.slides.length} beautifully designed slides. Each slide uses professional colors and modern visual design. You can now edit individual slides or ask me to make changes to the entire presentation.`,
                     generationProgress: {
                       ...msg.generationProgress!,
                       stage: "complete" as const,
@@ -303,7 +293,6 @@ function EditorContent({ params }: EditorContentProps) {
 
             setChatMessages(completedMessages)
 
-            // Save chat history after completion
             setTimeout(() => {
               saveChatHistory(completedMessages)
             }, 1000)
@@ -327,7 +316,7 @@ function EditorContent({ params }: EditorContentProps) {
         },
       )
     },
-    [claude, uploadedFile, selectedTheme, projectName, authUser, streamingContent, chatMessages, saveChatHistory],
+    [claude, uploadedFile, projectName, authUser, streamingContent, chatMessages, saveChatHistory], // REMOVED selectedTheme dependency
   )
 
   // Add function to toggle progress minimization
@@ -384,6 +373,7 @@ function EditorContent({ params }: EditorContentProps) {
     return () => clearTimeout(saveTimer)
   }, [slides, projectName, chatMessages, autoSave])
 
+  // FIXED: Chat submit handler that preserves Claude's design
   const handleChatSubmit = async () => {
     if (!inputMessage.trim() || claude.isLoading) return
 
@@ -412,7 +402,6 @@ function EditorContent({ params }: EditorContentProps) {
     const currentInput = inputMessage
     setInputMessage("")
 
-    // Start thinking timer for follow-up requests
     let thinkingTime = 0
     const thinkingInterval = setInterval(() => {
       thinkingTime += 1
@@ -432,7 +421,6 @@ function EditorContent({ params }: EditorContentProps) {
     }, 1000)
 
     if (editMode === "selected" && selectedSlide) {
-      // Edit only the selected slide
       const slide = slides.find((s) => s.id === selectedSlide)
       if (slide) {
         const result = await claude.editSlide(selectedSlide, slide.title, currentInput)
@@ -441,17 +429,17 @@ function EditorContent({ params }: EditorContentProps) {
         setChatMessages((prev) => prev.filter((msg) => !msg.isLoading))
 
         if (result) {
-          setSlides(
-            result.slides.map((s, index) => ({
-              ...s,
-              background: index === 0 ? selectedTheme.primary : selectedTheme.secondary,
-              textColor: selectedTheme.text,
-            })),
-          )
+          // *** PRESERVE Claude's design for edited slides too ***
+          const enhancedSlides = result.slides.map((s) => ({
+            ...s,
+            // Don't override Claude's color choices
+          }))
+
+          setSlides(enhancedSlides)
           const assistantMessage: ChatMessage = {
             id: (Date.now() + 2).toString(),
             type: "assistant",
-            content: `Great! I've updated the "${slide.title}" slide based on your request. The changes should now be visible in the preview.`,
+            content: `Great! I've updated the "${slide.title}" slide with a new professional design. The changes should now be visible in the preview.`,
             timestamp: new Date(),
           }
           const updatedMessages = [...newMessages.filter((msg) => !msg.isLoading), assistantMessage]
@@ -460,7 +448,7 @@ function EditorContent({ params }: EditorContentProps) {
         }
       }
     } else {
-      // Regenerate all slides or create new ones
+      // Regenerate all slides
       let result
       if (slides.length > 0) {
         result = await claude.regenerateAllSlides(currentInput)
@@ -472,14 +460,15 @@ function EditorContent({ params }: EditorContentProps) {
       setChatMessages((prev) => prev.filter((msg) => !msg.isLoading))
 
       if (result) {
-        const themedSlides = result.slides.map((slide, index) => ({
+        // *** PRESERVE Claude's design for regenerated slides ***
+        const enhancedSlides = result.slides.map((slide) => ({
           ...slide,
-          background: index === 0 ? selectedTheme.primary : selectedTheme.secondary,
-          textColor: selectedTheme.text,
+          // Don't apply theme override
         }))
-        setSlides(themedSlides)
-        if (themedSlides.length > 0 && !selectedSlide) {
-          setSelectedSlide(themedSlides[0].id)
+
+        setSlides(enhancedSlides)
+        if (enhancedSlides.length > 0 && !selectedSlide) {
+          setSelectedSlide(enhancedSlides[0].id)
           setCurrentSlideIndex(0)
         }
 
@@ -488,8 +477,8 @@ function EditorContent({ params }: EditorContentProps) {
           type: "assistant",
           content:
             slides.length > 0
-              ? "Perfect! I've updated all slides based on your feedback. Take a look at the changes in the preview."
-              : `Excellent! I've created ${result.slides.length} slides for your presentation. You can now review them, make edits, or ask for specific changes.`,
+              ? "Perfect! I've updated all slides with fresh professional designs and colors. Take a look at the new visual styling in the preview."
+              : `Excellent! I've created ${result.slides.length} slides with modern design and professional color schemes. You can now review them, make edits, or ask for specific changes.`,
           timestamp: new Date(),
         }
         const updatedMessages = [...newMessages.filter((msg) => !msg.isLoading), assistantMessage]
@@ -543,13 +532,13 @@ function EditorContent({ params }: EditorContentProps) {
       setChatMessages((prev) => prev.filter((msg) => !msg.isLoading))
 
       if (result) {
-        const themedSlides = result.slides.map((slide, index) => ({
+        // Preserve Claude's original design
+        const enhancedSlides = result.slides.map((slide) => ({
           ...slide,
-          background: index === 0 ? selectedTheme.primary : selectedTheme.secondary,
-          textColor: selectedTheme.text,
+          // Don't override colors
         }))
-        setSlides(themedSlides)
-        setSelectedSlide(themedSlides[0]?.id || "")
+        setSlides(enhancedSlides)
+        setSelectedSlide(enhancedSlides[0]?.id || "")
         setCurrentSlideIndex(0)
 
         const assistantMessage: ChatMessage = {
@@ -573,26 +562,35 @@ function EditorContent({ params }: EditorContentProps) {
     // Remove the automatic chat message - only update the UI indicator
   }
 
+  // FIXED: Make theme application optional with user confirmation
   const handleThemeChange = (themeName: string) => {
     const theme = colorThemes.find((t) => t.name === themeName) || colorThemes[0]
     setSelectedTheme(theme)
 
-    const themedSlides = slides.map((slide, index) => ({
-      ...slide,
-      background: index === 0 ? theme.primary : theme.secondary,
-      textColor: theme.text,
-    }))
-    setSlides(themedSlides)
+    // Make theme application OPTIONAL - only apply if user explicitly requests it
+    const confirmation = window.confirm(
+      `Would you like to apply the ${theme.name} theme to all slides? This will override the current AI-generated colors.`,
+    )
 
-    const themeMessage: ChatMessage = {
-      id: Date.now().toString(),
-      type: "assistant",
-      content: `Perfect! I've applied the ${theme.name} theme to all your slides. The new color scheme gives your presentation a fresh look.`,
-      timestamp: new Date(),
+    if (confirmation) {
+      const themedSlides = slides.map((slide, index) => ({
+        ...slide,
+        background: index === 0 ? theme.primary : theme.secondary,
+        textColor: theme.text,
+        accentColor: theme.primary,
+      }))
+      setSlides(themedSlides)
+
+      const themeMessage: ChatMessage = {
+        id: Date.now().toString(),
+        type: "assistant",
+        content: `Perfect! I've applied the ${theme.name} theme to all your slides. The new color scheme gives your presentation a cohesive look.`,
+        timestamp: new Date(),
+      }
+      const updatedMessages = [...chatMessages, themeMessage]
+      setChatMessages(updatedMessages)
+      saveChatHistory(updatedMessages)
     }
-    const updatedMessages = [...chatMessages, themeMessage]
-    setChatMessages(updatedMessages)
-    saveChatHistory(updatedMessages)
   }
 
   const handleNameSave = () => {
