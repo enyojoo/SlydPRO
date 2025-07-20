@@ -18,7 +18,7 @@ interface SlideGenerationRequest {
   hasFile?: boolean
 }
 
-// Load design context from environment variable (MANDATORY - NO FALLBACKS)
+// Load design context from environment variable
 const getUltimateDesignContext = () => {
   if (!process.env.SLYDPRO_DESIGN_CONTEXT) {
     throw new Error("SLYDPRO_DESIGN_CONTEXT environment variable is required and missing")
@@ -31,52 +31,103 @@ const getUltimateDesignContext = () => {
   }
 }
 
-// Build design instructions from context
-const buildDesignInstructions = (designContext: any) => {
-  const iconSystems = designContext.iconSystems || {}
-  const colorIntelligence = designContext.colorIntelligence || {}
-  const typographyMastery = designContext.typographyMastery || {}
-  const layoutMastery = designContext.layoutMastery || {}
+// Apply design context intelligence to slides
+const applyDesignContext = (slides: any[], designContext: any) => {
+  return slides.map((slide, index) => {
+    // Get content type rules from design context
+    const contentType = slide.contentType || "business"
+    const colorRules =
+      designContext.colorIntelligence?.psychologyMapping?.[contentType] ||
+      (Array.isArray(designContext.colorIntelligence?.advancedPalettes)
+        ? designContext.colorIntelligence.advancedPalettes[
+            index % designContext.colorIntelligence.advancedPalettes.length
+          ]
+        : null)
 
-  return `
-DESIGN CONTEXT INSTRUCTIONS (Use these sophisticated rules):
+    const iconRules = designContext.iconSystems?.contextualMapping?.[contentType] || []
+    const layoutRules =
+      designContext.layoutMastery?.slideTemplates?.find((template: any) => template.name === slide.layout) || {}
 
-PROFESSIONAL REACT ICONS:
-Business Icons: ${iconSystems.businessIcons?.join(", ") || "trending-up, briefcase, target, lightning, star, dollar, award, trophy, gem, rocket, lightbulb, shield"}
-Data Icons: ${iconSystems.dataIcons?.join(", ") || "bar-chart, pie-chart, analytics, dashboard, insights, assessment, chart, timeline, activity"}
-Tech Icons: ${iconSystems.techIcons?.join(", ") || "monitor, smartphone, database, server, cpu, settings, tool, code"}
-Team Icons: ${iconSystems.teamIcons?.join(", ") || "users, group, business"}
+    // Fallback gradients if design context doesn't provide colors
+    const fallbackGradients = [
+      "linear-gradient(135deg, #027659 0%, #065f46 100%)",
+      "linear-gradient(135deg, #3b82f6 0%, #1e40af 100%)",
+      "linear-gradient(135deg, #7c3aed 0%, #5b21b6 100%)",
+      "linear-gradient(135deg, #dc2626 0%, #991b1b 100%)",
+      "linear-gradient(135deg, #ea580c 0%, #c2410c 100%)",
+      "linear-gradient(135deg, #059669 0%, #047857 100%)",
+    ]
 
-ICON USAGE RULES from Design Context:
-${
-  iconSystems.contextualMapping
-    ? Object.entries(iconSystems.contextualMapping)
-        .map(([context, icons]) => `${context}: ${Array.isArray(icons) ? icons.join(", ") : icons}`)
-        .join("\n")
-    : ""
+    return {
+      ...slide,
+      // Apply design context rules automatically
+      background: colorRules?.gradient || colorRules?.primary || fallbackGradients[index % fallbackGradients.length],
+      textColor: colorRules?.text || "#ffffff",
+      titleColor: colorRules?.accent || "#ffffff",
+      accentColor: colorRules?.accent || "#fbbf24",
+
+      // Icon from design context
+      professionalIcon:
+        Array.isArray(iconRules) && iconRules.length > 0
+          ? {
+              name: iconRules[0],
+              position: layoutRules.iconPlacement || "top-right",
+              style: "outline",
+              color: colorRules?.accent || "#fbbf24",
+            }
+          : null,
+
+      // Typography from design context
+      titleFont: Array.isArray(designContext.typographyMastery?.fontStacks)
+        ? designContext.typographyMastery.fontStacks[0]?.name || "SF Pro Display, Inter, sans-serif"
+        : "SF Pro Display, Inter, sans-serif",
+      contentFont: Array.isArray(designContext.typographyMastery?.fontStacks)
+        ? designContext.typographyMastery.fontStacks[1]?.name || "SF Pro Text, Inter, sans-serif"
+        : "SF Pro Text, Inter, sans-serif",
+
+      // Layout from design context
+      spacing: designContext.layoutMastery?.spacingRules?.comfortable || "comfortable",
+      alignment: slide.layout === "title" ? "center" : "left",
+      titleSize: slide.layout === "title" ? "clamp(2.5rem, 5vw, 4rem)" : "clamp(1.75rem, 3vw, 2.5rem)",
+      contentSize: "clamp(1rem, 1.5vw, 1.125rem)",
+
+      // Visual effects from design context
+      shadowEffect: designContext.visualEffects?.shadows?.elegant || "0 15px 35px rgba(0,0,0,0.1)",
+      borderRadius: designContext.visualEffects?.borderRadius?.modern || "20px",
+      glassmorphism: designContext.visualEffects?.glassmorphism || false,
+    }
+  })
 }
 
-COLOR INTELLIGENCE from Design Context:
-Advanced Palettes: ${Array.isArray(colorIntelligence.advancedPalettes) ? colorIntelligence.advancedPalettes.map((p) => `${p.name} (${p.primary}, ${p.secondary})`).join(", ") : ""}
-Psychology Mapping: ${
-    colorIntelligence.psychologyMapping
-      ? Object.entries(colorIntelligence.psychologyMapping)
-          .map(([mood, colors]) => `${mood}: ${colors}`)
-          .join(", ")
-      : ""
-  }
+// Build simplified instructions using design context
+const buildInstructions = (designContext: any) => `
+Generate SIMPLE slides with just content. The design context will handle ALL styling.
 
-TYPOGRAPHY MASTERY from Design Context:
-Professional Fonts: ${Array.isArray(typographyMastery.fontStacks) ? typographyMastery.fontStacks.map((f) => f.name).join(", ") : ""}
-Hierarchy Rules: ${typographyMastery.hierarchy ? Object.keys(typographyMastery.hierarchy).join(", ") : ""}
+SIMPLE SLIDE STRUCTURE:
+{
+  "id": "slide-1",
+  "title": "Clear Title",
+  "content": "Slide content here",
+  "contentType": "financial" | "growth" | "team" | "strategy" | "data",
+  "layout": "title" | "content" | "chart" | "table"
+}
 
-LAYOUT INTELLIGENCE from Design Context:
-${Array.isArray(layoutMastery.gridSystems) ? `Grid Systems: ${layoutMastery.gridSystems.join(", ")}` : ""}
-${layoutMastery.spacingRules ? `Spacing Rules: ${Object.keys(layoutMastery.spacingRules).join(", ")}` : ""}
+CONTENT TYPES for design context mapping:
+- "financial": Revenue, profit, money-related content
+- "growth": Metrics, trends, increases
+- "team": People, collaboration, users
+- "strategy": Plans, goals, objectives
+- "data": Analytics, charts, insights
 
-CRITICAL: Apply these design intelligence rules from the environment context, not basic defaults.
+The design context will automatically apply:
+✅ Appropriate colors based on psychology mapping
+✅ Contextual icons based on content type
+✅ Professional typography from font stacks
+✅ Optimal spacing and layout rules
+✅ Icon positioning based on layout templates
+
+DON'T specify colors, icons, or styling - let design context handle it!
 `
-}
 
 // Content analysis for intelligent visual suggestions
 const analyzeContentForVisuals = (content: string) => {
@@ -93,91 +144,6 @@ const analyzeContentForVisuals = (content: string) => {
     needsTable: analysis.hasComparisons,
     needsInfographic: analysis.hasProcess,
   }
-}
-
-// Get contextual icon based on content
-const getContextualIcon = (content: string, title: string, designContext: any) => {
-  const combinedText = (title + " " + content).toLowerCase()
-  const contextualMapping = designContext.iconSystems?.contextualMapping || {}
-
-  // Financial content
-  if (
-    combinedText.includes("revenue") ||
-    combinedText.includes("profit") ||
-    combinedText.includes("financial") ||
-    combinedText.includes("investment") ||
-    combinedText.includes("funding") ||
-    combinedText.includes("cost") ||
-    /\$\d+/.test(combinedText)
-  ) {
-    const financialIcons = contextualMapping.financial || ["dollar", "bar-chart", "pie-chart", "trending-up"]
-    return { name: financialIcons[0], style: "outline", shouldShow: true }
-  }
-
-  // Strategy content
-  if (
-    combinedText.includes("strategy") ||
-    combinedText.includes("goal") ||
-    combinedText.includes("target") ||
-    combinedText.includes("objective") ||
-    combinedText.includes("plan") ||
-    combinedText.includes("roadmap")
-  ) {
-    const strategyIcons = contextualMapping.strategy || ["target", "lightbulb", "rocket", "shield"]
-    return { name: strategyIcons[0], style: "outline", shouldShow: true }
-  }
-
-  // Performance content
-  if (
-    combinedText.includes("performance") ||
-    combinedText.includes("results") ||
-    combinedText.includes("achievement") ||
-    combinedText.includes("success") ||
-    combinedText.includes("metrics") ||
-    combinedText.includes("kpi")
-  ) {
-    const performanceIcons = contextualMapping.performance || ["trophy", "award", "star", "analytics"]
-    return { name: performanceIcons[0], style: "outline", shouldShow: true }
-  }
-
-  // Technology content
-  if (
-    combinedText.includes("technology") ||
-    combinedText.includes("digital") ||
-    combinedText.includes("software") ||
-    combinedText.includes("system") ||
-    combinedText.includes("platform") ||
-    combinedText.includes("data")
-  ) {
-    const technologyIcons = contextualMapping.technology || ["monitor", "database", "cpu", "settings"]
-    return { name: technologyIcons[0], style: "outline", shouldShow: true }
-  }
-
-  // Growth content
-  if (
-    combinedText.includes("growth") ||
-    combinedText.includes("increase") ||
-    combinedText.includes("expansion") ||
-    combinedText.includes("scale") ||
-    combinedText.includes("launch") ||
-    combinedText.includes("innovation")
-  ) {
-    return { name: "trending-up", style: "outline", shouldShow: true }
-  }
-
-  // Team content
-  if (
-    combinedText.includes("team") ||
-    combinedText.includes("people") ||
-    combinedText.includes("employee") ||
-    combinedText.includes("staff") ||
-    combinedText.includes("culture") ||
-    combinedText.includes("talent")
-  ) {
-    return { name: "users", style: "outline", shouldShow: true }
-  }
-
-  return { name: "", style: "outline", shouldShow: false }
 }
 
 // Enhanced sample data generators
@@ -225,7 +191,7 @@ const generateSampleData = (type: string, title: string) => {
 
 const parseFileContent = async (file: File): Promise<string> => {
   const text = await file.text()
-  return text.substring(0, 2000) // Limit file content
+  return text.substring(0, 2000)
 }
 
 export async function POST(request: NextRequest) {
@@ -241,9 +207,9 @@ export async function POST(request: NextRequest) {
       fileContent = await parseFileContent(uploadedFile)
     }
 
-    // GET DESIGN CONTEXT (not hardcoded rules)
+    // Get design context
     const designContext = getUltimateDesignContext()
-    const designInstructions = buildDesignInstructions(designContext)
+    const instructions = buildInstructions(designContext)
 
     const {
       prompt,
@@ -256,33 +222,11 @@ export async function POST(request: NextRequest) {
       selectedSlideTitle,
     } = requestData
 
-    // Build the complete prompt using design context
-    const systemPrompt = `You are SlydPRO's design AI. Create professional presentations using the sophisticated design context provided.
+    const systemPrompt = `You are SlydPRO's design AI. Create simple slide content - the design context handles all styling.
 
-${designInstructions}
+${instructions}
 
-SLIDE STRUCTURE with React Icons:
-{
-  "id": "slide-1",
-  "title": "Professional Title",
-  "content": "Content here...",
-  "layout": "title" | "content" | "chart" | "table" | "two-column",
-  "background": "linear-gradient(135deg, #color1, #color2)",
-  "textColor": "#ffffff",
-  "professionalIcon": {
-    "name": "trending-up", // React Icons name from design context
-    "position": "top-right",
-    "style": "outline" | "filled" | "material",
-    "color": "#059669"
-  },
-  "chartData": {
-    "type": "bar" | "line" | "pie" | "area",
-    "data": [{"name": "Q1", "value": 100}],
-    "config": {"showGrid": true}
-  }
-}
-
-Use the design context intelligence to create sophisticated, professional presentations.`
+Return only clean JSON with slides array. No styling properties needed.`
 
     const userPrompt =
       editMode === "selected" && selectedSlideId && selectedSlideTitle
@@ -293,7 +237,7 @@ AUDIENCE: ${audience}
 TONE: ${tone}
 ${fileContent ? `\nSOURCE MATERIAL:\n${fileContent.substring(0, 800)}...` : ""}`
 
-    console.log("🎨 Generating premium presentation with design context for:", requestData.prompt)
+    console.log("🎨 Generating slides with design context intelligence for:", requestData.prompt)
 
     const message = await anthropic.messages.create({
       model: "claude-sonnet-4-20250514",
@@ -328,102 +272,18 @@ ${fileContent ? `\nSOURCE MATERIAL:\n${fileContent.substring(0, 800)}...` : ""}`
       throw new Error("Invalid slides data structure from Claude")
     }
 
-    // Validate and enhance slides using design context
-    const validatedSlides = result.slides.map((slide: any, index: number) => {
-      // Use design context color palettes with safe array handling
-      const contextPalettes = Array.isArray(designContext.colorIntelligence?.advancedPalettes)
-        ? designContext.colorIntelligence.advancedPalettes
-        : []
+    // Apply design context intelligence to raw slides
+    let enhancedSlides = applyDesignContext(result.slides, designContext)
 
-      const fallbackGradients = [
-        "linear-gradient(135deg, #027659 0%, #065f46 100%)",
-        "linear-gradient(135deg, #3b82f6 0%, #1e40af 100%)",
-        "linear-gradient(135deg, #7c3aed 0%, #5b21b6 100%)",
-        "linear-gradient(135deg, #dc2626 0%, #991b1b 100%)",
-        "linear-gradient(135deg, #ea580c 0%, #c2410c 100%)",
-        "linear-gradient(135deg, #059669 0%, #047857 100%)",
-      ]
-
-      const gradients =
-        contextPalettes.length > 0
-          ? contextPalettes.map((palette: any) => palette.primary || palette.gradient)
-          : fallbackGradients
-
-      const enhancedSlide = {
-        id: slide.id || `slide-${Date.now()}-${index}`,
-        title: slide.title || `Slide ${index + 1}`,
-        content: slide.content || "",
-        background: slide.background || gradients[index % gradients.length],
-        textColor: slide.textColor || "#ffffff",
-        layout: slide.layout || (index === 0 ? "title" : "content"),
-
-        // Advanced design properties using design context with safe access
-        titleFont:
-          slide.titleFont ||
-          (Array.isArray(designContext.typographyMastery?.fontStacks) &&
-            designContext.typographyMastery.fontStacks[0]?.name) ||
-          "SF Pro Display, Inter, sans-serif",
-        contentFont:
-          slide.contentFont ||
-          (Array.isArray(designContext.typographyMastery?.fontStacks) &&
-            designContext.typographyMastery.fontStacks[1]?.name) ||
-          "SF Pro Text, Inter, sans-serif",
-        titleSize: slide.titleSize || (index === 0 ? "clamp(2.5rem, 5vw, 4rem)" : "clamp(1.75rem, 3vw, 2.5rem)"),
-        contentSize: slide.contentSize || "clamp(1rem, 1.5vw, 1.125rem)",
-        spacing: slide.spacing || designContext.layoutMastery?.spacingRules?.comfortable || "comfortable",
-        alignment: slide.alignment || (index === 0 ? "center" : "left"),
-        titleColor: slide.titleColor || "#ffffff",
-        accentColor:
-          slide.accentColor ||
-          (Array.isArray(designContext.colorIntelligence?.accentColors)
-            ? designContext.colorIntelligence.accentColors[0]
-            : "#fbbf24"),
-        shadowEffect:
-          slide.shadowEffect || designContext.visualEffects?.shadows?.elegant || "0 15px 35px rgba(0,0,0,0.1)",
-        borderRadius: slide.borderRadius || designContext.visualEffects?.borderRadius?.modern || "20px",
-        glassmorphism: slide.glassmorphism || false,
-
-        // Professional icon from design context
-        professionalIcon: slide.professionalIcon || null,
-
-        // Visual content with validation
-        chartData: slide.chartData
-          ? {
-              type: slide.chartData.type || "bar",
-              data: slide.chartData.data || [],
-              config: slide.chartData.config || {},
-              style: slide.chartData.style || "modern",
-            }
-          : null,
-
-        tableData: slide.tableData
-          ? {
-              headers: slide.tableData.headers || [],
-              rows: slide.tableData.rows || [],
-              style: slide.tableData.style || "modern",
-              interactive: slide.tableData.interactive || false,
-            }
-          : null,
-
-        // Legacy icon support (empty for now)
-        icons: [],
-
-        // Animation and effects using design context
-        animations: slide.animations || {
-          entrance: "fadeIn",
-          emphasis: [],
-        },
-        customCSS: slide.customCSS || "",
-      }
-
-      // Intelligent enhancement based on content analysis
-      const content = (enhancedSlide.title + " " + enhancedSlide.content).toLowerCase()
+    // Add visual content based on content analysis
+    enhancedSlides = enhancedSlides.map((slide) => {
+      const content = (slide.title + " " + slide.content).toLowerCase()
       const contentAnalysis = analyzeContentForVisuals(content)
 
-      // Auto-generate chart data if needed and not provided
-      if (contentAnalysis.needsChart && !enhancedSlide.chartData && enhancedSlide.layout !== "table") {
-        enhancedSlide.layout = "chart"
-        enhancedSlide.chartData = {
+      // Auto-generate chart data if needed
+      if (contentAnalysis.needsChart && slide.layout !== "table") {
+        slide.layout = "chart"
+        slide.chartData = {
           type: content.includes("market") || content.includes("region") ? "pie" : "bar",
           data: generateSampleData(
             content.includes("revenue")
@@ -433,17 +293,17 @@ ${fileContent ? `\nSOURCE MATERIAL:\n${fileContent.substring(0, 800)}...` : ""}`
                 : content.includes("market")
                   ? "market"
                   : "performance",
-            enhancedSlide.title,
+            slide.title,
           ),
           config: { showGrid: true },
           style: "modern",
         }
       }
 
-      // Auto-generate table data if needed and not provided
-      if (contentAnalysis.needsTable && !enhancedSlide.tableData && enhancedSlide.layout !== "chart") {
-        enhancedSlide.layout = "table"
-        enhancedSlide.tableData = {
+      // Auto-generate table data if needed
+      if (contentAnalysis.needsTable && slide.layout !== "chart") {
+        slide.layout = "table"
+        slide.tableData = {
           headers: ["Metric", "Q3", "Q4", "Growth"],
           rows: [
             ["New Customers", "1,200", "1,850", "+54%"],
@@ -456,36 +316,19 @@ ${fileContent ? `\nSOURCE MATERIAL:\n${fileContent.substring(0, 800)}...` : ""}`
         }
       }
 
-      // Add contextual professional icon if not provided
-      if (!enhancedSlide.professionalIcon) {
-        const contextualIcon = getContextualIcon(enhancedSlide.content, enhancedSlide.title, designContext)
-
-        if (contextualIcon.shouldShow) {
-          enhancedSlide.professionalIcon = {
-            name: contextualIcon.name,
-            position: "top-right",
-            style: contextualIcon.style,
-            color: enhancedSlide.accentColor,
-          }
-        }
-      }
-
-      return enhancedSlide
+      return slide
     })
 
-    console.log(`✅ Generated ${validatedSlides.length} premium slides with design context intelligence`)
+    console.log(`✅ Generated ${enhancedSlides.length} slides with design context intelligence`)
 
     return NextResponse.json({
-      slides: validatedSlides,
-      message:
-        result.message || `Generated ${validatedSlides.length} pixel-perfect slides with design context intelligence.`,
-      designNotes:
-        result.designNotes ||
-        "Applied complete design context intelligence with React Icons and sophisticated visual effects.",
+      slides: enhancedSlides,
+      message: result.message || `Generated ${enhancedSlides.length} slides with design context intelligence.`,
+      designNotes: "Applied complete design context intelligence with automatic styling and contextual icons.",
       overallTheme: result.overallTheme,
     })
   } catch (error) {
-    console.error("❌ Premium SlydPRO API Error:", error)
+    console.error("❌ SlydPRO API Error:", error)
 
     if (error instanceof Error) {
       if (error.message.includes("rate_limit")) {
@@ -510,7 +353,7 @@ ${fileContent ? `\nSOURCE MATERIAL:\n${fileContent.substring(0, 800)}...` : ""}`
 
       return NextResponse.json(
         {
-          error: `Premium generation failed: ${error.message}`,
+          error: `Generation failed: ${error.message}`,
           type: "generation_error",
         },
         { status: 500 },
@@ -519,7 +362,7 @@ ${fileContent ? `\nSOURCE MATERIAL:\n${fileContent.substring(0, 800)}...` : ""}`
 
     return NextResponse.json(
       {
-        error: "An unexpected error occurred in the premium design system.",
+        error: "An unexpected error occurred in the design system.",
         type: "unknown_error",
       },
       { status: 500 },

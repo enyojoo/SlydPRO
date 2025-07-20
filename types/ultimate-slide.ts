@@ -1,69 +1,80 @@
 import type React from "react"
+export interface ChartData {
+  type: "bar" | "line" | "pie" | "donut" | "area"
+  data: Array<{
+    name: string
+    value: number
+    [key: string]: any
+  }>
+  config?: {
+    showGrid?: boolean
+    gradient?: boolean
+    [key: string]: any
+  }
+  style?: string
+}
+
+export interface TableData {
+  headers: string[]
+  rows: string[][]
+  style?: string
+  interactive?: boolean
+}
+
+export interface ProfessionalIcon {
+  name: string
+  position: "top-left" | "top-right" | "bottom-left" | "bottom-right" | "center"
+  style: "outline" | "filled" | "material"
+  color: string
+}
+
+export interface IconData {
+  icon: string
+  position: string
+  color?: string
+  size?: number
+}
+
+export interface AnimationData {
+  entrance: string
+  emphasis: string[]
+}
+
 export interface UltimateSlide {
   id: string
   title: string
   content: string | React.ReactNode
-  background?: string
-  textColor?: string
-  layout?: "title" | "content" | "chart" | "table" | "two-column" | "image"
+  contentType?: "financial" | "growth" | "team" | "strategy" | "data" | "business"
+  layout: "title" | "content" | "chart" | "table" | "two-column" | "image"
+  background: string
+  textColor: string
+  titleColor?: string
+  accentColor?: string
 
-  // Advanced design properties
+  // Typography
   titleFont?: string
   contentFont?: string
   titleSize?: string
   contentSize?: string
-  spacing?: "tight" | "comfortable" | "relaxed" | "generous"
+
+  // Layout
+  spacing?: "compact" | "relaxed" | "comfortable" | "generous"
   alignment?: "left" | "center" | "right"
-  titleColor?: string
-  accentColor?: string
+
+  // Visual Effects
   shadowEffect?: string
   borderRadius?: string
   glassmorphism?: boolean
 
-  // Professional React Icon
-  professionalIcon?: {
-    name: string
-    position: "top-left" | "top-right" | "bottom-left" | "bottom-right" | "center"
-    style: "outline" | "filled" | "material"
-    color: string
-  }
+  // Icons
+  professionalIcon?: ProfessionalIcon
+  icons?: IconData[]
 
-  // Visual content
-  chartData?: {
-    type: "bar" | "line" | "pie" | "area" | "donut"
-    data: Array<{
-      name: string
-      value: number
-      [key: string]: any
-    }>
-    config?: {
-      showGrid?: boolean
-      gradient?: boolean
-      [key: string]: any
-    }
-    style?: "modern" | "minimal" | "corporate"
-  }
+  // Visual Content
+  chartData?: ChartData
+  tableData?: TableData
 
-  tableData?: {
-    headers: string[]
-    rows: string[][]
-    style?: "modern" | "minimal" | "corporate"
-    interactive?: boolean
-  }
-
-  // Legacy icon support
-  icons?: Array<{
-    icon: string
-    position: string
-    color?: string
-    size?: number | string
-  }>
-
-  // Animation and effects
-  animations?: {
-    entrance: string
-    emphasis: string[]
-  }
-
+  // Animation
+  animations?: AnimationData
   customCSS?: string
 }
