@@ -1,0 +1,122 @@
+import type React from "react"
+import {
+  // Business Icons - Feather style (clean outlines)
+  FiTrendingUp,
+  FiBriefcase,
+  FiTarget,
+  FiZap,
+  FiStar,
+  FiDollarSign,
+  FiFileText,
+  FiUsers,
+  FiActivity,
+  FiAward,
+  FiBarChart3,
+  // Tech Icons - Feather style
+  FiMonitor,
+  FiSmartphone,
+  FiDatabase,
+  FiServer,
+  FiCpu,
+  FiSettings,
+  FiTool,
+  FiCode,
+} from "react-icons/fi"
+import {
+  BsBriefcase as BsBriefcaseOutline,
+  BsGraphUp as BsGraphUpOutline,
+  BsLightbulb as BsLightbulbOutline,
+  BsRocket as BsRocketOutline,
+  BsTrophy as BsTrophyOutline,
+  BsGem as BsGemOutline,
+  BsShield as BsShieldOutline,
+  BsPieChart as BsPieChartOutline,
+  BsBarChart as BsBarChartOutline,
+  BsGraphDown as BsGraphDownOutline,
+} from "react-icons/bs"
+import {
+  MdDashboard,
+  MdAnalytics,
+  MdInsights,
+  MdTrendingUp,
+  MdBusiness,
+  MdGroup,
+  MdTimeline,
+  MdAssessment,
+  MdShowChart,
+} from "react-icons/md"
+
+interface IconRendererProps {
+  name: string
+  size?: number
+  className?: string
+  style?: "outline" | "filled" | "material"
+}
+
+export const IconRenderer = ({ name, size = 24, className = "", style = "outline" }: IconRendererProps) => {
+  // Outline style icons (Feather Icons)
+  const outlineIcons: Record<string, React.ComponentType<any>> = {
+    "trending-up": FiTrendingUp,
+    briefcase: FiBriefcase,
+    target: FiTarget,
+    lightning: FiZap,
+    star: FiStar,
+    dollar: FiDollarSign,
+    document: FiFileText,
+    users: FiUsers,
+    activity: FiActivity,
+    award: FiAward,
+    "bar-chart": FiBarChart3,
+    monitor: FiMonitor,
+    smartphone: FiSmartphone,
+    database: FiDatabase,
+    server: FiServer,
+    cpu: FiCpu,
+    settings: FiSettings,
+    tool: FiTool,
+    code: FiCode,
+  }
+
+  // Filled style icons (Bootstrap Icons)
+  const filledIcons: Record<string, React.ComponentType<any>> = {
+    briefcase: BsBriefcaseOutline,
+    "graph-up": BsGraphUpOutline,
+    lightbulb: BsLightbulbOutline,
+    rocket: BsRocketOutline,
+    trophy: BsTrophyOutline,
+    gem: BsGemOutline,
+    shield: BsShieldOutline,
+    "pie-chart": BsPieChartOutline,
+    "bar-chart": BsBarChartOutline,
+    "graph-down": BsGraphDownOutline,
+  }
+
+  // Material Design style icons
+  const materialIcons: Record<string, React.ComponentType<any>> = {
+    dashboard: MdDashboard,
+    analytics: MdAnalytics,
+    insights: MdInsights,
+    trending: MdTrendingUp,
+    business: MdBusiness,
+    group: MdGroup,
+    timeline: MdTimeline,
+    assessment: MdAssessment,
+    chart: MdShowChart,
+  }
+
+  let IconComponent
+
+  if (style === "filled") {
+    IconComponent = filledIcons[name]
+  } else if (style === "material") {
+    IconComponent = materialIcons[name]
+  } else {
+    IconComponent = outlineIcons[name]
+  }
+
+  if (!IconComponent) {
+    return null
+  }
+
+  return <IconComponent size={size} className={className} />
+}

@@ -945,42 +945,13 @@ function EditorContent({ params }: EditorContentProps) {
                         </div>
                       </div>
 
-                      {/* Slide Preview - Static Image Preview */}
+                      {/* Slide Preview - Fixed Container */}
                       <div className="p-3 pt-4">
                         <div className="w-full aspect-video rounded border overflow-hidden bg-gray-50 relative">
-                          {/* Static thumbnail preview - no interactions */}
-                          <div
-                            className="w-full h-full flex flex-col p-2 text-xs pointer-events-none"
-                            style={{
-                              background: slide.background || "linear-gradient(135deg, #027659 0%, #065f46 100%)",
-                              color: slide.textColor || "#ffffff",
-                            }}
-                          >
-                            {/* Title preview */}
-                            <div className="font-semibold mb-1 truncate text-[8px] leading-tight">{slide.title}</div>
-
-                            {/* Content preview */}
-                            <div className="flex-1 text-[6px] leading-tight opacity-80">
-                              <div className="space-y-0.5">
-                                {(slide.content || "")
-                                  .toString()
-                                  .split("\n")
-                                  .slice(0, 4)
-                                  .map((line, idx) => (
-                                    <div key={idx} className="truncate">
-                                      {line.startsWith("•") ? `• ${line.substring(1).trim()}` : line}
-                                    </div>
-                                  ))}
-                              </div>
+                          <div className="absolute inset-0 transform scale-[0.25] origin-top-left">
+                            <div style={{ width: "400%", height: "400%" }}>
+                              <UltimateSlideRenderer slide={slide} isSelected={false} className="w-full h-full" />
                             </div>
-
-                            {/* Chart/Table indicator */}
-                            {slide.chartData && (
-                              <div className="absolute bottom-1 right-1 text-[8px] opacity-60">📊</div>
-                            )}
-                            {slide.tableData && (
-                              <div className="absolute bottom-1 right-1 text-[8px] opacity-60">📋</div>
-                            )}
                           </div>
                         </div>
                       </div>

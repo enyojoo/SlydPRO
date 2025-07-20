@@ -19,6 +19,7 @@ import {
 } from "recharts"
 import { TrendingUp, Users, DollarSign, Target, Zap, Star, Award, Globe } from "lucide-react"
 import type { UltimateSlide } from "@/types/ultimate-slide"
+import { IconRenderer } from "./IconRenderer"
 
 interface UltimateSlideRendererProps {
   slide: UltimateSlide
@@ -238,7 +239,45 @@ export const UltimateSlideRenderer: React.FC<UltimateSlideRendererProps> = ({
     )
   }
 
-  // Enhanced icon renderer
+  // Professional React Icon renderer
+  const renderProfessionalIcon = () => {
+    if (!slide.professionalIcon) return null
+
+    return (
+      <div className={`absolute ${getIconPosition(slide.professionalIcon.position)} z-10`}>
+        <div
+          className="w-12 h-12 rounded-2xl bg-white/10 backdrop-blur-md flex items-center justify-center shadow-lg border border-white/20"
+          style={{ color: slide.professionalIcon.color }}
+        >
+          <IconRenderer
+            name={slide.professionalIcon.name}
+            size={24}
+            style={slide.professionalIcon.style || "outline"}
+            className="drop-shadow-sm"
+          />
+        </div>
+      </div>
+    )
+  }
+
+  const getIconPosition = (position: string) => {
+    switch (position) {
+      case "top-left":
+        return "top-6 left-6"
+      case "top-right":
+        return "top-6 right-6"
+      case "bottom-left":
+        return "bottom-6 left-6"
+      case "bottom-right":
+        return "bottom-6 right-6"
+      case "center":
+        return "top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2"
+      default:
+        return "top-6 right-6"
+    }
+  }
+
+  // Enhanced icon renderer (legacy support)
   const renderIcons = () => {
     if (!slide.icons || slide.icons.length === 0) return null
 
@@ -394,6 +433,7 @@ export const UltimateSlideRenderer: React.FC<UltimateSlideRendererProps> = ({
         </svg>
       </div>
 
+      {renderProfessionalIcon()}
       {renderIcons()}
 
       <div className={`relative z-10 h-full flex flex-col ${getSpacing()} ${getAlignment()}`}>
