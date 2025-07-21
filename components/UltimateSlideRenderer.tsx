@@ -22,7 +22,7 @@ import {
 interface UltimateSlide {
   id: string
   title: string
-  content: string
+  content: string | React.ReactNode
   background: string
   textColor: string
   layout: "title" | "content" | "two-column" | "image" | "chart" | "table"
@@ -65,9 +65,19 @@ interface UltimateSlide {
 
 interface UltimateSlideRendererProps {
   slide: UltimateSlide
+  isSelected?: boolean
+  onClick?: () => void
+  className?: string
+  isPresentationMode?: boolean
 }
 
-const UltimateSlideRenderer: React.FC<UltimateSlideRendererProps> = ({ slide }) => {
+const UltimateSlideRenderer: React.FC<UltimateSlideRendererProps> = ({
+  slide,
+  isSelected = false,
+  onClick,
+  className = "",
+  isPresentationMode = false,
+}) => {
   // DEBUG: Log slide properties
   console.log("🖼️ Rendering slide with:", {
     background: slide.background,
@@ -275,9 +285,26 @@ const UltimateSlideRenderer: React.FC<UltimateSlideRendererProps> = ({ slide }) 
     )
   }
 
+  // Safely render content that might be a string or React node
+  const renderContent = (content: string | React.ReactNode) => {
+    if (typeof content === "string") {
+      return (
+        <div
+          className="leading-relaxed opacity-90 whitespace-pre-line"
+          dangerouslySetInnerHTML={{
+            __html: content.replace(/\n/g, "<br />").replace(/•/g, "•"),
+          }}
+        />
+      )
+    }
+    return <div className="leading-relaxed opacity-90">{content}</div>
+  }
+
   return (
     <div
-      className="w-full h-full relative overflow-hidden"
+      className={`relative w-full h-full cursor-pointer transition-all duration-300 ${
+        isSelected ? "ring-4 ring-blue-400 ring-opacity-60" : ""
+      } ${className}`}
       style={{
         background: slide.background || "linear-gradient(135deg, #027659 0%, #065f46 100%)", // Force fallback
         color: slide.textColor || "#ffffff", // Force fallback
@@ -285,6 +312,7 @@ const UltimateSlideRenderer: React.FC<UltimateSlideRendererProps> = ({ slide }) 
         borderRadius: slide.borderRadius || "20px",
         boxShadow: slide.shadowEffect || "0 15px 35px rgba(0,0,0,0.1)",
       }}
+      onClick={onClick}
     >
       {slide.glassmorphism && <div className="absolute inset-0 bg-white/5 backdrop-blur-sm" />}
 
@@ -303,7 +331,7 @@ const UltimateSlideRenderer: React.FC<UltimateSlideRendererProps> = ({ slide }) 
             >
               {slide.title}
             </h1>
-            <p
+            <div
               className="opacity-90 leading-relaxed"
               style={{
                 fontSize: slide.contentSize || "1.5rem",
@@ -311,8 +339,8 @@ const UltimateSlideRenderer: React.FC<UltimateSlideRendererProps> = ({ slide }) 
                 fontFamily: slide.contentFont || "Inter, sans-serif",
               }}
             >
-              {slide.content}
-            </p>
+              {typeof slide.content === "string" ? slide.content : slide.content}
+            </div>
           </div>
         ) : slide.layout === "chart" ? (
           <div>
@@ -326,7 +354,7 @@ const UltimateSlideRenderer: React.FC<UltimateSlideRendererProps> = ({ slide }) 
             >
               {slide.title}
             </h1>
-            <p
+            <div
               className="leading-relaxed opacity-90 mb-4"
               style={{
                 fontSize: slide.contentSize || "1.125rem",
@@ -334,8 +362,8 @@ const UltimateSlideRenderer: React.FC<UltimateSlideRendererProps> = ({ slide }) 
                 fontFamily: slide.contentFont || "Inter, sans-serif",
               }}
             >
-              {slide.content}
-            </p>
+              {typeof slide.content === "string" ? slide.content : slide.content}
+            </div>
             {renderChart()}
           </div>
         ) : slide.layout === "table" ? (
@@ -350,7 +378,7 @@ const UltimateSlideRenderer: React.FC<UltimateSlideRendererProps> = ({ slide }) 
             >
               {slide.title}
             </h1>
-            <p
+            <div
               className="leading-relaxed opacity-90 mb-4"
               style={{
                 fontSize: slide.contentSize || "1.125rem",
@@ -358,8 +386,8 @@ const UltimateSlideRenderer: React.FC<UltimateSlideRendererProps> = ({ slide }) 
                 fontFamily: slide.contentFont || "Inter, sans-serif",
               }}
             >
-              {slide.content}
-            </p>
+              {typeof slide.content === "string" ? slide.content : slide.content}
+            </div>
             {renderTable()}
           </div>
         ) : (
@@ -375,16 +403,24 @@ const UltimateSlideRenderer: React.FC<UltimateSlideRendererProps> = ({ slide }) 
               {slide.title}
             </h1>
             <div
-              className="leading-relaxed opacity-90 whitespace-pre-line"
+              className="leading-relaxed opacity-90"
               style={{
                 fontSize: slide.contentSize || "1.125rem",
                 color: slide.textColor || "#ffffff",
                 fontFamily: slide.contentFont || "Inter, sans-serif",
               }}
-              dangerouslySetInnerHTML={{
-                __html: slide.content.replace(/\n/g, "<br />").replace(/•/g, "•"),
-              }}
-            />
+            >
+              {typeof slide.content === "string" ? (
+                <div
+                  className="whitespace-pre-line"
+                  dangerouslySetInnerHTML={{
+                    __html: slide.content.replace(/\n/g, "<br />").replace(/•/g, "•"),
+                  }}
+                />
+              ) : (
+                slide.content
+              )}
+            </div>
           </div>
         )}
       </div>

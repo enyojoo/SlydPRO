@@ -333,6 +333,11 @@ ${fileContent ? `\nSOURCE MATERIAL:\n${fileContent.substring(0, 800)}...` : ""}`
 
     // Add visual content based on content analysis
     enhancedSlides = enhancedSlides.map((slide) => {
+      // Ensure slide.content is always a string
+      if (typeof slide.content !== "string") {
+        slide.content = String(slide.content || "")
+      }
+
       const content = (slide.title + " " + slide.content).toLowerCase()
       const contentAnalysis = analyzeContentForVisuals(content)
 

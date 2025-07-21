@@ -1,7 +1,9 @@
+import type React from "react"
+
 export interface UltimateSlide {
   id: string
   title: string
-  content: string
+  content: string | React.ReactNode
   background: string
   textColor: string
   layout: "title" | "content" | "two-column" | "image" | "chart" | "table"
@@ -52,4 +54,7 @@ export interface UltimateSlide {
   }
 
   customCSS?: string
+
+  // Content classification for design context
+  contentType?: "financial" | "growth" | "team" | "strategy" | "data" | "business"
 }

@@ -1,51 +1,33 @@
+"use client"
+
 import type React from "react"
 import {
-  // Business Icons - Feather style (clean outlines)
-  FiTrendingUp,
-  FiBriefcase,
-  FiTarget,
-  FiZap,
-  FiStar,
-  FiDollarSign,
-  FiFileText,
-  FiUsers,
-  FiActivity,
-  FiAward,
-  FiBarChart3,
-  // Tech Icons - Feather style
-  FiMonitor,
-  FiSmartphone,
-  FiDatabase,
-  FiServer,
-  FiCpu,
-  FiSettings,
-  FiTool,
-  FiCode,
-} from "react-icons/fi"
-
-import {
-  BsGraphUp,
-  BsLightbulb,
-  BsRocket,
-  BsTrophy,
-  BsGem,
-  BsShield,
-  BsPieChart,
-  BsBarChart,
-  BsGraphDown,
-} from "react-icons/bs"
-
-import {
-  MdDashboard,
-  MdAnalytics,
-  MdInsights,
-  MdTrendingUp,
-  MdBusiness,
-  MdGroup,
-  MdTimeline,
-  MdAssessment,
-  MdShowChart,
-} from "react-icons/md"
+  TrendingUp,
+  Briefcase,
+  Target,
+  Zap,
+  Star,
+  DollarSign,
+  FileText,
+  Users,
+  Activity,
+  Award,
+  BarChart2,
+  Monitor,
+  Smartphone,
+  Database,
+  Server,
+  Cpu,
+  Settings,
+  PenToolIcon as Tool,
+  Code,
+  PieChart,
+  TrendingDown,
+  Shield,
+  Lightbulb,
+  Rocket,
+  Globe,
+} from "lucide-react"
 
 interface IconRendererProps {
   name: string
@@ -54,55 +36,40 @@ interface IconRendererProps {
   style?: "outline" | "filled" | "material"
 }
 
-export const IconRenderer = ({ name, size = 24, className = "", style = "outline" }: IconRendererProps) => {
-  // Outline style icons (Feather Icons)
+export const IconRenderer: React.FC<IconRendererProps> = ({ name, size = 24, className = "", style = "outline" }) => {
+  // Outline style icons (Feather/Lucide Icons)
   const outlineIcons: Record<string, React.ComponentType<any>> = {
-    "trending-up": FiTrendingUp,
-    briefcase: FiBriefcase,
-    target: FiTarget,
-    lightning: FiZap,
-    star: FiStar,
-    dollar: FiDollarSign,
-    document: FiFileText,
-    users: FiUsers,
-    activity: FiActivity,
-    award: FiAward,
-    "bar-chart": FiBarChart3,
-    monitor: FiMonitor,
-    smartphone: FiSmartphone,
-    database: FiDatabase,
-    server: FiServer,
-    cpu: FiCpu,
-    settings: FiSettings,
-    tool: FiTool,
-    code: FiCode,
+    "trending-up": TrendingUp,
+    briefcase: Briefcase,
+    target: Target,
+    lightning: Zap,
+    star: Star,
+    dollar: DollarSign,
+    document: FileText,
+    users: Users,
+    activity: Activity,
+    award: Award,
+    "bar-chart": BarChart2,
+    monitor: Monitor,
+    smartphone: Smartphone,
+    database: Database,
+    server: Server,
+    cpu: Cpu,
+    settings: Settings,
+    tool: Tool,
+    code: Code,
+    "pie-chart": PieChart,
+    "trending-down": TrendingDown,
+    shield: Shield,
+    lightbulb: Lightbulb,
+    rocket: Rocket,
+    globe: Globe,
   }
 
-  // Filled style icons (Bootstrap Icons)
-  const filledIcons: Record<string, React.ComponentType<any>> = {
-    briefcase: BsGraphUp,
-    "graph-up": BsLightbulb,
-    lightbulb: BsRocket,
-    rocket: BsTrophy,
-    trophy: BsGem,
-    gem: BsShield,
-    shield: BsPieChart,
-    "pie-chart": BsBarChart,
-    "bar-chart": BsGraphDown,
-  }
-
-  // Material Design style icons
-  const materialIcons: Record<string, React.ComponentType<any>> = {
-    dashboard: MdDashboard,
-    analytics: MdAnalytics,
-    insights: MdInsights,
-    trending: MdTrendingUp,
-    business: MdBusiness,
-    group: MdGroup,
-    timeline: MdTimeline,
-    assessment: MdAssessment,
-    chart: MdShowChart,
-  }
+  // For now, we'll use the same icons for all styles since we're using Lucide
+  // In a real implementation, you'd import different icon sets for filled/material
+  const filledIcons = outlineIcons
+  const materialIcons = outlineIcons
 
   let IconComponent
 
@@ -115,8 +82,11 @@ export const IconRenderer = ({ name, size = 24, className = "", style = "outline
   }
 
   if (!IconComponent) {
-    return null
+    // Fallback to a default icon if the requested one isn't found
+    IconComponent = outlineIcons["star"]
   }
 
   return <IconComponent size={size} className={className} />
 }
+
+export default IconRenderer
