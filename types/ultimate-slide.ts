@@ -1,14 +1,13 @@
-import type React from "react"
-
 export interface UltimateSlide {
+  // Keep existing properties (CRITICAL - don't break existing slides)
   id: string
   title: string
-  content: string | React.ReactNode
+  content: string
   background: string
   textColor: string
-  layout: "title" | "content" | "two-column" | "image" | "chart" | "table"
+  layout: "title" | "content" | "two-column" | "image" | "chart" | "table" | "infographic"
 
-  // Advanced design properties
+  // Add new optional properties (won't break existing slides)
   titleFont?: string
   contentFont?: string
   titleSize?: string
@@ -19,42 +18,26 @@ export interface UltimateSlide {
   accentColor?: string
   shadowEffect?: string
   borderRadius?: string
-  glassmorphism?: boolean
 
-  // Professional icon
-  professionalIcon?: {
-    name: string
-    position: string
-    style: "outline" | "filled" | "material"
-    color: string
-  }
-
-  // Visual content
+  // Visual content (optional - existing slides won't have these)
   chartData?: {
-    type: "bar" | "line" | "pie" | "area"
-    data: Array<{ name: string; value: number }>
-    config: { showGrid?: boolean; gradient?: boolean }
+    type: "bar" | "line" | "pie" | "donut" | "area"
+    data: any[]
+    config: any
     style: string
   }
-
   tableData?: {
     headers: string[]
-    rows: string[][]
+    rows: any[][]
     style: string
     interactive: boolean
   }
+  icons?: Array<{
+    icon: string
+    position: string
+    color: string
+    size: string
+  }>
 
-  // Legacy support
-  icons?: any[]
-
-  // Animation and effects
-  animations?: {
-    entrance: string
-    emphasis: any[]
-  }
-
-  customCSS?: string
-
-  // Content classification for design context
-  contentType?: "financial" | "growth" | "team" | "strategy" | "data" | "business"
+  glassmorphism?: boolean
 }
