@@ -587,7 +587,7 @@ export async function POST(request: NextRequest): Promise<NextResponse<APIRespon
     let message
     try {
       message = await anthropic.messages.create({
-        model: "claude-3-5-sonnet-20241022",
+        model: "claude-sonnet-4-20250514",
         max_tokens: 8000,
         temperature: 0.8,
         system: `You are SlydPRO AI, the world's most sophisticated presentation designer. You create slides that would win design awards and close Fortune 500 deals. 
