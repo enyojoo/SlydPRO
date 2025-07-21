@@ -22,17 +22,19 @@ import {
   FiTool,
   FiCode,
 } from "react-icons/fi"
+
 import {
-  BsBriefcase as BsBriefcaseOutline,
-  BsGraphUp as BsGraphUpOutline,
-  BsLightbulb as BsLightbulbOutline,
-  BsRocket as BsRocketOutline,
-  BsTrophy as BsTrophyOutline,
-  BsGem as BsGemOutline,
-  BsShield as BsShieldOutline,
-  BsPieChart as BsPieChartOutline,
-  BsBarChart as BsBarChartOutline,
+  BsGraphUp,
+  BsLightbulb,
+  BsRocket,
+  BsTrophy,
+  BsGem,
+  BsShield,
+  BsPieChart,
+  BsBarChart,
+  BsGraphDown,
 } from "react-icons/bs"
+
 import {
   MdDashboard,
   MdAnalytics,
@@ -78,15 +80,15 @@ export const IconRenderer = ({ name, size = 24, className = "", style = "outline
 
   // Filled style icons (Bootstrap Icons)
   const filledIcons: Record<string, React.ComponentType<any>> = {
-    briefcase: BsBriefcaseOutline,
-    "graph-up": BsGraphUpOutline,
-    lightbulb: BsLightbulbOutline,
-    rocket: BsRocketOutline,
-    trophy: BsTrophyOutline,
-    gem: BsGemOutline,
-    shield: BsShieldOutline,
-    "pie-chart": BsPieChartOutline,
-    "bar-chart": BsBarChartOutline,
+    briefcase: BsGraphUp,
+    "graph-up": BsLightbulb,
+    lightbulb: BsRocket,
+    rocket: BsTrophy,
+    trophy: BsGem,
+    gem: BsShield,
+    shield: BsPieChart,
+    "pie-chart": BsBarChart,
+    "bar-chart": BsGraphDown,
   }
 
   // Material Design style icons

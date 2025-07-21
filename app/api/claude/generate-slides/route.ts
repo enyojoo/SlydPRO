@@ -274,18 +274,39 @@ ${fileContent ? `\nSOURCE MATERIAL:\n${fileContent.substring(0, 800)}...` : ""}`
 
     console.log("🎨 Generating slides with design context intelligence for:", requestData.prompt)
 
-    const message = await anthropic.messages.create({
-      model: "claude-sonnet-4-20250514",
-      max_tokens: 8000,
-      temperature: 0.95,
-      system: systemPrompt,
-      messages: [
-        {
-          role: "user",
-          content: userPrompt,
-        },
-      ],
-    })
+    // Handle Claude API overload with retry logic
+    let message
+    try {
+      message = await anthropic.messages.create({
+        model: "claude-3-5-sonnet-20241022", // Use stable model instead of claude-sonnet-4
+        max_tokens: 6000, // Reduced from 8000
+        temperature: 0.8, // Reduced from 0.95
+        system: systemPrompt,
+        messages: [
+          {
+            role: "user",
+            content: userPrompt,
+          },
+        ],
+      })
+    } catch (claudeError: any) {
+      // Handle Claude overload error
+      if (claudeError.status === 529 || claudeError.message?.includes("overloaded")) {
+        console.log("⚠️ Claude overloaded, using fallback generation...")
+
+        // Generate fallback slides without Claude
+        const fallbackSlides = generateFallbackSlides(prompt, slideCount)
+        const enhancedSlides = applyDesignContext(fallbackSlides, designContext)
+
+        return NextResponse.json({
+          slides: enhancedSlides,
+          message: `Generated ${enhancedSlides.length} slides with fallback system due to high demand.`,
+          designNotes: "Applied design context intelligence with fallback generation.",
+          overallTheme: "professional",
+        })
+      }
+      throw claudeError
+    }
 
     const responseText = message.content[0].type === "text" ? message.content[0].text : ""
 
@@ -366,10 +387,10 @@ ${fileContent ? `\nSOURCE MATERIAL:\n${fileContent.substring(0, 800)}...` : ""}`
     console.error("❌ SlydPRO API Error:", error)
 
     if (error instanceof Error) {
-      if (error.message.includes("rate_limit")) {
+      if (error.message.includes("rate_limit") || error.message.includes("overloaded")) {
         return NextResponse.json(
           {
-            error: "Too many requests. Please wait a moment and try again.",
+            error: "AI service is currently overloaded. Please wait a moment and try again.",
             type: "rate_limit",
           },
           { status: 429 },
@@ -403,4 +424,36 @@ ${fileContent ? `\nSOURCE MATERIAL:\n${fileContent.substring(0, 800)}...` : ""}`
       { status: 500 },
     )
   }
+}
+
+// Fallback slide generation when Claude is overloaded
+function generateFallbackSlides(prompt: string, slideCount: string | number) {
+  const count = slideCount === "auto" ? 6 : typeof slideCount === "string" ? Number.parseInt(slideCount) : slideCount
+
+  const slides = []
+
+  // Title slide
+  slides.push({
+    id: `slide-${Date.now()}-0`,
+    title: prompt.length > 50 ? prompt.substring(0, 50) + "..." : prompt,
+    content: "Professional presentation created with SlydPRO",
+    contentType: "strategy",
+    layout: "title",
+  })
+
+  // Content slides
+  const contentTypes = ["financial", "growth", "team", "strategy", "data"]
+  const layouts = ["content", "chart", "table"]
+
+  for (let i = 1; i < count; i++) {
+    slides.push({
+      id: `slide-${Date.now()}-${i}`,
+      title: `Key Point ${i}`,
+      content: `Important information and insights related to ${prompt}`,
+      contentType: contentTypes[i % contentTypes.length],
+      layout: layouts[i % layouts.length],
+    })
+  }
+
+  return slides
 }

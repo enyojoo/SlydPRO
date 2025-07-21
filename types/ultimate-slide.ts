@@ -1,76 +1,55 @@
-import type React from "react"
 export interface UltimateSlide {
   id: string
   title: string
-  content: string | React.ReactNode
-  layout: "title" | "content" | "chart" | "table" | "two-column" | "image"
-  background?: string
-  textColor?: string
-  titleColor?: string
-  accentColor?: string
+  content: string
+  background: string
+  textColor: string
+  layout: "title" | "content" | "two-column" | "image" | "chart" | "table"
 
-  // Typography
+  // Advanced design properties
   titleFont?: string
   contentFont?: string
   titleSize?: string
   contentSize?: string
-
-  // Layout
-  spacing?: "compact" | "comfortable" | "relaxed" | "generous"
-  alignment?: "left" | "center" | "right"
-
-  // Visual effects
+  spacing?: string
+  alignment?: string
+  titleColor?: string
+  accentColor?: string
   shadowEffect?: string
   borderRadius?: string
   glassmorphism?: boolean
 
-  // Professional icon system
+  // Professional icon
   professionalIcon?: {
     name: string
-    position: "top-left" | "top-right" | "bottom-left" | "bottom-right" | "center"
+    position: string
     style: "outline" | "filled" | "material"
     color: string
   }
 
-  // Legacy icon support
-  icons?: Array<{
-    icon: string
-    position: string
-    color?: string
-    size?: number
-  }>
-
   // Visual content
   chartData?: {
-    type: "bar" | "line" | "pie" | "area" | "donut"
-    data: Array<{
-      name: string
-      value: number
-      [key: string]: any
-    }>
-    config?: {
-      showGrid?: boolean
-      gradient?: boolean
-      [key: string]: any
-    }
-    style?: string
+    type: "bar" | "line" | "pie" | "area"
+    data: Array<{ name: string; value: number }>
+    config: { showGrid?: boolean; gradient?: boolean }
+    style: string
   }
 
   tableData?: {
     headers: string[]
     rows: string[][]
-    style?: string
-    interactive?: boolean
+    style: string
+    interactive: boolean
   }
+
+  // Legacy support
+  icons?: any[]
 
   // Animation and effects
   animations?: {
     entrance: string
-    emphasis: string[]
+    emphasis: any[]
   }
 
   customCSS?: string
-
-  // Content classification for design context
-  contentType?: "financial" | "growth" | "team" | "strategy" | "data" | "business"
 }
