@@ -589,7 +589,7 @@ export async function POST(request: NextRequest): Promise<NextResponse<APIRespon
       message = await anthropic.messages.create({
         model: "claude-sonnet-4-20250514",
         max_tokens: 8000,
-        temperature: 0.8,
+        temperature: 0.9,
         system: `You are SlydPRO AI, the world's most sophisticated presentation designer. You create slides that would win design awards and close Fortune 500 deals. 
 
 CRITICAL: Return ONLY clean, valid JSON with no markdown formatting, code blocks, or explanatory text. The response must be parseable JSON that starts with { and ends with }.

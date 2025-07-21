@@ -6,58 +6,96 @@ import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
-import { FileText, Download, Presentation, Settings, Check, Loader2, ImageIcon, Palette, Layout } from "lucide-react"
+import {
+  FileText,
+  Download,
+  Presentation,
+  Settings,
+  Check,
+  Loader2,
+  ImageIcon,
+  Palette,
+  Layout,
+  AlertCircle,
+} from "lucide-react"
+import { exportSlides, downloadBlob } from "@/lib/export-utils"
+import type { UltimateSlide } from "@/types/ultimate-slide"
 
 interface ExportDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   projectName: string
   slideCount: number
+  slides: UltimateSlide[]
 }
 
-export function ExportDialog({ open, onOpenChange, projectName, slideCount }: ExportDialogProps) {
+export function ExportDialog({ open, onOpenChange, projectName, slideCount, slides }: ExportDialogProps) {
   const [selectedFormat, setSelectedFormat] = useState<"pdf" | "pptx" | null>(null)
   const [isExporting, setIsExporting] = useState(false)
   const [exportProgress, setExportProgress] = useState(0)
   const [exportComplete, setExportComplete] = useState(false)
+  const [exportError, setExportError] = useState<string | null>(null)
+  const [currentStep, setCurrentStep] = useState<string>("")
 
   const handleExport = async (format: "pdf" | "pptx") => {
+    if (!slides || slides.length === 0) {
+      setExportError("No slides available to export")
+      return
+    }
+
     setSelectedFormat(format)
     setIsExporting(true)
     setExportProgress(0)
+    setExportError(null)
+    setExportComplete(false)
 
-    // Simulate export progress
-    const progressInterval = setInterval(() => {
-      setExportProgress((prev) => {
-        if (prev >= 100) {
-          clearInterval(progressInterval)
-          setIsExporting(false)
-          setExportComplete(true)
+    try {
+      // Simulate progress updates
+      const progressSteps = [
+        { progress: 10, step: "Preparing slides for export..." },
+        { progress: 25, step: "Processing slide content..." },
+        { progress: 40, step: "Applying formatting and styles..." },
+        { progress: 60, step: "Generating visual elements..." },
+        { progress: 80, step: "Creating final document..." },
+        { progress: 95, step: "Finalizing export..." },
+      ]
 
-          // Simulate file download
-          const link = document.createElement("a")
-          if (format === "pdf") {
-            link.href =
-              "data:application/pdf;base64,JVBERi0xLjQKJdPr6eEKMSAwIG9iago8PAovVHlwZSAvQ2F0YWxvZwovUGFnZXMgMiAwIFIKPj4KZW5kb2JqCjIgMCBvYmoKPDwKL1R5cGUgL1BhZ2VzCi9LaWRzIFszIDAgUl0KL0NvdW50IDEKPD4KZW5kb2JqCjMgMCBvYmoKPDwKL1R5cGUgL1BhZ2UKL1BhcmVudCAyIDAgUgovTWVkaWFCb3ggWzAgMCA2MTIgNzkyXQo+PgplbmRvYmoKeHJlZgowIDQKMDAwMDAwMDAwMCA2NTUzNSBmIAowMDAwMDAwMDA5IDAwMDAwIG4gCjAwMDAwMDAwNTggMDAwMDAgbiAKMDAwMDAwMDExNSAwMDAwMCBuIAp0cmFpbGVyCjw8Ci9SaXplIDQKL1Jvb3QgMSAwIFIKPj4Kc3RhcnR4cmVmCjE3NQolJUVPRg=="
-            link.download = `${projectName}.pdf`
-          } else {
-            link.href =
-              "data:application/vnd.openxmlformats-officedocument.presentationml.presentation;base64,UEsDBBQAAAAIAA=="
-            link.download = `${projectName}.pptx`
-          }
-          link.click()
+      // Update progress with steps
+      for (const { progress, step } of progressSteps) {
+        setExportProgress(progress)
+        setCurrentStep(step)
+        await new Promise((resolve) => setTimeout(resolve, 800))
+      }
 
-          setTimeout(() => {
-            setExportComplete(false)
-            setSelectedFormat(null)
-            onOpenChange(false)
-          }, 2000)
-
-          return 100
-        }
-        return prev + 10
+      // Perform actual export
+      const blob = await exportSlides(slides, projectName, format, {
+        format,
+        quality: "high",
+        pageSize: "16:9",
       })
-    }, 200)
+
+      // Download the file
+      const filename = `${projectName}.${format}`
+      downloadBlob(blob, filename)
+
+      setExportProgress(100)
+      setCurrentStep(`Successfully exported ${format.toUpperCase()}!`)
+      setIsExporting(false)
+      setExportComplete(true)
+
+      // Auto-close after success
+      setTimeout(() => {
+        setExportComplete(false)
+        setSelectedFormat(null)
+        onOpenChange(false)
+      }, 3000)
+    } catch (error) {
+      console.error("Export error:", error)
+      setIsExporting(false)
+      setExportError(error instanceof Error ? error.message : "Export failed. Please try again.")
+      setExportProgress(0)
+      setCurrentStep("")
+    }
   }
 
   const resetDialog = () => {
@@ -65,7 +103,11 @@ export function ExportDialog({ open, onOpenChange, projectName, slideCount }: Ex
     setIsExporting(false)
     setExportProgress(0)
     setExportComplete(false)
+    setExportError(null)
+    setCurrentStep("")
   }
+
+  const canExport = slides && slides.length > 0
 
   return (
     <Dialog
@@ -86,7 +128,23 @@ export function ExportDialog({ open, onOpenChange, projectName, slideCount }: Ex
         </DialogHeader>
 
         <div className="py-8">
-          {!selectedFormat && !isExporting && !exportComplete && (
+          {!canExport ? (
+            // No slides available
+            <div className="text-center space-y-6">
+              <div className="w-16 h-16 bg-red-100 rounded-2xl flex items-center justify-center mx-auto">
+                <AlertCircle className="h-8 w-8 text-red-600" />
+              </div>
+              <div>
+                <h3 className="text-xl font-bold text-gray-900 mb-2">No Slides Available</h3>
+                <p className="text-gray-600">
+                  Please create some slides before attempting to export your presentation.
+                </p>
+              </div>
+              <Button onClick={() => onOpenChange(false)} variant="outline" className="w-full">
+                Close
+              </Button>
+            </div>
+          ) : !selectedFormat && !isExporting && !exportComplete && !exportError ? (
             <div className="space-y-6">
               {/* Project Info */}
               <div className="bg-gradient-to-r from-[#027659]/5 to-[#10b981]/5 rounded-xl p-6 border border-[#027659]/20 mb-8">
@@ -170,10 +228,8 @@ export function ExportDialog({ open, onOpenChange, projectName, slideCount }: Ex
                 </div>
               </div>
             </div>
-          )}
-
-          {/* Export Progress */}
-          {isExporting && (
+          ) : isExporting ? (
+            // Export Progress
             <div className="space-y-6 text-center">
               <div className="w-20 h-20 bg-gradient-to-r from-[#027659] to-[#10b981] rounded-2xl flex items-center justify-center mx-auto">
                 <Loader2 className="h-10 w-10 text-white animate-spin" />
@@ -189,6 +245,7 @@ export function ExportDialog({ open, onOpenChange, projectName, slideCount }: Ex
               <div className="space-y-2">
                 <Progress value={exportProgress} className="w-full h-3" />
                 <p className="text-sm text-gray-500">{exportProgress}% complete</p>
+                {currentStep && <p className="text-sm text-[#027659] font-medium">{currentStep}</p>}
               </div>
 
               <div className="bg-[#027659]/5 rounded-xl p-4 border border-[#027659]/20">
@@ -197,10 +254,37 @@ export function ExportDialog({ open, onOpenChange, projectName, slideCount }: Ex
                 </p>
               </div>
             </div>
-          )}
+          ) : exportError ? (
+            // Export Error
+            <div className="space-y-6 text-center">
+              <div className="w-20 h-20 bg-red-100 rounded-2xl flex items-center justify-center mx-auto">
+                <AlertCircle className="h-10 w-10 text-red-600" />
+              </div>
 
-          {/* Export Complete */}
-          {exportComplete && (
+              <div>
+                <h3 className="text-xl font-bold text-gray-900 mb-2">Export Failed</h3>
+                <p className="text-gray-600 mb-4">{exportError}</p>
+              </div>
+
+              <div className="flex space-x-3 justify-center">
+                <Button
+                  onClick={() => {
+                    setExportError(null)
+                    if (selectedFormat) {
+                      handleExport(selectedFormat)
+                    }
+                  }}
+                  className="bg-[#027659] hover:bg-[#065f46] text-white"
+                >
+                  Try Again
+                </Button>
+                <Button onClick={resetDialog} variant="outline">
+                  Back to Options
+                </Button>
+              </div>
+            </div>
+          ) : exportComplete ? (
+            // Export Complete
             <div className="space-y-6 text-center">
               <div className="w-20 h-20 bg-gradient-to-r from-[#10b981] to-[#34d399] rounded-2xl flex items-center justify-center mx-auto">
                 <Check className="h-10 w-10 text-white" />
@@ -218,8 +302,12 @@ export function ExportDialog({ open, onOpenChange, projectName, slideCount }: Ex
                   ✅ File saved: {projectName}.{selectedFormat}
                 </p>
               </div>
+
+              <Button onClick={() => onOpenChange(false)} className="bg-[#027659] hover:bg-[#065f46] text-white">
+                Close
+              </Button>
             </div>
-          )}
+          ) : null}
         </div>
       </DialogContent>
     </Dialog>
