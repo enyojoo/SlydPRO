@@ -1,195 +1,291 @@
 "use client"
 
-import { supabase, type Presentation } from "./supabase"
-import { useState, useCallback, useEffect } from "react"
+import { useState, useCallback } from "react"
+import { useAuth } from "@/lib/auth-context"
 
-export class PresentationsAPI {
-  private async getAuthHeaders() {
-    const {
-      data: { session },
-    } = await supabase.auth.getSession()
-    return session ? { Authorization: `Bearer ${session.access_token}` } : {}
+export interface Presentation {
+  id: string
+  title: string
+  description?: string
+  slides: any[]
+  created_at: string
+  updated_at: string
+  user_id: string
+  thumbnail_url?: string
+  is_public: boolean
+  tags?: string[]
+}
+
+export interface CreatePresentationData {
+  title: string
+  description?: string
+  slides: any[]
+  is_public?: boolean
+  tags?: string[]
+}
+
+export interface UpdatePresentationData {
+  title?: string
+  description?: string
+  slides?: any[]
+  is_public?: boolean
+  tags?: string[]
+}
+
+class PresentationsAPI {
+  private baseUrl = "/api/presentations"
+
+  async getAll(token: string): Promise<Presentation[]> {
+    const response = await fetch(this.baseUrl, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+    })
+
+    if (!response.ok) {
+      throw new Error(`Failed to fetch presentations: ${response.statusText}`)
+    }
+
+    return response.json()
   }
 
-  async createPresentation(data: {
-    name: string
-    slides: any[]
-    category?: string
-    chat_history?: any[]
-  }): Promise<Presentation> {
-    const response = await fetch("/api/presentations", {
+  async getById(id: string, token: string): Promise<Presentation> {
+    const response = await fetch(`${this.baseUrl}/${id}`, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+    })
+
+    if (!response.ok) {
+      throw new Error(`Failed to fetch presentation: ${response.statusText}`)
+    }
+
+    return response.json()
+  }
+
+  async create(data: CreatePresentationData, token: string): Promise<Presentation> {
+    const response = await fetch(this.baseUrl, {
       method: "POST",
       headers: {
+        Authorization: `Bearer ${token}`,
         "Content-Type": "application/json",
-        ...(await this.getAuthHeaders()),
       },
       body: JSON.stringify(data),
     })
 
     if (!response.ok) {
-      throw new Error("Failed to create presentation")
+      throw new Error(`Failed to create presentation: ${response.statusText}`)
     }
 
     return response.json()
   }
 
-  async updatePresentation(id: string, data: Partial<Presentation>): Promise<Presentation> {
-    const response = await fetch(`/api/presentations/${id}`, {
+  async update(id: string, data: UpdatePresentationData, token: string): Promise<Presentation> {
+    const response = await fetch(`${this.baseUrl}/${id}`, {
       method: "PUT",
       headers: {
+        Authorization: `Bearer ${token}`,
         "Content-Type": "application/json",
-        ...(await this.getAuthHeaders()),
       },
       body: JSON.stringify(data),
     })
 
     if (!response.ok) {
-      throw new Error("Failed to update presentation")
+      throw new Error(`Failed to update presentation: ${response.statusText}`)
     }
 
     return response.json()
   }
 
-  async deletePresentation(id: string): Promise<void> {
-    const response = await fetch(`/api/presentations/${id}`, {
+  async delete(id: string, token: string): Promise<void> {
+    const response = await fetch(`${this.baseUrl}/${id}`, {
       method: "DELETE",
-      headers: await this.getAuthHeaders(),
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
     })
 
     if (!response.ok) {
-      throw new Error("Failed to delete presentation")
+      throw new Error(`Failed to delete presentation: ${response.statusText}`)
     }
   }
 
-  async getPresentation(id: string): Promise<Presentation> {
-    const response = await fetch(`/api/presentations/${id}`, {
-      headers: await this.getAuthHeaders(),
+  async duplicate(id: string, token: string): Promise<Presentation> {
+    const response = await fetch(`${this.baseUrl}/${id}/duplicate`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
     })
 
     if (!response.ok) {
-      throw new Error("Failed to fetch presentation")
-    }
-
-    return response.json()
-  }
-
-  async getUserPresentations(): Promise<Presentation[]> {
-    const response = await fetch("/api/presentations", {
-      headers: await this.getAuthHeaders(),
-    })
-
-    if (!response.ok) {
-      throw new Error("Failed to fetch presentations")
+      throw new Error(`Failed to duplicate presentation: ${response.statusText}`)
     }
 
     return response.json()
   }
 }
 
-export const presentationsAPI = new PresentationsAPI()
+const presentationsAPI = new PresentationsAPI()
 
-// Hook for using presentations API with React state management
 export function usePresentationsApi() {
-  const [presentations, setPresentations] = useState<Presentation[]>([])
-  const [loading, setLoading] = useState(false)
+  const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const { session } = useAuth()
 
-  const fetchPresentations = useCallback(async () => {
-    setLoading(true)
-    setError(null)
-    try {
-      const data = await presentationsAPI.getUserPresentations()
-      setPresentations(data)
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to fetch presentations")
-    } finally {
-      setLoading(false)
+  const getAll = useCallback(async (): Promise<Presentation[]> => {
+    if (!session?.access_token) {
+      throw new Error("Authentication required")
     }
-  }, [])
 
-  const createPresentation = useCallback(
-    async (data: {
-      name: string
-      slides: any[]
-      category?: string
-      chat_history?: any[]
-    }) => {
-      setLoading(true)
+    setIsLoading(true)
+    setError(null)
+
+    try {
+      const presentations = await presentationsAPI.getAll(session.access_token)
+      return presentations
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : "Failed to fetch presentations"
+      setError(errorMessage)
+      throw err
+    } finally {
+      setIsLoading(false)
+    }
+  }, [session])
+
+  const getById = useCallback(
+    async (id: string): Promise<Presentation> => {
+      if (!session?.access_token) {
+        throw new Error("Authentication required")
+      }
+
+      setIsLoading(true)
       setError(null)
+
       try {
-        const newPresentation = await presentationsAPI.createPresentation(data)
-        setPresentations((prev) => [newPresentation, ...prev])
-        return newPresentation
+        const presentation = await presentationsAPI.getById(id, session.access_token)
+        return presentation
       } catch (err) {
-        setError(err instanceof Error ? err.message : "Failed to create presentation")
+        const errorMessage = err instanceof Error ? err.message : "Failed to fetch presentation"
+        setError(errorMessage)
         throw err
       } finally {
-        setLoading(false)
+        setIsLoading(false)
       }
     },
-    [],
+    [session],
   )
 
-  const updatePresentation = useCallback(async (id: string, data: Partial<Presentation>) => {
-    setLoading(true)
-    setError(null)
-    try {
-      const updatedPresentation = await presentationsAPI.updatePresentation(id, data)
-      setPresentations((prev) => prev.map((p) => (p.id === id ? updatedPresentation : p)))
-      return updatedPresentation
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to update presentation")
-      throw err
-    } finally {
-      setLoading(false)
-    }
-  }, [])
+  const create = useCallback(
+    async (data: CreatePresentationData): Promise<Presentation> => {
+      if (!session?.access_token) {
+        throw new Error("Authentication required")
+      }
 
-  const deletePresentation = useCallback(async (id: string) => {
-    setLoading(true)
-    setError(null)
-    try {
-      await presentationsAPI.deletePresentation(id)
-      setPresentations((prev) => prev.filter((p) => p.id !== id))
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to delete presentation")
-      throw err
-    } finally {
-      setLoading(false)
-    }
-  }, [])
+      setIsLoading(true)
+      setError(null)
 
-  const getPresentation = useCallback(async (id: string) => {
-    setLoading(true)
-    setError(null)
-    try {
-      const presentation = await presentationsAPI.getPresentation(id)
-      return presentation
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to fetch presentation")
-      throw err
-    } finally {
-      setLoading(false)
-    }
-  }, [])
+      try {
+        const presentation = await presentationsAPI.create(data, session.access_token)
+        return presentation
+      } catch (err) {
+        const errorMessage = err instanceof Error ? err.message : "Failed to create presentation"
+        setError(errorMessage)
+        throw err
+      } finally {
+        setIsLoading(false)
+      }
+    },
+    [session],
+  )
+
+  const update = useCallback(
+    async (id: string, data: UpdatePresentationData): Promise<Presentation> => {
+      if (!session?.access_token) {
+        throw new Error("Authentication required")
+      }
+
+      setIsLoading(true)
+      setError(null)
+
+      try {
+        const presentation = await presentationsAPI.update(id, data, session.access_token)
+        return presentation
+      } catch (err) {
+        const errorMessage = err instanceof Error ? err.message : "Failed to update presentation"
+        setError(errorMessage)
+        throw err
+      } finally {
+        setIsLoading(false)
+      }
+    },
+    [session],
+  )
+
+  const deletePresentation = useCallback(
+    async (id: string): Promise<void> => {
+      if (!session?.access_token) {
+        throw new Error("Authentication required")
+      }
+
+      setIsLoading(true)
+      setError(null)
+
+      try {
+        await presentationsAPI.delete(id, session.access_token)
+      } catch (err) {
+        const errorMessage = err instanceof Error ? err.message : "Failed to delete presentation"
+        setError(errorMessage)
+        throw err
+      } finally {
+        setIsLoading(false)
+      }
+    },
+    [session],
+  )
+
+  const duplicate = useCallback(
+    async (id: string): Promise<Presentation> => {
+      if (!session?.access_token) {
+        throw new Error("Authentication required")
+      }
+
+      setIsLoading(true)
+      setError(null)
+
+      try {
+        const presentation = await presentationsAPI.duplicate(id, session.access_token)
+        return presentation
+      } catch (err) {
+        const errorMessage = err instanceof Error ? err.message : "Failed to duplicate presentation"
+        setError(errorMessage)
+        throw err
+      } finally {
+        setIsLoading(false)
+      }
+    },
+    [session],
+  )
 
   const clearError = useCallback(() => {
     setError(null)
   }, [])
 
-  useEffect(() => {
-    fetchPresentations()
-  }, [fetchPresentations])
-
   return {
-    presentations,
-    loading,
+    isLoading,
     error,
-    fetchPresentations,
-    createPresentation,
-    updatePresentation,
-    deletePresentation,
-    getPresentation,
+    getAll,
+    getById,
+    create,
+    update,
+    delete: deletePresentation,
+    duplicate,
     clearError,
   }
 }
+
+export default presentationsAPI

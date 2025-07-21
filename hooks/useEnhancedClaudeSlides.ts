@@ -17,8 +17,8 @@ interface GenerationResult {
   overallTheme: string
   keyMetrics?: string[]
   tokenUsage?: {
-    input: number
-    output: number
+    prompt: number
+    completion: number
     total: number
   }
   creditCost?: number
@@ -30,8 +30,8 @@ interface GenerationProgress {
   currentSlide?: string
   totalSlides?: number
   message: string
+  estimatedTimeRemaining?: number
   tokenUsage?: number
-  estimatedCredits?: number
 }
 
 interface ContentAnalysis {
@@ -51,7 +51,7 @@ interface RetryConfig {
 }
 
 interface ErrorDetails {
-  type: "auth" | "rate_limit" | "file_error" | "generation_error" | "network_error" | "unknown"
+  type: "auth" | "rate_limit" | "file_error" | "network" | "server" | "unknown"
   message: string
   retryable: boolean
   retryAfter?: number
@@ -66,32 +66,49 @@ const DEFAULT_RETRY_CONFIG: RetryConfig = {
 
 export function useEnhancedClaudeSlides() {
   const [isLoading, setIsLoading] = useState(false)
-  const [error, setError] = useState(null)
-  const [progress, setProgress] = useState(null)
-  const [contentAnalysis, setContentAnalysis] = useState(null)
-  const [creditBalance, setCreditBalance] = useState(null)
-  const abortControllerRef = useRef(null)
-
+  const [error, setError] = useState<string | null>(null)
+  const [progress, setProgress] = useState<GenerationProgress | null>(null)
+  const [contentAnalysis, setContentAnalysis] = useState<ContentAnalysis | null>(null)
+  const [retryCount, setRetryCount] = useState(0)
+  const abortControllerRef = useRef<AbortController | null>(null)
   const { session } = useAuth()
 
-  // Analyze content before generation
-  const analyzeContent = useCallback(async (prompt, file) => {
-    const words = prompt.split(/\s+/).length
-    const hasFile = !!file
+  // Content analysis function
+  const analyzeContent = useCallback((prompt: string, file?: File): ContentAnalysis => {
+    const words = prompt.toLowerCase().split(/\s+/)
+    const wordCount = words.length
 
-    // Extract topics using simple keyword analysis
-    const topics = extractTopics(prompt)
+    // Extract topics using keyword analysis
+    const businessKeywords = ["revenue", "profit", "market", "strategy", "growth", "sales"]
+    const techKeywords = ["technology", "software", "data", "algorithm", "system", "platform"]
+    const academicKeywords = ["research", "study", "analysis", "methodology", "findings", "conclusion"]
+
+    const topics: string[] = []
+    if (businessKeywords.some((keyword) => words.includes(keyword))) topics.push("business")
+    if (techKeywords.some((keyword) => words.includes(keyword))) topics.push("technology")
+    if (academicKeywords.some((keyword) => words.includes(keyword))) topics.push("academic")
 
     // Determine complexity
-    const complexity = determineComplexity(prompt, hasFile)
+    let complexity: "simple" | "moderate" | "complex" = "simple"
+    if (wordCount > 100) complexity = "moderate"
+    if (wordCount > 300 || file) complexity = "complex"
 
     // Suggest chart types based on content
-    const suggestedCharts = suggestChartTypes(prompt)
+    const suggestedCharts: string[] = []
+    if (words.some((w) => ["data", "numbers", "statistics", "metrics"].includes(w))) {
+      suggestedCharts.push("bar", "line")
+    }
+    if (words.some((w) => ["comparison", "versus", "compare"].includes(w))) {
+      suggestedCharts.push("pie", "bar")
+    }
+    if (words.some((w) => ["trend", "growth", "over time", "timeline"].includes(w))) {
+      suggestedCharts.push("line", "area")
+    }
 
     // Estimate slides and tokens
-    const estimatedSlides = Math.max(3, Math.min(15, Math.ceil(words / 50) + (hasFile ? 2 : 0)))
-    const estimatedTokens = words * 4 + (hasFile ? 1000 : 0) + estimatedSlides * 200
-    const estimatedCredits = Math.ceil(estimatedTokens / 1000)
+    const estimatedSlides = Math.max(3, Math.min(15, Math.ceil(wordCount / 50)))
+    const estimatedTokens = wordCount * 4 + (file ? 1000 : 0) // Rough estimation
+    const estimatedCredits = Math.ceil(estimatedTokens / 1000) * 2 // 2 credits per 1k tokens
 
     return {
       topics,
@@ -103,68 +120,71 @@ export function useEnhancedClaudeSlides() {
     }
   }, [])
 
-  // Enhanced error handling with specific error types
-  const handleError = useCallback((error) => {
-    if (error.name === "AbortError") {
-      return {
-        type: "unknown",
-        message: "Generation was cancelled",
-        retryable: false,
-      }
-    }
+  // Enhanced error categorization
+  const categorizeError = useCallback((error: any): ErrorDetails => {
+    const message = error?.message || error?.toString() || "Unknown error"
 
-    if (error.status === 401) {
+    if (message.includes("401") || message.includes("unauthorized")) {
       return {
         type: "auth",
-        message: "Authentication required. Please log in again.",
+        message: "Authentication failed. Please log in again.",
         retryable: false,
       }
     }
 
-    if (error.status === 429) {
-      const retryAfter = error.headers?.get("retry-after")
+    if (message.includes("429") || message.includes("rate limit")) {
+      const retryAfter = error?.retryAfter || 60
       return {
         type: "rate_limit",
-        message: "Rate limit exceeded. Please try again later.",
+        message: `Rate limit exceeded. Please try again in ${retryAfter} seconds.`,
         retryable: true,
-        retryAfter: retryAfter ? Number.parseInt(retryAfter) * 1000 : 60000,
+        retryAfter,
       }
     }
 
-    if (error.status >= 500) {
-      return {
-        type: "network_error",
-        message: "Server error. Please try again.",
-        retryable: true,
-      }
-    }
-
-    if (error.message?.includes("file")) {
+    if (message.includes("file") || message.includes("upload")) {
       return {
         type: "file_error",
         message: "File processing failed. Please check your file and try again.",
-        retryable: false,
+        retryable: true,
+      }
+    }
+
+    if (message.includes("network") || message.includes("fetch")) {
+      return {
+        type: "network",
+        message: "Network error. Please check your connection and try again.",
+        retryable: true,
+      }
+    }
+
+    if (message.includes("500") || message.includes("server")) {
+      return {
+        type: "server",
+        message: "Server error. Please try again in a moment.",
+        retryable: true,
       }
     }
 
     return {
-      type: "generation_error",
-      message: error.message || "Generation failed. Please try again.",
+      type: "unknown",
+      message: message,
       retryable: true,
     }
   }, [])
 
   // Generic retry function with exponential backoff
   const retryWithBackoff = useCallback(
-    (operation, config = DEFAULT_RETRY_CONFIG) => {
-      let lastError
+    async (operation: () => Promise<any>, config: RetryConfig = DEFAULT_RETRY_CONFIG): Promise<any> => {
+      let lastError: any
 
       for (let attempt = 0; attempt <= config.maxRetries; attempt++) {
         try {
-          return operation()
+          setRetryCount(attempt)
+          return await operation()
         } catch (error) {
           lastError = error
-          const errorDetails = handleError(error)
+          const errorDetails = categorizeError(error)
 
           if (!errorDetails.retryable || attempt === config.maxRetries) {
             throw error
@@ -173,101 +193,104 @@ export function useEnhancedClaudeSlides() {
           // Calculate delay with exponential backoff
           const delay = Math.min(config.baseDelay * Math.pow(config.backoffFactor, attempt), config.maxDelay)
 
-          // Use retry-after header if available
-          const actualDelay = errorDetails.retryAfter || delay
+          // Add jitter to prevent thundering herd
+          const jitteredDelay = delay + Math.random() * 1000
 
           setProgress((prev) =>
             prev
               ? {
                   ...prev,
-                  message: `Retrying in ${Math.ceil(actualDelay / 1000)} seconds... (Attempt ${attempt + 1}/${config.maxRetries + 1})`,
+                  message: `Retrying in ${Math.ceil(jitteredDelay / 1000)} seconds... (Attempt ${attempt + 1}/${config.maxRetries + 1})`,
                 }
               : null,
           )
 
-          return new Promise((resolve) => setTimeout(resolve, actualDelay))
+          await new Promise((resolve) => setTimeout(resolve, jitteredDelay))
         }
       }
 
       throw lastError
     },
-    [handleError],
+    [categorizeError],
   )
 
   // Credit tracking and deduction
   const trackCredits = useCallback(
-    async (tokenUsage) => {
+    async (operation: "estimate" | "deduct", amount: number) => {
+      if (!session?.access_token) return
+
       try {
         const response = await fetch("/api/credits/deduct", {
           method: "POST",
           headers: {
+            Authorization: `Bearer ${session.access_token}`,
             "Content-Type": "application/json",
-            Authorization: `Bearer ${session?.access_token}`,
           },
           body: JSON.stringify({
-            tokens: tokenUsage,
-            operation: "slide_generation",
+            operation,
+            amount,
+            description: operation === "estimate" ? "Slide generation estimate" : "Slide generation",
           }),
         })
 
-        if (response.ok) {
-          const data = await response.json()
-          setCreditBalance(data.remainingCredits)
-          return data.remainingCredits
+        if (!response.ok) {
+          throw new Error("Credit tracking failed")
         }
+
+        return await response.json()
       } catch (error) {
-        console.error("Credit tracking failed:", error)
+        console.error("Credit tracking error:", error)
       }
-      return null
     },
     [session],
   )
 
-  // Main slide generation function
   const generateSlides = useCallback(
-    async (prompt, file, options) => {
+    async (prompt: string, file?: File | null, options?: SlideGenerationOptions): Promise<GenerationResult | null> => {
       if (!session?.access_token) {
-        setError({
-          type: "auth",
-          message: "Authentication required",
-          retryable: false,
-        })
+        setError("Authentication required")
         return null
       }
 
-      // Abort any existing request
-      if (abortControllerRef.current) {
-        abortControllerRef.current.abort()
-      }
+      // Analyze content first
+      const analysis = analyzeContent(prompt, file || undefined)
+      setContentAnalysis(analysis)
 
-      abortControllerRef.current = new AbortController()
+      // Check credits
+      try {
+        await trackCredits("estimate", analysis.estimatedCredits)
+      } catch (error) {
+        setError("Insufficient credits for this operation")
+        return null
+      }
 
       setIsLoading(true)
       setError(null)
-      setProgress({
-        stage: "analyzing",
-        progress: 5,
-        message: "Analyzing your request and understanding the context...",
-      })
+      setRetryCount(0)
 
-      try {
-        // Analyze content first
-        const analysis = await analyzeContent(prompt, file)
-        setContentAnalysis(analysis)
+      // Create abort controller
+      abortControllerRef.current = new AbortController()
+
+      const startTime = Date.now()
+
+      const updateProgressWithTime = (stage: GenerationProgress["stage"], progress: number, message: string) => {
+        const elapsed = Date.now() - startTime
+        const estimatedTotal = (elapsed / progress) * 100
+        const remaining = Math.max(0, estimatedTotal - elapsed)
 
         setProgress({
-          stage: "analyzing",
-          progress: 10,
-          message: `Identified ${analysis.topics.length} key topics. Estimated ${analysis.estimatedSlides} slides.`,
-          estimatedCredits: analysis.estimatedCredits,
+          stage,
+          progress,
+          message,
+          estimatedTimeRemaining: Math.ceil(remaining / 1000),
+          tokenUsage: Math.floor((progress / 100) * analysis.estimatedTokens),
         })
+      }
 
-        // Check credit balance
-        if (creditBalance !== null && creditBalance < analysis.estimatedCredits) {
-          throw new Error(`Insufficient credits. Need ${analysis.estimatedCredits}, have ${creditBalance}`)
-        }
+      try {
+        return await retryWithBackoff(async () => {
+          updateProgressWithTime("analyzing", 10, "Analyzing your request and understanding the context...")
 
-        const operation = () => {
           const formData = new FormData()
           formData.append(
             "data",
@@ -287,111 +310,92 @@ export function useEnhancedClaudeSlides() {
             formData.append("file", file)
           }
 
-          setProgress({
-            stage: "structuring",
-            progress: 30,
-            message: "Creating presentation structure and flow...",
-          })
+          updateProgressWithTime("structuring", 30, "Creating presentation structure and flow...")
 
-          return fetch("/api/claude/generate-slides", {
+          const response = await fetch("/api/claude/generate-slides", {
             method: "POST",
             headers: {
               Authorization: `Bearer ${session.access_token}`,
             },
             body: formData,
             signal: abortControllerRef.current?.signal,
-          }).then((response) => {
-            setProgress({
-              stage: "designing",
-              progress: 60,
-              message: "Applying professional design and visual elements...",
-            })
-
-            if (!response.ok) {
-              throw response.json().then((data) => {
-                const error = new Error(data.error || "Failed to generate slides")
-                ;(error as any).status = response.status
-                ;(error as any).headers = response.headers
-                return error
-              })
-            }
-
-            return response.json()
           })
-        }
 
-        const result = await retryWithBackoff(operation)
+          updateProgressWithTime("designing", 60, "Applying professional design and visual elements...")
 
-        setProgress({
-          stage: "enhancing",
-          progress: 90,
-          message: "Adding final touches and optimizations...",
+          if (!response.ok) {
+            const errorData = await response.json()
+            throw new Error(errorData.error || "Failed to generate slides")
+          }
+
+          const result = await response.json()
+
+          updateProgressWithTime("enhancing", 90, "Adding final touches and optimizations...")
+
+          // Deduct credits for successful generation
+          await trackCredits("deduct", analysis.estimatedCredits)
+
+          await new Promise((resolve) => setTimeout(resolve, 1000))
+
+          updateProgressWithTime("complete", 100, `Successfully created ${result.slides.length} professional slides!`)
+
+          return {
+            ...result,
+            tokenUsage: {
+              prompt: analysis.estimatedTokens,
+              completion: result.slides.length * 100, // Rough estimate
+              total: analysis.estimatedTokens + result.slides.length * 100,
+            },
+            creditCost: analysis.estimatedCredits,
+          }
         })
-
-        // Track credit usage
-        if (result.tokenUsage) {
-          await trackCredits(result.tokenUsage.total)
-        }
-
-        await new Promise((resolve) => setTimeout(resolve, 1000))
-
-        setProgress({
-          stage: "complete",
-          progress: 100,
-          message: `Successfully created ${result.slides.length} professional slides!`,
-          tokenUsage: result.tokenUsage?.total,
-        })
-
-        return result
       } catch (err) {
-        if (err.name === "AbortError") {
-          return null
+        if (err instanceof Error && err.name === "AbortError") {
+          setError("Generation cancelled")
+        } else {
+          const errorDetails = categorizeError(err)
+          setError(errorDetails.message)
+          console.error("Slide generation error:", err)
         }
-
-        const errorDetails = handleError(err)
-        setError(errorDetails)
-        console.error("Slide generation error:", err)
         return null
       } finally {
         setIsLoading(false)
-        abortControllerRef.current = null
-        setTimeout(() => setProgress(null), 3000)
+        setTimeout(() => {
+          setProgress(null)
+          setRetryCount(0)
+        }, 3000)
       }
     },
-    [session, analyzeContent, contentAnalysis, creditBalance, retryWithBackoff, trackCredits],
+    [session, analyzeContent, trackCredits, retryWithBackoff, categorizeError],
   )
 
-  // Streaming generation with real-time updates
   const generateSlidesStreaming = useCallback(
-    async (prompt, file, onChunk, onComplete, onError) => {
+    async (
+      prompt: string,
+      file?: File | null,
+      onChunk?: (chunk: string) => void,
+      onComplete?: (result: GenerationResult) => void,
+      onError?: (error: Error) => void,
+    ) => {
       if (!session?.access_token) {
-        const authError = {
-          type: "auth",
-          message: "Authentication required",
-          retryable: false,
-        }
-        onError?.(authError)
+        onError?.(new Error("Authentication required"))
         return
       }
 
-      // Abort any existing request
-      if (abortControllerRef.current) {
-        abortControllerRef.current.abort()
-      }
-
-      abortControllerRef.current = new AbortController()
-
       setIsLoading(true)
       setError(null)
+      abortControllerRef.current = new AbortController()
 
       try {
+        const analysis = analyzeContent(prompt, file || undefined)
+        setContentAnalysis(analysis)
+
         setProgress({
           stage: "analyzing",
           progress: 5,
           message: "Starting AI analysis...",
         })
 
-        // Simulate progressive updates
         const progressInterval = setInterval(() => {
           setProgress((prev) => {
             if (!prev || prev.progress >= 90) return prev
@@ -409,244 +413,157 @@ export function useEnhancedClaudeSlides() {
           })
         }, 800)
 
-        const operation = () => {
-          const formData = new FormData()
-          formData.append(
-            "data",
-            JSON.stringify({
-              prompt,
-              streaming: true,
-              hasFile: !!file,
-            }),
-          )
+        const formData = new FormData()
+        formData.append(
+          "data",
+          JSON.stringify({
+            prompt,
+            slideCount: "auto",
+            presentationType: "business",
+            audience: "team",
+            tone: "professional",
+            streaming: true,
+            contentAnalysis: analysis,
+          }),
+        )
 
-          if (file) {
-            formData.append("file", file)
-          }
+        if (file) {
+          formData.append("file", file)
+        }
 
-          return fetch("/api/claude/stream-slides", {
-            method: "POST",
-            headers: {
-              Authorization: `Bearer ${session.access_token}`,
-            },
-            body: formData,
-            signal: abortControllerRef.current?.signal,
-          }).then((response) => {
-            if (!response.ok) {
-              throw response.json().then((data) => {
-                const error = new Error(data.error || "Streaming failed")
-                ;(error as any).status = response.status
-                return error
-              })
-            }
+        const response = await fetch("/api/claude/stream-slides", {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${session.access_token}`,
+          },
+          body: formData,
+          signal: abortControllerRef.current.signal,
+        })
 
-            const reader = response.body?.getReader()
-            if (!reader) throw new Error("No response stream")
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}: ${response.statusText}`)
+        }
 
-            const decoder = new TextDecoder()
-            let buffer = ""
-            let result = null
+        const reader = response.body?.getReader()
+        if (!reader) {
+          throw new Error("No response body")
+        }
 
-            return new Promise((resolve, reject) => {
-              const readStream = () => {
-                reader
-                  .read()
-                  .then(({ done, value }) => {
-                    if (done) {
-                      clearInterval(progressInterval)
-                      setProgress({
-                        stage: "complete",
-                        progress: 100,
-                        message: "Streaming complete!",
-                      })
-                      if (result) onComplete?.(result)
-                      resolve(result)
-                    } else {
-                      buffer += decoder.decode(value, { stream: true })
-                      const lines = buffer.split("\n")
-                      buffer = lines.pop() || ""
+        let buffer = ""
+        let result: GenerationResult | null = null
 
-                      for (const line of lines) {
-                        if (line.startsWith("data: ")) {
-                          const data = line.slice(6)
-                          if (data === "[DONE]") {
-                            clearInterval(progressInterval)
-                            setProgress({
-                              stage: "complete",
-                              progress: 100,
-                              message: "Streaming complete!",
-                            })
-                            if (result) onComplete?.(result)
-                            resolve(result)
-                          }
+        try {
+          while (true) {
+            const { done, value } = await reader.read()
+            if (done) break
 
-                          try {
-                            const parsed = JSON.parse(data)
-                            if (parsed.type === "chunk") {
-                              onChunk?.(parsed.content)
-                            } else if (parsed.type === "result") {
-                              result = parsed.data
-                            }
-                          } catch (e) {
-                            console.warn("Failed to parse streaming data:", data)
-                          }
-                        }
-                      }
+            buffer += new TextDecoder().decode(value)
+            const lines = buffer.split("\n")
+            buffer = lines.pop() || ""
 
-                      readStream()
-                    }
-                  })
-                  .catch(reject)
+            for (const line of lines) {
+              if (line.startsWith("data: ")) {
+                try {
+                  const data = JSON.parse(line.slice(6))
+
+                  if (data.type === "chunk") {
+                    onChunk?.(data.content)
+                  } else if (data.type === "complete") {
+                    result = data.result
+                    clearInterval(progressInterval)
+                    setProgress({
+                      stage: "complete",
+                      progress: 100,
+                      message: "Generation complete!",
+                    })
+                  } else if (data.type === "error") {
+                    throw new Error(data.error)
+                  }
+                } catch (parseError) {
+                  console.warn("Failed to parse SSE data:", parseError)
+                }
               }
-
-              readStream()
-            })
-          })
+            }
+          }
+        } finally {
+          reader.releaseLock()
+          clearInterval(progressInterval)
         }
 
-        await retryWithBackoff(operation)
+        if (result) {
+          await trackCredits("deduct", analysis.estimatedCredits)
+          onComplete?.(result)
+        }
       } catch (err) {
-        if (err.name === "AbortError") {
-          return
-        }
-
-        const errorDetails = handleError(err)
-        setError(errorDetails)
-        onError?.(errorDetails)
+        const error = err instanceof Error ? err : new Error("Generation failed")
+        setError(error.message)
+        onError?.(error)
       } finally {
         setIsLoading(false)
-        abortControllerRef.current = null
         setTimeout(() => setProgress(null), 3000)
       }
     },
-    [session, retryWithBackoff],
+    [session, analyzeContent, trackCredits],
   )
 
-  // Edit individual slides
   const editSlide = useCallback(
-    async (slideId, slideTitle, editPrompt) => {
+    async (slideId: string, slideTitle: string, editPrompt: string): Promise<GenerationResult | null> => {
       if (!session?.access_token) {
-        setError({
-          type: "auth",
-          message: "Authentication required",
-          retryable: false,
-        })
+        setError("Authentication required")
         return null
       }
 
       setIsLoading(true)
       setError(null)
-      setProgress({
-        stage: "analyzing",
-        progress: 20,
-        message: "Analyzing slide edit request...",
-      })
 
       try {
-        const operation = () => {
-          return fetch("/api/claude/edit-slide", {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              Authorization: `Bearer ${session.access_token}`,
-            },
-            body: JSON.stringify({
-              slideId,
-              slideTitle,
-              editPrompt,
-              editMode: "single",
-            }),
-            signal: abortControllerRef.current?.signal,
-          }).then((response) => {
-            setProgress({
-              stage: "designing",
-              progress: 70,
-              message: "Applying changes to slide...",
-            })
-
-            if (!response.ok) {
-              throw response.json().then((data) => {
-                const error = new Error(data.error || "Failed to edit slide")
-                ;(error as any).status = response.status
-                return error
-              })
-            }
-
-            return response.json()
-          })
-        }
-
-        const result = await retryWithBackoff(operation)
-
-        setProgress({
-          stage: "complete",
-          progress: 100,
-          message: "Slide updated successfully!",
+        const response = await fetch("/api/claude/edit-slide", {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${session.access_token}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            slideId,
+            slideTitle,
+            editPrompt,
+          }),
         })
 
-        return result
-      } catch (err) {
-        if (err.name === "AbortError") {
-          return null
+        if (!response.ok) {
+          const errorData = await response.json()
+          throw new Error(errorData.error || "Failed to edit slide")
         }
 
-        const errorDetails = handleError(err)
-        setError(errorDetails)
-        console.error("Slide edit error:", err)
+        const result = await response.json()
+        return result
+      } catch (err) {
+        const errorMessage = err instanceof Error ? err.message : "Failed to edit slide"
+        setError(errorMessage)
+        console.error("Slide editing error:", err)
         return null
       } finally {
         setIsLoading(false)
-        setTimeout(() => setProgress(null), 2000)
       }
     },
-    [session, retryWithBackoff],
+    [session],
   )
 
-  // Cancel ongoing generation
   const cancelGeneration = useCallback(() => {
     if (abortControllerRef.current) {
       abortControllerRef.current.abort()
       setIsLoading(false)
       setProgress(null)
-      setError(null)
+      setError("Generation cancelled")
     }
   }, [])
 
-  // Clear error state
   const clearError = useCallback(() => {
     setError(null)
   }, [])
 
-  // Get credit balance
-  const getCreditBalance = useCallback(async () => {
-    if (!session?.access_token) return null
-
-    try {
-      const response = await fetch("/api/credits/balance", {
-        headers: {
-          Authorization: `Bearer ${session.access_token}`,
-        },
-      })
-
-      if (response.ok) {
-        const data = await response.json()
-        setCreditBalance(data.balance)
-        return data.balance
-      }
-    } catch (error) {
-      console.error("Failed to fetch credit balance:", error)
-    }
-    return null
-  }, [session])
-
-  // Cleanup on unmount
-  const cleanup = useCallback(() => {
-    if (abortControllerRef.current) {
-      abortControllerRef.current.abort()
-    }
-    setIsLoading(false)
+  const clearProgress = useCallback(() => {
     setProgress(null)
-    setError(null)
   }, [])
 
   return {
@@ -654,64 +571,12 @@ export function useEnhancedClaudeSlides() {
     error,
     progress,
     contentAnalysis,
-    creditBalance,
+    retryCount,
     generateSlides,
     generateSlidesStreaming,
     editSlide,
     cancelGeneration,
     clearError,
-    getCreditBalance,
-    cleanup,
+    clearProgress,
   }
-}
-
-// Helper functions
-function extractTopics(prompt) {
-  const keywords = prompt.toLowerCase().match(/\b\w{4,}\b/g) || []
-  const commonWords = new Set([
-    "this",
-    "that",
-    "with",
-    "have",
-    "will",
-    "from",
-    "they",
-    "been",
-    "were",
-    "said",
-    "each",
-    "which",
-    "their",
-    "time",
-    "about",
-  ])
-  return [...new Set(keywords.filter((word) => !commonWords.has(word)))].slice(0, 5)
-}
-
-function determineComplexity(prompt, hasFile) {
-  const wordCount = prompt.split(/\s+/).length
-  const hasComplexTerms = /\b(analysis|strategy|framework|methodology|implementation|optimization)\b/i.test(prompt)
-
-  if (hasFile || wordCount > 100 || hasComplexTerms) return "complex"
-  if (wordCount > 50) return "moderate"
-  return "simple"
-}
-
-function suggestChartTypes(prompt) {
-  const suggestions = []
-
-  if (/\b(data|statistics|numbers|metrics|performance|results)\b/i.test(prompt)) {
-    suggestions.push("bar", "line")
-  }
-  if (/\b(comparison|versus|compare|different|options)\b/i.test(prompt)) {
-    suggestions.push("bar", "pie")
-  }
-  if (/\b(trend|growth|over time|timeline|progress)\b/i.test(prompt)) {
-    suggestions.push("line", "area")
-  }
-  if (/\b(distribution|breakdown|percentage|share|portion)\b/i.test(prompt)) {
-    suggestions.push("pie", "donut")
-  }
-
-  return [...new Set(suggestions)]
 }
