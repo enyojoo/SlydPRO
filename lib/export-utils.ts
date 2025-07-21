@@ -1,115 +1,186 @@
 import jsPDF from "jspdf"
 import html2canvas from "html2canvas"
 import PptxGenJS from "pptxgenjs"
-import type { UltimateSlide } from "@/types/ultimate-slide"
+import type { ReactNode } from "react"
 
-export interface ExportOptions {
-  format: "pdf" | "pptx"
-  quality?: "low" | "medium" | "high"
-  includeNotes?: boolean
-  pageSize?: "A4" | "letter" | "16:9" | "4:3"
+export interface ExportSlide {
+  id: string
+  title: string
+  content: string | ReactNode
+  background: string
+  textColor: string
+  titleColor?: string
+  accentColor?: string
+  layout: "title" | "content" | "two-column" | "image" | "chart" | "table" | "split"
+  chartData?: {
+    type: "bar" | "line" | "pie" | "area"
+    data: Array<{ name: string; value: number }>
+    config: { showGrid?: boolean; gradient?: boolean }
+    style: string
+  }
+  tableData?: {
+    headers: string[]
+    rows: string[][]
+  }
+  professionalIcon?: {
+    name: string
+    position: string
+    style: "outline" | "filled" | "material"
+    color: string
+    size?: number
+  }
+}
+
+export interface ExportProgress {
+  stage: "preparing" | "rendering" | "generating" | "finalizing" | "complete"
+  progress: number
+  message: string
+  currentSlide?: number
+  totalSlides?: number
 }
 
 export class SlideExporter {
-  private slides: UltimateSlide[]
-  private projectName: string
+  private onProgress?: (progress: ExportProgress) => void
 
-  constructor(slides: UltimateSlide[], projectName: string) {
-    this.slides = slides
-    this.projectName = projectName
+  constructor(onProgress?: (progress: ExportProgress) => void) {
+    this.onProgress = onProgress
   }
 
-  async exportToPDF(options: ExportOptions = { format: "pdf" }): Promise<Blob> {
+  private updateProgress(
+    stage: ExportProgress["stage"],
+    progress: number,
+    message: string,
+    currentSlide?: number,
+    totalSlides?: number,
+  ) {
+    this.onProgress?.({
+      stage,
+      progress,
+      message,
+      currentSlide,
+      totalSlides,
+    })
+  }
+
+  async exportToPDF(slides: ExportSlide[], title = "SlydPRO Presentation"): Promise<Blob> {
+    this.updateProgress("preparing", 5, "Preparing PDF export...", 0, slides.length)
+
     const pdf = new jsPDF({
       orientation: "landscape",
-      unit: "mm",
-      format: options.pageSize === "A4" ? "a4" : [297, 210],
+      unit: "px",
+      format: [1920, 1080],
     })
 
-    // Set up PDF dimensions
-    const pageWidth = pdf.internal.pageSize.getWidth()
-    const pageHeight = pdf.internal.pageSize.getHeight()
-    const margin = 10
+    // Add metadata
+    pdf.setProperties({
+      title: title,
+      subject: "SlydPRO Generated Presentation",
+      author: "SlydPRO",
+      creator: "SlydPRO AI Presentation Generator",
+    })
 
-    for (let i = 0; i < this.slides.length; i++) {
-      const slide = this.slides[i]
+    this.updateProgress("rendering", 10, "Rendering slides for PDF...", 0, slides.length)
 
-      if (i > 0) {
-        pdf.addPage()
-      }
+    for (let i = 0; i < slides.length; i++) {
+      const slide = slides[i]
 
-      // Create a temporary div to render the slide
-      const slideElement = await this.createSlideElement(slide)
+      this.updateProgress(
+        "rendering",
+        10 + (i / slides.length) * 70,
+        `Rendering slide ${i + 1}...`,
+        i + 1,
+        slides.length,
+      )
+
+      // Create temporary DOM element for rendering
+      const slideElement = this.createSlideElement(slide)
       document.body.appendChild(slideElement)
 
       try {
-        // Convert slide to canvas
         const canvas = await html2canvas(slideElement, {
           width: 1920,
           height: 1080,
           scale: 2,
-          backgroundColor: null,
-          logging: false,
           useCORS: true,
+          allowTaint: true,
+          backgroundColor: null,
         })
 
-        // Add canvas to PDF
-        const imgData = canvas.toDataURL("image/png")
-        pdf.addImage(imgData, "PNG", margin, margin, pageWidth - margin * 2, pageHeight - margin * 2)
+        if (i > 0) {
+          pdf.addPage()
+        }
 
-        // Add slide number
-        pdf.setFontSize(10)
-        pdf.setTextColor(128, 128, 128)
-        pdf.text(`${i + 1} / ${this.slides.length}`, pageWidth - 30, pageHeight - 5)
+        const imgData = canvas.toDataURL("image/png")
+        pdf.addImage(imgData, "PNG", 0, 0, 1920, 1080)
       } finally {
         document.body.removeChild(slideElement)
       }
     }
 
-    // Add metadata
-    pdf.setProperties({
-      title: this.projectName,
-      subject: "Presentation created with SlydPRO",
-      author: "SlydPRO",
-      creator: "SlydPRO AI Presentation Generator",
-    })
+    this.updateProgress("finalizing", 90, "Finalizing PDF...", slides.length, slides.length)
 
-    return new Blob([pdf.output("blob")], { type: "application/pdf" })
+    const pdfBlob = pdf.output("blob")
+
+    this.updateProgress("complete", 100, "PDF export complete!", slides.length, slides.length)
+
+    return pdfBlob
   }
 
-  async exportToPPTX(options: ExportOptions = { format: "pptx" }): Promise<Blob> {
+  async exportToPowerPoint(slides: ExportSlide[], title = "SlydPRO Presentation"): Promise<Blob> {
+    this.updateProgress("preparing", 5, "Preparing PowerPoint export...", 0, slides.length)
+
     const pptx = new PptxGenJS()
 
     // Set presentation properties
     pptx.author = "SlydPRO"
-    pptx.company = "SlydPRO"
-    pptx.subject = this.projectName
-    pptx.title = this.projectName
+    pptx.company = "SlydPRO AI"
+    pptx.subject = "AI Generated Presentation"
+    pptx.title = title
 
-    // Set slide size (16:9 aspect ratio)
-    pptx.defineLayout({ name: "LAYOUT_16x9", width: 10, height: 5.625 })
+    // Set slide size to 16:9
+    pptx.defineLayout({ name: "LAYOUT_16x9", width: 13.33, height: 7.5 })
     pptx.layout = "LAYOUT_16x9"
 
-    for (const slide of this.slides) {
+    this.updateProgress("generating", 10, "Generating PowerPoint slides...", 0, slides.length)
+
+    for (let i = 0; i < slides.length; i++) {
+      const slide = slides[i]
+
+      this.updateProgress(
+        "generating",
+        10 + (i / slides.length) * 80,
+        `Creating slide ${i + 1}...`,
+        i + 1,
+        slides.length,
+      )
+
       const pptxSlide = pptx.addSlide()
 
-      // Set slide background
+      // Add background
       if (slide.background.includes("gradient")) {
-        // Extract gradient colors for PowerPoint
-        const gradientMatch = slide.background.match(/linear-gradient$$[^,]+,\s*([^,]+),\s*([^)]+)$$/)
+        const gradientMatch = slide.background.match(/linear-gradient$$([^)]+)$$/)
         if (gradientMatch) {
-          pptxSlide.background = {
-            fill: {
-              type: "gradient",
-              colors: [
-                { color: this.extractColor(gradientMatch[1]), position: 0 },
-                { color: this.extractColor(gradientMatch[2]), position: 100 },
-              ],
-              angle: 45,
-            },
+          const gradientParts = gradientMatch[1].split(",").map((s) => s.trim())
+          const angle = gradientParts[0].replace("deg", "")
+          const colors = gradientParts.slice(1).map((color) => {
+            const colorMatch = color.match(/#[0-9a-fA-F]{6}/)
+            return colorMatch ? colorMatch[0] : "#ffffff"
+          })
+
+          if (colors.length >= 2) {
+            pptxSlide.background = {
+              fill: {
+                type: "gradient",
+                angle: Number.parseInt(angle) || 45,
+                colors: colors.map((color, idx) => ({
+                  color: color,
+                  position: idx * (100 / (colors.length - 1)),
+                })),
+              },
+            }
           }
         }
-      } else {
+      } else if (slide.background.startsWith("#")) {
         pptxSlide.background = { fill: slide.background }
       }
 
@@ -117,294 +188,189 @@ export class SlideExporter {
       if (slide.title) {
         pptxSlide.addText(slide.title, {
           x: 0.5,
-          y: slide.layout === "title" ? 2 : 0.5,
-          w: 9,
-          h: 1.5,
-          fontSize: slide.layout === "title" ? 44 : 36,
-          fontFace: slide.titleFont?.split(",")[0] || "Arial",
+          y: slide.layout === "title" ? 2.5 : 0.5,
+          w: 12.33,
+          h: slide.layout === "title" ? 2 : 1.5,
+          fontSize: slide.layout === "title" ? 48 : 36,
+          fontFace: "SF Pro Display",
           color: slide.titleColor || slide.textColor,
           bold: true,
           align: slide.layout === "title" ? "center" : "left",
+          valign: "middle",
         })
       }
 
       // Add content
-      if (slide.content && typeof slide.content === "string") {
-        const contentY = slide.layout === "title" ? 3.5 : 2
+      if (typeof slide.content === "string" && slide.content.trim()) {
+        const contentY = slide.layout === "title" ? 4.5 : 2.2
+        const contentH = slide.layout === "title" ? 2 : 4.5
+
+        // Handle bullet points
         const lines = slide.content.split("\n").filter((line) => line.trim())
+        const bulletPoints = lines.filter((line) => line.trim().startsWith("•") || line.trim().startsWith("-"))
 
-        let currentY = contentY
-        for (const line of lines) {
-          const trimmedLine = line.trim()
-          const isBullet = trimmedLine.startsWith("•") || trimmedLine.startsWith("-")
-          const text = isBullet ? trimmedLine.substring(1).trim() : trimmedLine
+        if (bulletPoints.length > 0) {
+          const bulletText = bulletPoints.map((point) => point.replace(/^[•-]\s*/, "").trim()).join("\n")
 
-          pptxSlide.addText(text, {
-            x: isBullet ? 1 : 0.5,
-            y: currentY,
-            w: 8.5,
-            h: 0.6,
-            fontSize: Number.parseInt(slide.contentSize?.replace("rem", "")) * 16 || 18,
-            fontFace: slide.contentFont?.split(",")[0] || "Arial",
+          pptxSlide.addText(bulletText, {
+            x: 0.5,
+            y: contentY,
+            w: 12.33,
+            h: contentH,
+            fontSize: 24,
+            fontFace: "SF Pro Text",
             color: slide.textColor,
-            bullet: isBullet ? { type: "bullet" } : false,
+            bullet: { type: "bullet", style: "•" },
+            lineSpacing: 32,
+            valign: "top",
           })
-
-          currentY += 0.7
+        } else {
+          pptxSlide.addText(slide.content, {
+            x: 0.5,
+            y: contentY,
+            w: 12.33,
+            h: contentH,
+            fontSize: 24,
+            fontFace: "SF Pro Text",
+            color: slide.textColor,
+            align: slide.layout === "title" ? "center" : "left",
+            valign: slide.layout === "title" ? "middle" : "top",
+            lineSpacing: 32,
+          })
         }
       }
 
-      // Add charts if present
+      // Add charts
       if (slide.chartData) {
-        await this.addChartToPPTX(pptxSlide, slide.chartData, slide)
-      }
+        const chartData = slide.chartData.data.map((item) => ({
+          name: item.name,
+          labels: [item.name],
+          values: [item.value],
+        }))
 
-      // Add tables if present
-      if (slide.tableData) {
-        this.addTableToPPTX(pptxSlide, slide.tableData, slide)
-      }
-
-      // Add icons if present
-      if (slide.icons && slide.icons.length > 0) {
-        for (const icon of slide.icons) {
-          // Add icon as text (emoji) or shape
-          pptxSlide.addText(icon.icon, {
-            x: this.getIconXPosition(icon.position),
-            y: this.getIconYPosition(icon.position),
-            w: 0.5,
-            h: 0.5,
-            fontSize: Number.parseInt(icon.size) || 24,
-            color: icon.color,
-          })
+        let chartType: any = "bar"
+        switch (slide.chartData.type) {
+          case "line":
+            chartType = "line"
+            break
+          case "pie":
+            chartType = "pie"
+            break
+          case "area":
+            chartType = "area"
+            break
+          default:
+            chartType = "bar"
         }
+
+        pptxSlide.addChart(chartType, chartData, {
+          x: 1,
+          y: 3,
+          w: 11.33,
+          h: 4,
+          showTitle: false,
+          showLegend: true,
+          legendPos: "r",
+        })
+      }
+
+      // Add tables
+      if (slide.tableData) {
+        const tableData = [slide.tableData.headers, ...slide.tableData.rows]
+
+        pptxSlide.addTable(tableData, {
+          x: 0.5,
+          y: 2.5,
+          w: 12.33,
+          h: 4,
+          fontSize: 18,
+          fontFace: "SF Pro Text",
+          color: slide.textColor,
+          fill: { color: "F7F7F7" },
+          border: { pt: 1, color: "CFCFCF" },
+        })
       }
     }
 
-    const pptxBlob = await pptx.writeFile({ outputType: "blob" })
-    return pptxBlob as Blob
+    this.updateProgress("finalizing", 90, "Finalizing PowerPoint file...", slides.length, slides.length)
+
+    const pptxBlob = (await pptx.write("blob")) as Blob
+
+    this.updateProgress("complete", 100, "PowerPoint export complete!", slides.length, slides.length)
+
+    return pptxBlob
   }
 
-  private async createSlideElement(slide: UltimateSlide): Promise<HTMLElement> {
-    const slideDiv = document.createElement("div")
-    slideDiv.style.width = "1920px"
-    slideDiv.style.height = "1080px"
-    slideDiv.style.background = slide.background
-    slideDiv.style.color = slide.textColor
-    slideDiv.style.fontFamily = slide.titleFont || "Arial, sans-serif"
-    slideDiv.style.padding = "80px"
-    slideDiv.style.boxSizing = "border-box"
-    slideDiv.style.display = "flex"
-    slideDiv.style.flexDirection = "column"
-    slideDiv.style.justifyContent = slide.layout === "title" ? "center" : "flex-start"
-    slideDiv.style.position = "relative"
-    slideDiv.style.overflow = "hidden"
-
-    // Add glassmorphism effect if enabled
-    if (slide.glassmorphism) {
-      const glassDiv = document.createElement("div")
-      glassDiv.style.position = "absolute"
-      glassDiv.style.inset = "0"
-      glassDiv.style.background = "linear-gradient(135deg, rgba(255,255,255,0.1), rgba(255,255,255,0.05))"
-      glassDiv.style.backdropFilter = "blur(10px)"
-      slideDiv.appendChild(glassDiv)
-    }
+  private createSlideElement(slide: ExportSlide): HTMLElement {
+    const slideElement = document.createElement("div")
+    slideElement.style.width = "1920px"
+    slideElement.style.height = "1080px"
+    slideElement.style.background = slide.background
+    slideElement.style.color = slide.textColor
+    slideElement.style.padding = "80px"
+    slideElement.style.boxSizing = "border-box"
+    slideElement.style.fontFamily = "SF Pro Display, -apple-system, BlinkMacSystemFont, sans-serif"
+    slideElement.style.position = "absolute"
+    slideElement.style.top = "-10000px"
+    slideElement.style.left = "-10000px"
 
     // Add title
     if (slide.title) {
       const titleElement = document.createElement("h1")
       titleElement.textContent = slide.title
-      titleElement.style.fontSize = slide.titleSize || (slide.layout === "title" ? "4rem" : "2.5rem")
-      titleElement.style.color = slide.titleColor || slide.textColor
-      titleElement.style.fontFamily = slide.titleFont || "Arial, sans-serif"
+      titleElement.style.fontSize = slide.layout === "title" ? "72px" : "54px"
       titleElement.style.fontWeight = "bold"
-      titleElement.style.margin = "0 0 2rem 0"
-      titleElement.style.textAlign = slide.layout === "title" ? "center" : "left"
+      titleElement.style.color = slide.titleColor || slide.textColor
+      titleElement.style.marginBottom = "40px"
       titleElement.style.lineHeight = "1.2"
-      titleElement.style.position = "relative"
-      titleElement.style.zIndex = "10"
-      slideDiv.appendChild(titleElement)
+      titleElement.style.textAlign = slide.layout === "title" ? "center" : "left"
+      slideElement.appendChild(titleElement)
     }
 
     // Add content
-    if (slide.content && typeof slide.content === "string") {
-      const contentDiv = document.createElement("div")
-      contentDiv.style.fontSize = slide.contentSize || "1.5rem"
-      contentDiv.style.color = slide.textColor
-      contentDiv.style.fontFamily = slide.contentFont || "Arial, sans-serif"
-      contentDiv.style.lineHeight = "1.6"
-      contentDiv.style.position = "relative"
-      contentDiv.style.zIndex = "10"
-      contentDiv.style.textAlign = slide.layout === "title" ? "center" : "left"
+    if (typeof slide.content === "string" && slide.content.trim()) {
+      const contentElement = document.createElement("div")
+      contentElement.style.fontSize = "36px"
+      contentElement.style.lineHeight = "1.6"
+      contentElement.style.color = slide.textColor
 
       const lines = slide.content.split("\n").filter((line) => line.trim())
-      for (const line of lines) {
-        const trimmedLine = line.trim()
-        const isBullet = trimmedLine.startsWith("•") || trimmedLine.startsWith("-")
+      lines.forEach((line) => {
+        const lineElement = document.createElement("p")
+        lineElement.style.marginBottom = "20px"
 
-        if (isBullet) {
-          const bulletDiv = document.createElement("div")
-          bulletDiv.style.display = "flex"
-          bulletDiv.style.alignItems = "flex-start"
-          bulletDiv.style.marginBottom = "1rem"
+        if (line.trim().startsWith("•") || line.trim().startsWith("-")) {
+          lineElement.style.paddingLeft = "40px"
+          lineElement.style.position = "relative"
+          lineElement.textContent = line.replace(/^[•-]\s*/, "").trim()
 
           const bullet = document.createElement("span")
           bullet.textContent = "•"
+          bullet.style.position = "absolute"
+          bullet.style.left = "0"
           bullet.style.color = slide.accentColor || slide.textColor
-          bullet.style.marginRight = "1rem"
-          bullet.style.fontSize = "1.2em"
-
-          const text = document.createElement("span")
-          text.textContent = trimmedLine.substring(1).trim()
-
-          bulletDiv.appendChild(bullet)
-          bulletDiv.appendChild(text)
-          contentDiv.appendChild(bulletDiv)
+          lineElement.appendChild(bullet)
         } else {
-          const p = document.createElement("p")
-          p.textContent = trimmedLine
-          p.style.margin = "0 0 1rem 0"
-          contentDiv.appendChild(p)
+          lineElement.textContent = line.trim()
         }
-      }
 
-      slideDiv.appendChild(contentDiv)
+        contentElement.appendChild(lineElement)
+      })
+
+      slideElement.appendChild(contentElement)
     }
 
-    // Add icons
-    if (slide.icons && slide.icons.length > 0) {
-      for (const icon of slide.icons) {
-        const iconDiv = document.createElement("div")
-        iconDiv.textContent = icon.icon
-        iconDiv.style.position = "absolute"
-        iconDiv.style.fontSize = `${icon.size}px` || "24px"
-        iconDiv.style.color = icon.color
-        iconDiv.style.zIndex = "20"
-
-        // Position the icon
-        const { top, right, bottom, left } = this.getIconPosition(icon.position)
-        if (top) iconDiv.style.top = top
-        if (right) iconDiv.style.right = right
-        if (bottom) iconDiv.style.bottom = bottom
-        if (left) iconDiv.style.left = left
-
-        slideDiv.appendChild(iconDiv)
-      }
-    }
-
-    return slideDiv
+    return slideElement
   }
 
-  private extractColor(colorString: string): string {
-    // Extract hex color from various formats
-    const hexMatch = colorString.match(/#[0-9a-fA-F]{6}/)
-    if (hexMatch) return hexMatch[0]
-
-    // Convert common color names to hex
-    const colorMap: { [key: string]: string } = {
-      white: "#FFFFFF",
-      black: "#000000",
-      red: "#FF0000",
-      green: "#00FF00",
-      blue: "#0000FF",
-    }
-
-    return colorMap[colorString.toLowerCase()] || "#000000"
+  static async downloadFile(blob: Blob, filename: string) {
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement("a")
+    link.href = url
+    link.download = filename
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    URL.revokeObjectURL(url)
   }
-
-  private async addChartToPPTX(slide: any, chartData: any, slideData: UltimateSlide) {
-    const chartOptions = {
-      x: 1,
-      y: 3,
-      w: 8,
-      h: 4,
-      showTitle: false,
-      showLegend: true,
-      legendPos: "r",
-    }
-
-    switch (chartData.type) {
-      case "bar":
-        slide.addChart("bar", chartData.data, chartOptions)
-        break
-      case "line":
-        slide.addChart("line", chartData.data, chartOptions)
-        break
-      case "pie":
-        slide.addChart("pie", chartData.data, chartOptions)
-        break
-      case "area":
-        slide.addChart("area", chartData.data, chartOptions)
-        break
-    }
-  }
-
-  private addTableToPPTX(slide: any, tableData: any, slideData: UltimateSlide) {
-    const rows = [tableData.headers, ...tableData.rows]
-
-    slide.addTable(rows, {
-      x: 0.5,
-      y: 3,
-      w: 9,
-      h: 3,
-      fontSize: 12,
-      fontFace: slideData.contentFont?.split(",")[0] || "Arial",
-      color: slideData.textColor,
-      fill: { color: "F7F7F7" },
-      border: { pt: 1, color: "CFCFCF" },
-    })
-  }
-
-  private getIconXPosition(position: string): number {
-    if (position.includes("left")) return 0.5
-    if (position.includes("right")) return 9
-    return 4.75 // center
-  }
-
-  private getIconYPosition(position: string): number {
-    if (position.includes("top")) return 0.5
-    if (position.includes("bottom")) return 5
-    return 2.75 // center
-  }
-
-  private getIconPosition(position: string) {
-    const positions: { [key: string]: any } = {
-      "top-left": { top: "40px", left: "40px" },
-      "top-right": { top: "40px", right: "40px" },
-      "top-center": { top: "40px", left: "50%", transform: "translateX(-50%)" },
-      "bottom-left": { bottom: "40px", left: "40px" },
-      "bottom-right": { bottom: "40px", right: "40px" },
-      "bottom-center": { bottom: "40px", left: "50%", transform: "translateX(-50%)" },
-      "center-left": { top: "50%", left: "40px", transform: "translateY(-50%)" },
-      "center-right": { top: "50%", right: "40px", transform: "translateY(-50%)" },
-      center: { top: "50%", left: "50%", transform: "translate(-50%, -50%)" },
-    }
-
-    return positions[position] || positions["top-right"]
-  }
-}
-
-export async function exportSlides(
-  slides: UltimateSlide[],
-  projectName: string,
-  format: "pdf" | "pptx",
-  options?: ExportOptions,
-): Promise<Blob> {
-  const exporter = new SlideExporter(slides, projectName)
-
-  if (format === "pdf") {
-    return await exporter.exportToPDF({ ...options, format })
-  } else {
-    return await exporter.exportToPPTX({ ...options, format })
-  }
-}
-
-export function downloadBlob(blob: Blob, filename: string) {
-  const url = URL.createObjectURL(blob)
-  const link = document.createElement("a")
-  link.href = url
-  link.download = filename
-  document.body.appendChild(link)
-  link.click()
-  document.body.removeChild(link)
-  URL.revokeObjectURL(url)
 }

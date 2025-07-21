@@ -1,6 +1,7 @@
 "use client"
 
 import { supabase, type Presentation } from "./supabase"
+import { useState, useCallback, useEffect } from "react"
 
 export class PresentationsAPI {
   private async getAuthHeaders() {
@@ -86,3 +87,109 @@ export class PresentationsAPI {
 }
 
 export const presentationsAPI = new PresentationsAPI()
+
+// Hook for using presentations API with React state management
+export function usePresentationsApi() {
+  const [presentations, setPresentations] = useState<Presentation[]>([])
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  const fetchPresentations = useCallback(async () => {
+    setLoading(true)
+    setError(null)
+    try {
+      const data = await presentationsAPI.getUserPresentations()
+      setPresentations(data)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to fetch presentations")
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  const createPresentation = useCallback(
+    async (data: {
+      name: string
+      slides: any[]
+      category?: string
+      chat_history?: any[]
+    }) => {
+      setLoading(true)
+      setError(null)
+      try {
+        const newPresentation = await presentationsAPI.createPresentation(data)
+        setPresentations((prev) => [newPresentation, ...prev])
+        return newPresentation
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Failed to create presentation")
+        throw err
+      } finally {
+        setLoading(false)
+      }
+    },
+    [],
+  )
+
+  const updatePresentation = useCallback(async (id: string, data: Partial<Presentation>) => {
+    setLoading(true)
+    setError(null)
+    try {
+      const updatedPresentation = await presentationsAPI.updatePresentation(id, data)
+      setPresentations((prev) => prev.map((p) => (p.id === id ? updatedPresentation : p)))
+      return updatedPresentation
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to update presentation")
+      throw err
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  const deletePresentation = useCallback(async (id: string) => {
+    setLoading(true)
+    setError(null)
+    try {
+      await presentationsAPI.deletePresentation(id)
+      setPresentations((prev) => prev.filter((p) => p.id !== id))
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to delete presentation")
+      throw err
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  const getPresentation = useCallback(async (id: string) => {
+    setLoading(true)
+    setError(null)
+    try {
+      const presentation = await presentationsAPI.getPresentation(id)
+      return presentation
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to fetch presentation")
+      throw err
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  const clearError = useCallback(() => {
+    setError(null)
+  }, [])
+
+  useEffect(() => {
+    fetchPresentations()
+  }, [fetchPresentations])
+
+  return {
+    presentations,
+    loading,
+    error,
+    fetchPresentations,
+    createPresentation,
+    updatePresentation,
+    deletePresentation,
+    getPresentation,
+    clearError,
+  }
+}

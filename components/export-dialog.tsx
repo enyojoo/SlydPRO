@@ -3,39 +3,38 @@
 import { useState } from "react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
-import { Card } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
-import {
-  FileText,
-  Download,
-  Presentation,
-  Settings,
-  Check,
-  Loader2,
-  ImageIcon,
-  Palette,
-  Layout,
-  AlertCircle,
-} from "lucide-react"
-import { exportSlides, downloadBlob } from "@/lib/export-utils"
-import type { UltimateSlide } from "@/types/ultimate-slide"
+import { FileText, Download, Presentation, CheckCircle, AlertCircle, Loader2 } from "lucide-react"
+import { SlideExporter, type ExportSlide, type ExportProgress } from "@/lib/export-utils"
 
 interface ExportDialogProps {
-  open: boolean
-  onOpenChange: (open: boolean) => void
-  projectName: string
-  slideCount: number
-  slides: UltimateSlide[]
+  isOpen: boolean
+  onClose: () => void
+  slides: any[]
+  presentationName: string
 }
 
-export function ExportDialog({ open, onOpenChange, projectName, slideCount, slides }: ExportDialogProps) {
-  const [selectedFormat, setSelectedFormat] = useState<"pdf" | "pptx" | null>(null)
+export function ExportDialog({ isOpen, onClose, slides, presentationName }: ExportDialogProps) {
   const [isExporting, setIsExporting] = useState(false)
-  const [exportProgress, setExportProgress] = useState(0)
-  const [exportComplete, setExportComplete] = useState(false)
+  const [exportProgress, setExportProgress] = useState<ExportProgress | null>(null)
   const [exportError, setExportError] = useState<string | null>(null)
-  const [currentStep, setCurrentStep] = useState<string>("")
+  const [exportSuccess, setExportSuccess] = useState<string | null>(null)
+
+  const convertSlidesToExportFormat = (slides: any[]): ExportSlide[] => {
+    return slides.map((slide, index) => ({
+      id: slide.id || `slide-${index}`,
+      title: slide.title || `Slide ${index + 1}`,
+      content: slide.content || "",
+      background: slide.background || "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
+      textColor: slide.textColor || "#ffffff",
+      titleColor: slide.titleColor,
+      accentColor: slide.accentColor || "#3b82f6",
+      layout: slide.layout || "content",
+      chartData: slide.chartData,
+      tableData: slide.tableData,
+      professionalIcon: slide.professionalIcon,
+    }))
+  }
 
   const handleExport = async (format: "pdf" | "pptx") => {
     if (!slides || slides.length === 0) {
@@ -43,271 +42,159 @@ export function ExportDialog({ open, onOpenChange, projectName, slideCount, slid
       return
     }
 
-    setSelectedFormat(format)
     setIsExporting(true)
-    setExportProgress(0)
     setExportError(null)
-    setExportComplete(false)
+    setExportSuccess(null)
+    setExportProgress(null)
 
     try {
-      // Simulate progress updates
-      const progressSteps = [
-        { progress: 10, step: "Preparing slides for export..." },
-        { progress: 25, step: "Processing slide content..." },
-        { progress: 40, step: "Applying formatting and styles..." },
-        { progress: 60, step: "Generating visual elements..." },
-        { progress: 80, step: "Creating final document..." },
-        { progress: 95, step: "Finalizing export..." },
-      ]
-
-      // Update progress with steps
-      for (const { progress, step } of progressSteps) {
+      const exporter = new SlideExporter((progress) => {
         setExportProgress(progress)
-        setCurrentStep(step)
-        await new Promise((resolve) => setTimeout(resolve, 800))
-      }
-
-      // Perform actual export
-      const blob = await exportSlides(slides, projectName, format, {
-        format,
-        quality: "high",
-        pageSize: "16:9",
       })
 
-      // Download the file
-      const filename = `${projectName}.${format}`
-      downloadBlob(blob, filename)
+      const exportSlides = convertSlidesToExportFormat(slides)
+      const filename = `${presentationName || "SlydPRO-Presentation"}.${format}`
 
-      setExportProgress(100)
-      setCurrentStep(`Successfully exported ${format.toUpperCase()}!`)
-      setIsExporting(false)
-      setExportComplete(true)
+      let blob: Blob
 
-      // Auto-close after success
+      if (format === "pdf") {
+        blob = await exporter.exportToPDF(exportSlides, presentationName)
+      } else {
+        blob = await exporter.exportToPowerPoint(exportSlides, presentationName)
+      }
+
+      await SlideExporter.downloadFile(blob, filename)
+
+      setExportSuccess(`Successfully exported ${slides.length} slides as ${format.toUpperCase()}!`)
+
+      // Auto-close success message after 3 seconds
       setTimeout(() => {
-        setExportComplete(false)
-        setSelectedFormat(null)
-        onOpenChange(false)
+        setExportSuccess(null)
+        onClose()
       }, 3000)
     } catch (error) {
       console.error("Export error:", error)
-      setIsExporting(false)
       setExportError(error instanceof Error ? error.message : "Export failed. Please try again.")
-      setExportProgress(0)
-      setCurrentStep("")
+    } finally {
+      setIsExporting(false)
+      setTimeout(() => setExportProgress(null), 2000)
     }
   }
 
   const resetDialog = () => {
-    setSelectedFormat(null)
-    setIsExporting(false)
-    setExportProgress(0)
-    setExportComplete(false)
     setExportError(null)
-    setCurrentStep("")
+    setExportSuccess(null)
+    setExportProgress(null)
+    setIsExporting(false)
   }
 
-  const canExport = slides && slides.length > 0
+  const handleClose = () => {
+    if (!isExporting) {
+      resetDialog()
+      onClose()
+    }
+  }
 
   return (
-    <Dialog
-      open={open}
-      onOpenChange={(open) => {
-        onOpenChange(open)
-        if (!open) resetDialog()
-      }}
-    >
-      <DialogContent className="sm:max-w-2xl bg-white/95 backdrop-blur-xl border border-white/20">
+    <Dialog open={isOpen} onOpenChange={handleClose}>
+      <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle className="text-2xl font-bold text-gray-900 flex items-center space-x-3">
-            <div className="w-10 h-10 bg-gradient-to-r from-[#027659] to-[#10b981] rounded-lg flex items-center justify-center">
-              <Download className="h-5 w-5 text-white" />
-            </div>
-            <span>Export Presentation</span>
+          <DialogTitle className="flex items-center gap-2">
+            <Download className="h-5 w-5" />
+            Export Presentation
           </DialogTitle>
         </DialogHeader>
 
-        <div className="py-8">
-          {!canExport ? (
-            // No slides available
-            <div className="text-center space-y-6">
-              <div className="w-16 h-16 bg-red-100 rounded-2xl flex items-center justify-center mx-auto">
-                <AlertCircle className="h-8 w-8 text-red-600" />
+        <div className="space-y-6">
+          {/* Export Progress */}
+          {exportProgress && (
+            <div className="space-y-3">
+              <div className="flex items-center gap-2">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                <span className="text-sm font-medium">{exportProgress.message}</span>
               </div>
-              <div>
-                <h3 className="text-xl font-bold text-gray-900 mb-2">No Slides Available</h3>
-                <p className="text-gray-600">
-                  Please create some slides before attempting to export your presentation.
+              <Progress value={exportProgress.progress} className="w-full" />
+              {exportProgress.currentSlide && exportProgress.totalSlides && (
+                <p className="text-xs text-muted-foreground">
+                  Processing slide {exportProgress.currentSlide} of {exportProgress.totalSlides}
                 </p>
-              </div>
-              <Button onClick={() => onOpenChange(false)} variant="outline" className="w-full">
-                Close
-              </Button>
+              )}
             </div>
-          ) : !selectedFormat && !isExporting && !exportComplete && !exportError ? (
-            <div className="space-y-6">
-              {/* Project Info */}
-              <div className="bg-gradient-to-r from-[#027659]/5 to-[#10b981]/5 rounded-xl p-6 border border-[#027659]/20 mb-8">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h3 className="font-semibold text-gray-900 text-lg">{projectName}</h3>
-                    <p className="text-sm text-gray-600 mt-1">{slideCount} slides ready for export</p>
-                  </div>
-                  <Badge variant="secondary" className="bg-[#027659]/10 text-[#027659] border-[#027659]/20">
-                    Ready
-                  </Badge>
-                </div>
-              </div>
+          )}
 
-              {/* Export Options */}
-              <div className="space-y-6">
-                <h4 className="font-semibold text-gray-900 text-xl mb-6">Choose export format:</h4>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {/* PDF Option */}
-                  <Card
-                    className="p-8 cursor-pointer hover:shadow-xl transition-all duration-300 border-2 hover:border-[#027659]/30 bg-gradient-to-br from-[#027659]/5 to-[#10b981]/5 hover:scale-105"
-                    onClick={() => handleExport("pdf")}
-                  >
-                    <div className="flex flex-col items-center text-center space-y-4">
-                      <div className="w-16 h-16 bg-gradient-to-r from-[#027659] to-[#10b981] rounded-2xl flex items-center justify-center">
-                        <FileText className="h-8 w-8 text-white" />
-                      </div>
-                      <div>
-                        <h3 className="font-bold text-lg text-gray-900">PDF Document</h3>
-                        <p className="text-sm text-gray-600 mt-1">
-                          Perfect for sharing and printing. Maintains formatting across all devices.
-                        </p>
-                      </div>
-                      <div className="flex items-center space-x-4 text-xs text-gray-500">
-                        <div className="flex items-center space-x-1">
-                          <ImageIcon className="h-3 w-3" />
-                          <span>High Quality</span>
-                        </div>
-                        <div className="flex items-center space-x-1">
-                          <Layout className="h-3 w-3" />
-                          <span>Fixed Layout</span>
-                        </div>
-                      </div>
-                      <Button className="w-full bg-gradient-to-r from-[#027659] to-[#10b981] hover:from-[#065f46] hover:to-[#059669] text-white">
-                        Export as PDF
-                      </Button>
-                    </div>
-                  </Card>
-
-                  {/* PowerPoint Option */}
-                  <Card
-                    className="p-8 cursor-pointer hover:shadow-xl transition-all duration-300 border-2 hover:border-[#10b981]/30 bg-gradient-to-br from-[#10b981]/5 to-[#34d399]/5 hover:scale-105"
-                    onClick={() => handleExport("pptx")}
-                  >
-                    <div className="flex flex-col items-center text-center space-y-4">
-                      <div className="w-16 h-16 bg-gradient-to-r from-[#10b981] to-[#34d399] rounded-2xl flex items-center justify-center">
-                        <Presentation className="h-8 w-8 text-white" />
-                      </div>
-                      <div>
-                        <h3 className="font-bold text-lg text-gray-900">PowerPoint</h3>
-                        <p className="text-sm text-gray-600 mt-1">
-                          Editable presentation for Microsoft PowerPoint and compatible apps.
-                        </p>
-                      </div>
-                      <div className="flex items-center space-x-4 text-xs text-gray-500">
-                        <div className="flex items-center space-x-1">
-                          <Settings className="h-3 w-3" />
-                          <span>Editable</span>
-                        </div>
-                        <div className="flex items-center space-x-1">
-                          <Palette className="h-3 w-3" />
-                          <span>Customizable</span>
-                        </div>
-                      </div>
-                      <Button className="w-full bg-gradient-to-r from-[#10b981] to-[#34d399] hover:from-[#059669] hover:to-[#10b981] text-white">
-                        Export as PowerPoint
-                      </Button>
-                    </div>
-                  </Card>
-                </div>
-              </div>
+          {/* Success Message */}
+          {exportSuccess && (
+            <div className="flex items-center gap-2 p-3 bg-green-50 border border-green-200 rounded-lg">
+              <CheckCircle className="h-5 w-5 text-green-600" />
+              <span className="text-sm text-green-800">{exportSuccess}</span>
             </div>
-          ) : isExporting ? (
-            // Export Progress
-            <div className="space-y-6 text-center">
-              <div className="w-20 h-20 bg-gradient-to-r from-[#027659] to-[#10b981] rounded-2xl flex items-center justify-center mx-auto">
-                <Loader2 className="h-10 w-10 text-white animate-spin" />
-              </div>
+          )}
 
-              <div>
-                <h3 className="text-xl font-bold text-gray-900 mb-2">
-                  Exporting to {selectedFormat?.toUpperCase()}...
-                </h3>
-                <p className="text-gray-600 mb-4">Processing {slideCount} slides with high-quality rendering</p>
-              </div>
-
-              <div className="space-y-2">
-                <Progress value={exportProgress} className="w-full h-3" />
-                <p className="text-sm text-gray-500">{exportProgress}% complete</p>
-                {currentStep && <p className="text-sm text-[#027659] font-medium">{currentStep}</p>}
-              </div>
-
-              <div className="bg-[#027659]/5 rounded-xl p-4 border border-[#027659]/20">
-                <p className="text-sm text-[#027659]">
-                  This may take a few moments depending on the number of slides and complexity.
-                </p>
-              </div>
+          {/* Error Message */}
+          {exportError && (
+            <div className="flex items-center gap-2 p-3 bg-red-50 border border-red-200 rounded-lg">
+              <AlertCircle className="h-5 w-5 text-red-600" />
+              <span className="text-sm text-red-800">{exportError}</span>
             </div>
-          ) : exportError ? (
-            // Export Error
-            <div className="space-y-6 text-center">
-              <div className="w-20 h-20 bg-red-100 rounded-2xl flex items-center justify-center mx-auto">
-                <AlertCircle className="h-10 w-10 text-red-600" />
-              </div>
+          )}
 
-              <div>
-                <h3 className="text-xl font-bold text-gray-900 mb-2">Export Failed</h3>
-                <p className="text-gray-600 mb-4">{exportError}</p>
-              </div>
+          {/* Export Options */}
+          {!exportProgress && !exportSuccess && (
+            <div className="space-y-4">
+              <div className="text-sm text-muted-foreground">Choose your export format:</div>
 
-              <div className="flex space-x-3 justify-center">
+              <div className="grid gap-3">
+                {/* PDF Export */}
                 <Button
-                  onClick={() => {
-                    setExportError(null)
-                    if (selectedFormat) {
-                      handleExport(selectedFormat)
-                    }
-                  }}
-                  className="bg-[#027659] hover:bg-[#065f46] text-white"
+                  onClick={() => handleExport("pdf")}
+                  disabled={isExporting || !slides || slides.length === 0}
+                  className="flex items-center justify-between p-4 h-auto"
+                  variant="outline"
                 >
-                  Try Again
+                  <div className="flex items-center gap-3">
+                    <FileText className="h-5 w-5" />
+                    <div className="text-left">
+                      <div className="font-medium">Export as PDF</div>
+                      <div className="text-xs text-muted-foreground">High-quality PDF for sharing and printing</div>
+                    </div>
+                  </div>
+                  <div className="text-xs text-muted-foreground">{slides?.length || 0} slides</div>
                 </Button>
-                <Button onClick={resetDialog} variant="outline">
-                  Back to Options
+
+                {/* PowerPoint Export */}
+                <Button
+                  onClick={() => handleExport("pptx")}
+                  disabled={isExporting || !slides || slides.length === 0}
+                  className="flex items-center justify-between p-4 h-auto"
+                  variant="outline"
+                >
+                  <div className="flex items-center gap-3">
+                    <Presentation className="h-5 w-5" />
+                    <div className="text-left">
+                      <div className="font-medium">Export as PowerPoint</div>
+                      <div className="text-xs text-muted-foreground">Editable PPTX file for Microsoft PowerPoint</div>
+                    </div>
+                  </div>
+                  <div className="text-xs text-muted-foreground">{slides?.length || 0} slides</div>
                 </Button>
               </div>
+
+              {(!slides || slides.length === 0) && (
+                <p className="text-sm text-muted-foreground text-center">
+                  No slides available to export. Please generate slides first.
+                </p>
+              )}
             </div>
-          ) : exportComplete ? (
-            // Export Complete
-            <div className="space-y-6 text-center">
-              <div className="w-20 h-20 bg-gradient-to-r from-[#10b981] to-[#34d399] rounded-2xl flex items-center justify-center mx-auto">
-                <Check className="h-10 w-10 text-white" />
-              </div>
+          )}
 
-              <div>
-                <h3 className="text-xl font-bold text-gray-900 mb-2">Export Complete!</h3>
-                <p className="text-gray-600">
-                  Your presentation has been exported as {selectedFormat?.toUpperCase()} and downloaded.
-                </p>
-              </div>
-
-              <div className="bg-[#10b981]/10 rounded-xl p-4 border border-[#10b981]/20">
-                <p className="text-sm text-[#10b981]">
-                  ✅ File saved: {projectName}.{selectedFormat}
-                </p>
-              </div>
-
-              <Button onClick={() => onOpenChange(false)} className="bg-[#027659] hover:bg-[#065f46] text-white">
+          {/* Close Button */}
+          {!isExporting && (
+            <div className="flex justify-end">
+              <Button variant="outline" onClick={handleClose}>
                 Close
               </Button>
             </div>
-          ) : null}
+          )}
         </div>
       </DialogContent>
     </Dialog>
