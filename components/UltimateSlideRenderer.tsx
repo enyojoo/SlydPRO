@@ -36,6 +36,13 @@ export const UltimateSlideRenderer: React.FC<UltimateSlideRendererProps> = ({
   className = "",
   isPresentationMode = false,
 }) => {
+  // DEBUG: Log slide properties
+  console.log("🖼️ Rendering slide with:", {
+    background: slide.background,
+    textColor: slide.textColor,
+    title: slide.title,
+  })
+
   // Icon mapping with better icons
   const iconMap: { [key: string]: React.ComponentType<any> } = {
     "📈": TrendingUp,
@@ -361,9 +368,9 @@ export const UltimateSlideRenderer: React.FC<UltimateSlideRendererProps> = ({
   }
 
   const slideStyle: React.CSSProperties = {
-    background: getSlideBackground(),
-    color: slide.textColor || "#ffffff",
-    fontFamily: slide.contentFont || "Inter, system-ui, sans-serif",
+    background: slide.background || "linear-gradient(135deg, #027659 0%, #065f46 100%)", // Force fallback
+    color: slide.textColor || "#ffffff", // Force fallback
+    fontFamily: slide.titleFont || "Inter, sans-serif",
     borderRadius: slide.borderRadius || "16px",
     boxShadow: slide.shadowEffect || "0 20px 40px rgba(0,0,0,0.15)",
     position: "relative",

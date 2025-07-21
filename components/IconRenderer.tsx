@@ -12,16 +12,6 @@ import {
   FiActivity,
   FiAward,
   FiBarChart3,
-  // Business Icons - Bootstrap style (filled)
-  BsBriefcase,
-  BsGraphUp,
-  BsLightbulb,
-  BsRocket,
-  BsTrophy,
-  BsGem,
-  BsShield,
-  BsPieChart,
-  BsBarChart,
   // Tech Icons - Feather style
   FiMonitor,
   FiSmartphone,
@@ -31,7 +21,19 @@ import {
   FiSettings,
   FiTool,
   FiCode,
-  // Material Design Icons
+} from "react-icons/fi"
+import {
+  BsBriefcase as BsBriefcaseOutline,
+  BsGraphUp as BsGraphUpOutline,
+  BsLightbulb as BsLightbulbOutline,
+  BsRocket as BsRocketOutline,
+  BsTrophy as BsTrophyOutline,
+  BsGem as BsGemOutline,
+  BsShield as BsShieldOutline,
+  BsPieChart as BsPieChartOutline,
+  BsBarChart as BsBarChartOutline,
+} from "react-icons/bs"
+import {
   MdDashboard,
   MdAnalytics,
   MdInsights,
@@ -41,7 +43,7 @@ import {
   MdTimeline,
   MdAssessment,
   MdShowChart,
-} from "react-icons"
+} from "react-icons/md"
 
 interface IconRendererProps {
   name: string
@@ -76,15 +78,15 @@ export const IconRenderer = ({ name, size = 24, className = "", style = "outline
 
   // Filled style icons (Bootstrap Icons)
   const filledIcons: Record<string, React.ComponentType<any>> = {
-    briefcase: BsBriefcase,
-    "graph-up": BsGraphUp,
-    lightbulb: BsLightbulb,
-    rocket: BsRocket,
-    trophy: BsTrophy,
-    gem: BsGem,
-    shield: BsShield,
-    "pie-chart": BsPieChart,
-    "bar-chart": BsBarChart,
+    briefcase: BsBriefcaseOutline,
+    "graph-up": BsGraphUpOutline,
+    lightbulb: BsLightbulbOutline,
+    rocket: BsRocketOutline,
+    trophy: BsTrophyOutline,
+    gem: BsGemOutline,
+    shield: BsShieldOutline,
+    "pie-chart": BsPieChartOutline,
+    "bar-chart": BsBarChartOutline,
   }
 
   // Material Design style icons
@@ -107,10 +109,6 @@ export const IconRenderer = ({ name, size = 24, className = "", style = "outline
   } else if (style === "material") {
     IconComponent = materialIcons[name]
   } else {
-    IconComponent = outlineIcons[name]
-  }
-
-  if (!IconComponent) {
     IconComponent = outlineIcons[name]
   }
 

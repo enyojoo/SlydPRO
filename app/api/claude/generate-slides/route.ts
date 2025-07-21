@@ -33,35 +33,64 @@ const getUltimateDesignContext = () => {
 
 // Apply design context intelligence to slides
 const applyDesignContext = (slides: any[], designContext: any) => {
+  // DEBUG: Log the actual design context structure
+  console.log("🔍 Design Context Structure:", JSON.stringify(designContext, null, 2))
+
   return slides.map((slide, index) => {
-    // Get content type rules from design context
     const contentType = slide.contentType || "business"
-    const colorRules =
-      designContext.colorIntelligence?.psychologyMapping?.[contentType] ||
-      (Array.isArray(designContext.colorIntelligence?.advancedPalettes)
-        ? designContext.colorIntelligence.advancedPalettes[
-            index % designContext.colorIntelligence.advancedPalettes.length
-          ]
-        : null)
+
+    // DEBUG: Log what we're looking for
+    console.log("🎨 Looking for colors for contentType:", contentType)
+    console.log("🎨 Available colorIntelligence:", designContext.colorIntelligence)
+
+    // Try multiple ways to get colors from design context
+    let colorRules = null
+
+    // Method 1: Psychology mapping
+    if (designContext.colorIntelligence?.psychologyMapping?.[contentType]) {
+      colorRules = designContext.colorIntelligence.psychologyMapping[contentType]
+      console.log("✅ Found psychology mapping colors:", colorRules)
+    }
+
+    // Method 2: Advanced palettes array
+    else if (
+      Array.isArray(designContext.colorIntelligence?.advancedPalettes) &&
+      designContext.colorIntelligence.advancedPalettes.length > 0
+    ) {
+      colorRules =
+        designContext.colorIntelligence.advancedPalettes[
+          index % designContext.colorIntelligence.advancedPalettes.length
+        ]
+      console.log("✅ Found palette colors:", colorRules)
+    }
+
+    // Method 3: First palette if available
+    else if (designContext.colorIntelligence?.advancedPalettes?.[0]) {
+      colorRules = designContext.colorIntelligence.advancedPalettes[0]
+      console.log("✅ Using first palette:", colorRules)
+    }
+
+    // Enhanced fallback gradients (always works)
+    const fallbackGradients = [
+      "linear-gradient(135deg, #027659 0%, #065f46 100%)", // Green
+      "linear-gradient(135deg, #3b82f6 0%, #1e40af 100%)", // Blue
+      "linear-gradient(135deg, #7c3aed 0%, #5b21b6 100%)", // Purple
+      "linear-gradient(135deg, #dc2626 0%, #991b1b 100%)", // Red
+      "linear-gradient(135deg, #ea580c 0%, #c2410c 100%)", // Orange
+      "linear-gradient(135deg, #059669 0%, #047857 100%)", // Emerald
+    ]
 
     const iconRules = designContext.iconSystems?.contextualMapping?.[contentType] || []
     const layoutRules =
       designContext.layoutMastery?.slideTemplates?.find((template: any) => template.name === slide.layout) || {}
 
-    // Fallback gradients if design context doesn't provide colors
-    const fallbackGradients = [
-      "linear-gradient(135deg, #027659 0%, #065f46 100%)",
-      "linear-gradient(135deg, #3b82f6 0%, #1e40af 100%)",
-      "linear-gradient(135deg, #7c3aed 0%, #5b21b6 100%)",
-      "linear-gradient(135deg, #dc2626 0%, #991b1b 100%)",
-      "linear-gradient(135deg, #ea580c 0%, #c2410c 100%)",
-      "linear-gradient(135deg, #059669 0%, #047857 100%)",
-    ]
-
-    return {
+    // Apply colors with multiple fallback levels
+    const finalSlide = {
       ...slide,
-      // Apply design context rules automatically
+      // Background - try multiple sources
       background: colorRules?.gradient || colorRules?.primary || fallbackGradients[index % fallbackGradients.length],
+
+      // Text color - ensure it's always readable
       textColor: colorRules?.text || "#ffffff",
       titleColor: colorRules?.accent || "#ffffff",
       accentColor: colorRules?.accent || "#fbbf24",
@@ -77,25 +106,28 @@ const applyDesignContext = (slides: any[], designContext: any) => {
             }
           : null,
 
-      // Typography from design context
-      titleFont: Array.isArray(designContext.typographyMastery?.fontStacks)
-        ? designContext.typographyMastery.fontStacks[0]?.name || "SF Pro Display, Inter, sans-serif"
-        : "SF Pro Display, Inter, sans-serif",
-      contentFont: Array.isArray(designContext.typographyMastery?.fontStacks)
-        ? designContext.typographyMastery.fontStacks[1]?.name || "SF Pro Text, Inter, sans-serif"
-        : "SF Pro Text, Inter, sans-serif",
+      // Typography with fallbacks
+      titleFont: designContext.typographyMastery?.fontStacks?.[0]?.name || "Inter, sans-serif",
+      contentFont: designContext.typographyMastery?.fontStacks?.[1]?.name || "Inter, sans-serif",
 
-      // Layout from design context
+      // Layout properties with fallbacks
       spacing: designContext.layoutMastery?.spacingRules?.comfortable || "comfortable",
       alignment: slide.layout === "title" ? "center" : "left",
       titleSize: slide.layout === "title" ? "clamp(2.5rem, 5vw, 4rem)" : "clamp(1.75rem, 3vw, 2.5rem)",
       contentSize: "clamp(1rem, 1.5vw, 1.125rem)",
 
-      // Visual effects from design context
+      // Visual effects with fallbacks
       shadowEffect: designContext.visualEffects?.shadows?.elegant || "0 15px 35px rgba(0,0,0,0.1)",
       borderRadius: designContext.visualEffects?.borderRadius?.modern || "20px",
       glassmorphism: designContext.visualEffects?.glassmorphism || false,
     }
+
+    console.log("🎨 Final slide colors:", {
+      background: finalSlide.background,
+      textColor: finalSlide.textColor,
+    })
+
+    return finalSlide
   })
 }
 
@@ -206,6 +238,9 @@ export async function POST(request: NextRequest) {
     if (uploadedFile) {
       fileContent = await parseFileContent(uploadedFile)
     }
+
+    // Temporary debug: Check your design context
+    console.log("📋 Raw SLYDPRO_DESIGN_CONTEXT:", process.env.SLYDPRO_DESIGN_CONTEXT?.substring(0, 500))
 
     // Get design context
     const designContext = getUltimateDesignContext()

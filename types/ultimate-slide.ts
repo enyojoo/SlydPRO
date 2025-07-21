@@ -1,53 +1,11 @@
 import type React from "react"
-export interface ChartData {
-  type: "bar" | "line" | "pie" | "donut" | "area"
-  data: Array<{
-    name: string
-    value: number
-    [key: string]: any
-  }>
-  config?: {
-    showGrid?: boolean
-    gradient?: boolean
-    [key: string]: any
-  }
-  style?: string
-}
-
-export interface TableData {
-  headers: string[]
-  rows: string[][]
-  style?: string
-  interactive?: boolean
-}
-
-export interface ProfessionalIcon {
-  name: string
-  position: "top-left" | "top-right" | "bottom-left" | "bottom-right" | "center"
-  style: "outline" | "filled" | "material"
-  color: string
-}
-
-export interface IconData {
-  icon: string
-  position: string
-  color?: string
-  size?: number
-}
-
-export interface AnimationData {
-  entrance: string
-  emphasis: string[]
-}
-
 export interface UltimateSlide {
   id: string
   title: string
   content: string | React.ReactNode
-  contentType?: "financial" | "growth" | "team" | "strategy" | "data" | "business"
   layout: "title" | "content" | "chart" | "table" | "two-column" | "image"
-  background: string
-  textColor: string
+  background?: string
+  textColor?: string
   titleColor?: string
   accentColor?: string
 
@@ -58,23 +16,61 @@ export interface UltimateSlide {
   contentSize?: string
 
   // Layout
-  spacing?: "compact" | "relaxed" | "comfortable" | "generous"
+  spacing?: "compact" | "comfortable" | "relaxed" | "generous"
   alignment?: "left" | "center" | "right"
 
-  // Visual Effects
+  // Visual effects
   shadowEffect?: string
   borderRadius?: string
   glassmorphism?: boolean
 
-  // Icons
-  professionalIcon?: ProfessionalIcon
-  icons?: IconData[]
+  // Professional icon system
+  professionalIcon?: {
+    name: string
+    position: "top-left" | "top-right" | "bottom-left" | "bottom-right" | "center"
+    style: "outline" | "filled" | "material"
+    color: string
+  }
 
-  // Visual Content
-  chartData?: ChartData
-  tableData?: TableData
+  // Legacy icon support
+  icons?: Array<{
+    icon: string
+    position: string
+    color?: string
+    size?: number
+  }>
 
-  // Animation
-  animations?: AnimationData
+  // Visual content
+  chartData?: {
+    type: "bar" | "line" | "pie" | "area" | "donut"
+    data: Array<{
+      name: string
+      value: number
+      [key: string]: any
+    }>
+    config?: {
+      showGrid?: boolean
+      gradient?: boolean
+      [key: string]: any
+    }
+    style?: string
+  }
+
+  tableData?: {
+    headers: string[]
+    rows: string[][]
+    style?: string
+    interactive?: boolean
+  }
+
+  // Animation and effects
+  animations?: {
+    entrance: string
+    emphasis: string[]
+  }
+
   customCSS?: string
+
+  // Content classification for design context
+  contentType?: "financial" | "growth" | "team" | "strategy" | "data" | "business"
 }
