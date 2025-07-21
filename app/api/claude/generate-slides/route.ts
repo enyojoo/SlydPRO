@@ -1,96 +1,104 @@
 import { type NextRequest, NextResponse } from "next/server"
 import Anthropic from "@anthropic-ai/sdk"
 
+// Initialize Anthropic client
 const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY!,
 })
 
 // Enhanced TypeScript interfaces
-interface SlideGenerationRequest {
-  prompt: string
-  slideCount?: number | "auto"
-  presentationType?: "business" | "academic" | "creative" | "technical" | "marketing"
-  audience?: "executive" | "team" | "public" | "students" | "clients"
-  tone?: "professional" | "casual" | "persuasive" | "educational" | "inspiring"
-  editMode?: "all" | "selected"
-  selectedSlideId?: string
-  selectedSlideTitle?: string
-  existingSlides?: any[]
-  hasFile?: boolean
+interface ChartDataPoint {
+  name: string
+  value: number
+  [key: string]: string | number
 }
 
-interface ColorPalette {
-  primary: string
-  secondary: string
-  accent: string
-  text: string
-  textSecondary: string
-  background: string
-}
-
-interface ChartData {
+interface ChartConfig {
   type: "bar" | "line" | "pie" | "area" | "donut"
-  data: Array<{ name: string; value: number; [key: string]: any }>
-  config: { showGrid?: boolean; gradient?: boolean; [key: string]: any }
-  style: string
+  data: ChartDataPoint[]
+  config?: {
+    showGrid?: boolean
+    gradient?: boolean
+    colors?: string[]
+    showLegend?: boolean
+  }
 }
 
 interface TableData {
   headers: string[]
   rows: string[][]
-  style: string
-  interactive: boolean
 }
 
-interface EnhancedSlide {
+interface IconData {
+  icon: string
+  position: "top-left" | "top-right" | "bottom-left" | "bottom-right" | "center"
+  color?: string
+  size?: number
+}
+
+interface SlideRequest {
+  prompt: string
+  slideCount?: string | number
+  presentationType?: "business" | "creative" | "minimal" | "vibrant" | "nature" | "ocean" | "sunset"
+  audience?: string
+  tone?: "professional" | "casual" | "inspiring" | "technical"
+  includeCharts?: boolean
+  includeTables?: boolean
+}
+
+interface GeneratedSlide {
   id: string
   title: string
   content: string
-  background: string
-  textColor: string
-  titleColor: string
-  accentColor: string
   layout: "title" | "content" | "chart" | "table" | "two-column" | "split"
-  titleFont: string
-  contentFont: string
-  titleSize: string
-  contentSize: string
-  shadowEffect: string
-  borderRadius: string
-  glassmorphism: boolean
-  chartData?: ChartData
-  tableData?: TableData
-  contentType?: "opening" | "problem" | "solution" | "data" | "conclusion"
-  designTheme: string
-  spacing: string
-  alignment: string
-  icons?: Array<{
-    icon: string
-    position: string
-    color: string
-    size: number
-  }>
-}
-
-interface AISlideResponse {
-  id: string
-  title: string
-  content: string
-  layout: string
-  contentType?: string
+  contentType: "opening" | "problem" | "solution" | "data" | "conclusion" | "transition"
   visualElements?: {
     suggestedChart?: string
     suggestedIcon?: string
     emphasis?: string
-    dataPoints?: string[]
+    tableData?: TableData
   }
 }
 
-interface GenerationResult {
-  slides: AISlideResponse[]
+interface EnhancedSlide extends GeneratedSlide {
+  background: string
+  textColor: string
+  titleColor?: string
+  accentColor?: string
+  titleFont?: string
+  contentFont?: string
+  titleSize?: string
+  contentSize?: string
+  shadowEffect?: string
+  borderRadius?: string
+  glassmorphism?: boolean
+  chartData?: ChartConfig
+  tableData?: TableData
+  icons?: IconData[]
   designTheme: string
+  spacing?: "compact" | "comfortable" | "generous"
+  alignment?: "left" | "center" | "right"
+}
+
+interface APIResponse {
+  slides: EnhancedSlide[]
   message: string
-  keyMetrics?: string[]
+  designNotes: string
+  overallTheme: string
+  keyMetrics: string[]
+  generationStats: {
+    slideCount: number
+    processingTime: number
+    hasCharts: boolean
+    hasTables: boolean
+  }
+}
+
+interface APIError {
+  error: string
+  type: "validation_error" | "file_error" | "ai_error" | "rate_limit_error" | "auth_error"
+  details?: string
+  retryAfter?: number
 }
 
 // Enhanced Design System with 7 sophisticated palettes
@@ -113,12 +121,12 @@ const DESIGN_SYSTEM = {
       background: "#1e1b4b",
     },
     minimal: {
-      primary: "linear-gradient(135deg, #0f172a 0%, #1e293b 100%)",
-      secondary: "linear-gradient(135deg, #374151 0%, #4b5563 100%)",
-      accent: "#6366f1",
-      text: "#ffffff",
-      textSecondary: "#d1d5db",
-      background: "#111827",
+      primary: "linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%)",
+      secondary: "linear-gradient(135deg, #64748b 0%, #475569 100%)",
+      accent: "#0f172a",
+      text: "#0f172a",
+      textSecondary: "#475569",
+      background: "#ffffff",
     },
     vibrant: {
       primary: "linear-gradient(135deg, #dc2626 0%, #ef4444 100%)",
@@ -152,620 +160,582 @@ const DESIGN_SYSTEM = {
       textSecondary: "#fed7aa",
       background: "#9a3412",
     },
-  } as Record<string, ColorPalette>,
-
+    corporate: {
+      primary: "linear-gradient(135deg, #1f2937 0%, #111827 100%)",
+      secondary: "linear-gradient(135deg, #374151 0%, #1f2937 100%)",
+      accent: "#3b82f6",
+      text: "#ffffff",
+      textSecondary: "#d1d5db",
+      background: "#0f172a",
+    },
+    modern: {
+      primary: "linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)",
+      secondary: "linear-gradient(135deg, #a855f7 0%, #c084fc 100%)",
+      accent: "#8b5cf6",
+      text: "#ffffff",
+      textSecondary: "#e0e7ff",
+      background: "#312e81",
+    },
+    elegant: {
+      primary: "linear-gradient(135deg, #1f2937 0%, #374151 100%)",
+      secondary: "linear-gradient(135deg, #6b7280 0%, #9ca3af 100%)",
+      accent: "#d97706",
+      text: "#ffffff",
+      textSecondary: "#f3f4f6",
+      background: "#111827",
+    },
+  },
   typography: {
     title: {
-      fontFamily: '"SF Pro Display", "Inter", system-ui, sans-serif',
+      fontFamily: '"Inter", system-ui, sans-serif',
       fontWeight: "700",
-      lineHeight: "1.1",
+      lineHeight: "1.2",
       letterSpacing: "-0.025em",
     },
     subtitle: {
-      fontFamily: '"SF Pro Display", "Inter", system-ui, sans-serif',
+      fontFamily: '"Inter", system-ui, sans-serif',
       fontWeight: "600",
-      lineHeight: "1.2",
+      lineHeight: "1.3",
       letterSpacing: "-0.01em",
     },
     body: {
-      fontFamily: '"SF Pro Text", "Inter", system-ui, sans-serif',
+      fontFamily: '"Inter", system-ui, sans-serif',
       fontWeight: "400",
       lineHeight: "1.6",
       letterSpacing: "0",
     },
   },
-
   effects: {
-    glassmorphism: "backdrop-blur-sm bg-white/10 border border-white/20",
-    modernShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.25)",
-    softGlow: "0 0 50px rgba(59, 130, 246, 0.15)",
-    premiumShadow: "0 30px 60px rgba(0, 0, 0, 0.3)",
-    subtleShadow: "0 10px 25px rgba(0, 0, 0, 0.15)",
+    glassmorphism: "backdrop-blur-xl bg-white/10 border border-white/20",
+    premiumShadow: "0 20px 40px -12px rgba(0, 0, 0, 0.25)",
+    softGlow: "0 0 30px rgba(59, 130, 246, 0.15)",
+    modernGradient: "linear-gradient(135deg, rgba(255,255,255,0.1) 0%, rgba(255,255,255,0.05) 100%)",
+  },
+  spacing: {
+    compact: { padding: "1.5rem", gap: "0.75rem" },
+    comfortable: { padding: "2rem", gap: "1rem" },
+    generous: { padding: "2.5rem", gap: "1.25rem" },
   },
 }
 
-// Enhanced chart data generation
-const generateChartData = (type: string, title: string, contentHint?: string): ChartData => {
-  const datasets = {
-    revenue: [
-      { name: "Q1 2024", value: 850000, growth: 12 },
-      { name: "Q2 2024", value: 1200000, growth: 18 },
-      { name: "Q3 2024", value: 1650000, growth: 24 },
-      { name: "Q4 2024", value: 2100000, growth: 28 },
-    ],
-    growth: [
-      { name: "2021", value: 120, target: 100 },
-      { name: "2022", value: 145, target: 130 },
-      { name: "2023", value: 189, target: 160 },
-      { name: "2024", value: 234, target: 200 },
-    ],
-    market: [
-      { name: "North America", value: 45, share: 45 },
-      { name: "Europe", value: 30, share: 30 },
-      { name: "Asia Pacific", value: 15, share: 15 },
-      { name: "Other", value: 10, share: 10 },
-    ],
-    performance: [
-      { name: "Customer Satisfaction", value: 92, benchmark: 85 },
-      { name: "Sales Target", value: 115, benchmark: 100 },
-      { name: "Team Performance", value: 88, benchmark: 80 },
-      { name: "Market Penetration", value: 78, benchmark: 70 },
-    ],
-    timeline: [
-      { name: "Jan", value: 65, forecast: 60 },
-      { name: "Feb", value: 78, forecast: 70 },
-      { name: "Mar", value: 92, forecast: 85 },
-      { name: "Apr", value: 108, forecast: 100 },
-      { name: "May", value: 125, forecast: 115 },
-      { name: "Jun", value: 142, forecast: 130 },
-    ],
-  }
+// Enhanced AI Prompting System
+const createEnhancedPrompt = (request: SlideRequest): string => {
+  const themes = [
+    "business",
+    "creative",
+    "minimal",
+    "vibrant",
+    "nature",
+    "ocean",
+    "sunset",
+    "corporate",
+    "modern",
+    "elegant",
+  ]
+  const randomTheme = themes[Math.floor(Math.random() * themes.length)]
 
-  const titleLower = (title + " " + (contentHint || "")).toLowerCase()
-
-  let selectedData = datasets.performance
-  if (titleLower.includes("revenue") || titleLower.includes("financial") || titleLower.includes("sales")) {
-    selectedData = datasets.revenue
-  } else if (titleLower.includes("growth") || titleLower.includes("trend") || titleLower.includes("increase")) {
-    selectedData = datasets.growth
-  } else if (titleLower.includes("market") || titleLower.includes("region") || titleLower.includes("share")) {
-    selectedData = datasets.market
-  } else if (titleLower.includes("time") || titleLower.includes("month") || titleLower.includes("quarter")) {
-    selectedData = datasets.timeline
-  }
-
-  return {
-    type: type as ChartData["type"],
-    data: selectedData,
-    config: {
-      showGrid: true,
-      gradient: type === "area",
-      responsive: true,
-      animation: true,
-    },
-    style: "modern",
-  }
-}
-
-// Enhanced table data generation
-const generateTableData = (title: string, contentHint?: string): TableData => {
-  const tableTemplates = {
-    financial: {
-      headers: ["Metric", "Q3 2024", "Q4 2024", "Growth", "Target"],
-      rows: [
-        ["Revenue", "$1.2M", "$1.8M", "+50%", "$1.6M"],
-        ["New Customers", "1,200", "1,850", "+54%", "1,500"],
-        ["Market Share", "12%", "15%", "+25%", "14%"],
-        ["Customer LTV", "$2,400", "$2,850", "+19%", "$2,600"],
-      ],
-    },
-    performance: {
-      headers: ["KPI", "Current", "Previous", "Change", "Benchmark"],
-      rows: [
-        ["Customer Satisfaction", "4.6/5", "4.2/5", "+9%", "4.0/5"],
-        ["Response Time", "2.1s", "3.2s", "-34%", "3.0s"],
-        ["Conversion Rate", "3.8%", "3.1%", "+23%", "3.5%"],
-        ["Retention Rate", "94%", "89%", "+6%", "90%"],
-      ],
-    },
-    comparison: {
-      headers: ["Feature", "Our Solution", "Competitor A", "Competitor B"],
-      rows: [
-        ["Price", "$99/month", "$149/month", "$129/month"],
-        ["Features", "50+", "35", "42"],
-        ["Support", "24/7", "Business hours", "Email only"],
-        ["Integration", "200+", "50", "75"],
-      ],
-    },
-  }
-
-  const titleLower = (title + " " + (contentHint || "")).toLowerCase()
-
-  if (titleLower.includes("revenue") || titleLower.includes("financial") || titleLower.includes("sales")) {
-    return { ...tableTemplates.financial, style: "modern", interactive: false }
-  } else if (titleLower.includes("vs") || titleLower.includes("compare") || titleLower.includes("competitor")) {
-    return { ...tableTemplates.comparison, style: "modern", interactive: false }
-  } else {
-    return { ...tableTemplates.performance, style: "modern", interactive: false }
-  }
-}
-
-// Enhanced AI prompting system with design variety
-const createEnhancedPrompt = (request: SlideGenerationRequest, fileContent?: string): string => {
   const {
     prompt,
     slideCount = "auto",
-    presentationType = "business",
+    presentationType = randomTheme,
     audience = "team",
     tone = "professional",
-    editMode = "all",
-    selectedSlideId,
-    selectedSlideTitle,
+    includeCharts = true,
+    includeTables = false,
   } = request
 
-  if (editMode === "selected" && selectedSlideId && selectedSlideTitle) {
-    return `You are SlydPRO AI, the world's premier presentation design expert with the creative power of v0.dev.
-
-MISSION: Transform the slide "${selectedSlideTitle}" into a stunning, professional masterpiece with VARIED DESIGN.
+  return `You are SlydPRO AI, an expert presentation designer who creates Fortune 500-caliber slides.
 
 USER REQUEST: "${prompt}"
 PRESENTATION TYPE: ${presentationType}
-AUDIENCE: ${audience}
-TONE: ${tone}
-
-CRITICAL DESIGN REQUIREMENTS:
-🎨 Use DIFFERENT color themes for variety (business, creative, minimal, vibrant, nature, ocean, sunset)
-📊 Add intelligent data visualizations when content mentions metrics
-🎯 Include relevant premium icons that enhance meaning
-✨ Apply modern glassmorphism and shadow effects
-🔤 Use typography hierarchy that guides the eye
-📐 Balance whitespace and content for optimal readability
-⚡ ENSURE text fits within slide boundaries - use concise, impactful content
-
-REQUIRED JSON FORMAT:
-{
-  "slides": [
-    {
-      "id": "${selectedSlideId}",
-      "title": "Enhanced Professional Title (max 60 chars)",
-      "content": "Compelling content with clear value proposition\\n• Key insight with supporting data\\n• Important metric or achievement\\n• Clear action item or next step",
-      "layout": "content|chart|table|two-column",
-      "contentType": "problem|solution|data|conclusion",
-      "visualElements": {
-        "suggestedChart": "bar|line|pie|area|donut|none",
-        "suggestedIcon": "trending-up|target|lightbulb|chart-bar|users|dollar-sign",
-        "emphasis": "highlight key metrics or important quotes",
-        "dataPoints": ["key", "metrics", "to", "highlight"]
-      }
-    }
-  ],
-  "designTheme": "business|creative|minimal|vibrant|nature|ocean|sunset",
-  "message": "Brief explanation of the enhancement",
-  "keyMetrics": ["important", "numbers", "or", "stats"]
-}`
-  }
-
-  return `You are SlydPRO AI, an expert presentation designer with the creative intelligence of v0.dev and Lovable.ai.
-
-USER REQUEST: "${prompt}"
-PRESENTATION TYPE: ${presentationType}
+THEME: ${randomTheme}
 AUDIENCE: ${audience}
 TONE: ${tone}
 SLIDE COUNT: ${slideCount === "auto" ? "6-8 slides" : slideCount}
-${
-  fileContent
-    ? `
-SOURCE MATERIAL:
-${fileContent.substring(0, 1000)}...`
-    : ""
-}
+INCLUDE CHARTS: ${includeCharts}
+INCLUDE TABLES: ${includeTables}
 
-DESIGN EXCELLENCE MANDATE (Like v0.dev for presentations):
-1. Create VARIED slide designs - each slide should have unique visual appeal
-2. Use DIFFERENT color themes across slides for visual interest
-3. Apply intelligent layout selection based on content type
-4. Ensure ALL text fits within slide boundaries - be concise and impactful
-5. Use data visualization strategically to support key points
-6. Include relevant icons and visual elements that enhance comprehension
-7. Apply modern design trends: gradients, glassmorphism, premium shadows
-8. Create slides that would win design awards and close Fortune 500 deals
+DESIGN PRINCIPLES:
+1. Create slides with clear visual hierarchy and compelling headlines
+2. Use data-driven insights with professional visualizations
+3. Break complex information into digestible chunks
+4. Ensure each slide advances the narrative
+5. Only include icons when they are part of the actual slide content (not decorative)
+6. Keep text concise and within slide boundaries
+7. Use consistent design theme throughout
 
-SLIDE STRUCTURE GUIDELINES:
-• Opening: Hook with compelling value proposition (title layout)
-• Problem: Clearly articulate challenge (content layout)
-• Solution: Present approach with confidence (two-column layout)
-• Data: Use charts and metrics to build credibility (chart layout)
-• Conclusion: End with strong call-to-action (content layout)
-
-CRITICAL: Keep titles under 60 characters and bullet points under 80 characters to prevent overflow.
-
-REQUIRED JSON FORMAT:
+REQUIRED JSON FORMAT (return ONLY valid JSON):
 {
   "slides": [
     {
       "id": "slide-1",
-      "title": "Compelling Title That Grabs Attention",
-      "content": "Opening statement that immediately engages\\n• Powerful benefit statement with impact\\n• Key differentiator that sets you apart\\n• Clear promise of value delivery",
+      "title": "Clear, Concise Title",
+      "content": "• Brief, impactful point\\n• Supporting detail\\n• Clear value proposition",
       "layout": "title|content|chart|table|two-column",
-      "contentType": "opening|problem|solution|data|conclusion",
+      "contentType": "opening|problem|solution|data|conclusion|transition",
       "visualElements": {
-        "suggestedChart": "bar|line|pie|area|donut|none",
-        "suggestedIcon": "trending-up|target|lightbulb|chart-bar|users|dollar-sign|rocket|star|award",
-        "emphasis": "highlight key metrics, quotes, or important statements",
-        "dataPoints": ["specific", "numbers", "percentages", "or", "metrics"]
+        "suggestedChart": "${includeCharts ? "bar|line|pie|area|donut" : "none"}",
+        "suggestedIcon": "none",
+        "emphasis": "key metrics or call-to-action",
+        ${includeTables ? '"tableData": { "headers": ["Column 1", "Column 2"], "rows": [["Data 1", "Data 2"]] },' : ""}
       }
     }
   ],
-  "designTheme": "business|creative|minimal|vibrant|nature|ocean|sunset",
-  "message": "Brief explanation of the presentation flow and key insights",
-  "keyMetrics": ["list", "of", "important", "numbers", "stats", "or", "achievements"]
+  "designTheme": "${randomTheme}",
+  "message": "Brief explanation of presentation structure",
+  "keyMetrics": ["important", "numbers", "from", "content"]
 }
 
-Create slides with the design intelligence of v0.dev - varied, professional, and strategically crafted for maximum impact.`
+Create professional slides with consistent theming and proper text sizing.`
 }
 
-// Enhanced slide processing with intelligent design application and variety
-const enhanceSlides = (slides: AISlideResponse[], designTheme = "business"): EnhancedSlide[] => {
-  const availableThemes = ["business", "creative", "minimal", "vibrant", "nature", "ocean", "sunset"]
+// Intelligent chart data generation
+const generateChartData = (chartType: string, title: string, context?: string): ChartConfig | null => {
+  const chartTemplates = {
+    bar: {
+      revenue: [
+        { name: "Q1", value: 2400000 },
+        { name: "Q2", value: 3200000 },
+        { name: "Q3", value: 2800000 },
+        { name: "Q4", value: 4100000 },
+      ],
+      growth: [
+        { name: "2021", value: 45 },
+        { name: "2022", value: 67 },
+        { name: "2023", value: 89 },
+        { name: "2024", value: 112 },
+      ],
+      market: [
+        { name: "North America", value: 45 },
+        { name: "Europe", value: 32 },
+        { name: "Asia Pacific", value: 28 },
+        { name: "Other", value: 15 },
+      ],
+    },
+    line: {
+      performance: [
+        { name: "Jan", value: 85 },
+        { name: "Feb", value: 88 },
+        { name: "Mar", value: 92 },
+        { name: "Apr", value: 89 },
+        { name: "May", value: 95 },
+        { name: "Jun", value: 98 },
+      ],
+      users: [
+        { name: "Week 1", value: 1200 },
+        { name: "Week 2", value: 1800 },
+        { name: "Week 3", value: 2400 },
+        { name: "Week 4", value: 3200 },
+      ],
+    },
+    pie: {
+      distribution: [
+        { name: "Product A", value: 35 },
+        { name: "Product B", value: 28 },
+        { name: "Product C", value: 22 },
+        { name: "Product D", value: 15 },
+      ],
+      demographics: [
+        { name: "18-25", value: 25 },
+        { name: "26-35", value: 35 },
+        { name: "36-45", value: 25 },
+        { name: "46+", value: 15 },
+      ],
+    },
+  }
+
+  // Intelligent selection based on title and context
+  const titleLower = title.toLowerCase()
+  const contextLower = (context || "").toLowerCase()
+
+  let selectedData
+  if (titleLower.includes("revenue") || titleLower.includes("sales")) {
+    selectedData = chartTemplates.bar.revenue
+  } else if (titleLower.includes("growth") || titleLower.includes("performance")) {
+    selectedData = chartType === "line" ? chartTemplates.line.performance : chartTemplates.bar.growth
+  } else if (titleLower.includes("market") || titleLower.includes("region")) {
+    selectedData = chartType === "pie" ? chartTemplates.pie.distribution : chartTemplates.bar.market
+  } else if (titleLower.includes("user") || titleLower.includes("customer")) {
+    selectedData = chartType === "line" ? chartTemplates.line.users : chartTemplates.pie.demographics
+  } else {
+    // Default selection based on chart type
+    selectedData =
+      chartTemplates[chartType as keyof typeof chartTemplates]?.revenue ||
+      chartTemplates[chartType as keyof typeof chartTemplates]?.performance ||
+      chartTemplates[chartType as keyof typeof chartTemplates]?.distribution ||
+      chartTemplates.bar.revenue
+  }
+
+  return {
+    type: chartType as ChartConfig["type"],
+    data: selectedData,
+    config: {
+      showGrid: chartType !== "pie" && chartType !== "donut",
+      gradient: true,
+      showLegend: chartType === "pie" || chartType === "donut",
+    },
+  }
+}
+
+// Professional table templates
+const generateTableData = (context: string): TableData => {
+  const tableTemplates = {
+    financial: {
+      headers: ["Metric", "Q3 2023", "Q4 2023", "Growth"],
+      rows: [
+        ["Revenue", "$2.4M", "$3.2M", "+33%"],
+        ["Profit Margin", "18%", "22%", "+4pp"],
+        ["Customer Count", "1,250", "1,680", "+34%"],
+        ["ARPU", "$1,920", "$1,905", "-1%"],
+      ],
+    },
+    comparison: {
+      headers: ["Feature", "Basic", "Pro", "Enterprise"],
+      rows: [
+        ["Users", "5", "25", "Unlimited"],
+        ["Storage", "10GB", "100GB", "1TB"],
+        ["Support", "Email", "Priority", "Dedicated"],
+        ["Price", "$9/mo", "$29/mo", "$99/mo"],
+      ],
+    },
+    roadmap: {
+      headers: ["Phase", "Timeline", "Key Features", "Status"],
+      rows: [
+        ["Phase 1", "Q1 2024", "Core Platform", "✅ Complete"],
+        ["Phase 2", "Q2 2024", "Advanced Analytics", "🚧 In Progress"],
+        ["Phase 3", "Q3 2024", "AI Integration", "📋 Planned"],
+        ["Phase 4", "Q4 2024", "Mobile App", "📋 Planned"],
+      ],
+    },
+  }
+
+  const contextLower = context.toLowerCase()
+  if (contextLower.includes("financial") || contextLower.includes("revenue") || contextLower.includes("profit")) {
+    return tableTemplates.financial
+  } else if (contextLower.includes("comparison") || contextLower.includes("pricing") || contextLower.includes("plan")) {
+    return tableTemplates.comparison
+  } else if (contextLower.includes("roadmap") || contextLower.includes("timeline") || contextLower.includes("phase")) {
+    return tableTemplates.roadmap
+  }
+
+  return tableTemplates.comparison // Default
+}
+
+// Enhanced slide processing with intelligent design application
+const enhanceSlides = (slides: GeneratedSlide[], designTheme = "business"): EnhancedSlide[] => {
+  const availableThemes = Object.keys(DESIGN_SYSTEM.colorPalettes)
+  const selectedTheme = availableThemes.includes(designTheme)
+    ? designTheme
+    : availableThemes[Math.floor(Math.random() * availableThemes.length)]
+
+  const palette = DESIGN_SYSTEM.colorPalettes[selectedTheme as keyof typeof DESIGN_SYSTEM.colorPalettes]
 
   return slides.map((slide, index) => {
-    // Rotate through different themes for variety (like v0.dev does)
-    const themeIndex = index % availableThemes.length
-    const currentTheme = availableThemes[themeIndex]
-    const palette = DESIGN_SYSTEM.colorPalettes[currentTheme] || DESIGN_SYSTEM.colorPalettes.business
-
     const isTitle = slide.layout === "title" || index === 0
     const isClosing = index === slides.length - 1
 
-    // Smart background selection with variety
+    // Smart background selection with more variation
     let background = palette.primary
     if (isTitle) {
-      background = palette.primary // Hero slide
+      background = palette.primary
     } else if (isClosing) {
-      background = palette.secondary // Closing slide
-    } else if (index % 3 === 0) {
-      background = palette.secondary // Variation every 3rd slide
-    } else if (slide.contentType === "data") {
-      background = palette.background // Data slides get special treatment
+      background = palette.secondary
+    } else if (index % 2 === 0) {
+      background = palette.secondary
     }
 
-    // Responsive typography with proper sizing to prevent overflow
-    const titleSize = isTitle
-      ? "clamp(1.75rem, 3.5vw, 3rem)" // Reduced from 4.5rem to prevent overflow
-      : "clamp(1.25rem, 2.2vw, 2rem)" // Reduced from 2.75rem
+    // Fixed responsive typography that stays within bounds
+    const titleSize = isTitle ? "2.5rem" : "1.875rem"
+    const contentSize = "1.125rem"
 
-    const contentSize = isTitle
-      ? "clamp(1rem, 1.4vw, 1.25rem)" // Reduced from 1.75rem
-      : "clamp(0.875rem, 1.1vw, 1rem)" // Reduced from 1.25rem
-
-    // Generate enhanced chart data if needed
-    let chartData: ChartData | undefined
-    if (slide.layout === "chart" || slide.visualElements?.suggestedChart !== "none") {
-      const chartType = slide.visualElements?.suggestedChart || "bar"
-      chartData = generateChartData(chartType, slide.title, slide.content)
+    // Generate chart data if suggested
+    let chartData: ChartConfig | null = null
+    if (
+      slide.layout === "chart" ||
+      (slide.visualElements?.suggestedChart && slide.visualElements.suggestedChart !== "none")
+    ) {
+      chartData = generateChartData(slide.visualElements?.suggestedChart || "bar", slide.title, slide.content)
     }
 
     // Generate table data if needed
     let tableData: TableData | undefined
-    if (slide.layout === "table") {
-      tableData = generateTableData(slide.title, slide.content)
+    if (slide.layout === "table" || slide.visualElements?.tableData) {
+      tableData = slide.visualElements?.tableData || generateTableData(slide.title + " " + slide.content)
     }
-
-    // Enhanced professional icon mapping
-    const iconMapping: Record<string, string> = {
-      "trending-up": "📈",
-      target: "🎯",
-      lightbulb: "💡",
-      "chart-bar": "📊",
-      users: "👥",
-      "dollar-sign": "💰",
-      rocket: "🚀",
-      star: "⭐",
-      award: "🏆",
-      globe: "🌍",
-      shield: "🛡️",
-      zap: "⚡",
-    }
-
-    // Convert to icons array format for compatibility
-    const icons = slide.visualElements?.suggestedIcon
-      ? [
-          {
-            icon: iconMapping[slide.visualElements.suggestedIcon] || "🎯",
-            position: "top-right",
-            color: palette.accent,
-            size: isTitle ? 32 : 24,
-          },
-        ]
-      : []
 
     return {
-      id: slide.id || `slide-${Date.now()}-${index}`,
-      title: slide.title,
-      content: slide.content,
+      ...slide,
       background,
       textColor: palette.text,
       titleColor: palette.text,
       accentColor: palette.accent,
-      layout: slide.layout as EnhancedSlide["layout"],
 
-      // Enhanced typography with proper sizing
+      // Fixed typography
       titleFont: DESIGN_SYSTEM.typography.title.fontFamily,
       contentFont: DESIGN_SYSTEM.typography.body.fontFamily,
       titleSize,
       contentSize,
 
-      // Visual effects based on content type
-      shadowEffect:
-        slide.contentType === "data" ? DESIGN_SYSTEM.effects.premiumShadow : DESIGN_SYSTEM.effects.modernShadow,
-      borderRadius: "24px",
-      glassmorphism: slide.contentType === "data" || slide.contentType === "conclusion",
-
-      // Enhanced spacing and alignment
-      spacing: isTitle ? "generous" : "comfortable",
-      alignment: isTitle ? "center" : "left",
+      // Visual effects
+      shadowEffect: DESIGN_SYSTEM.effects.premiumShadow,
+      borderRadius: "16px",
+      glassmorphism: selectedTheme === "minimal" || selectedTheme === "elegant",
 
       // Data visualization
-      chartData,
+      chartData: chartData || undefined,
       tableData,
-      icons,
+      icons: [], // Remove random icons
 
-      // Content classification
-      contentType: slide.contentType as EnhancedSlide["contentType"],
-      designTheme: currentTheme, // Use the varied theme, not the original
+      // Layout enhancements
+      designTheme: selectedTheme,
+      spacing: "comfortable" as const,
+      alignment: isTitle ? ("center" as const) : ("left" as const),
     }
   })
 }
 
-// Enhanced file parsing with better error handling
-const parseFileContent = async (file: File): Promise<string> => {
-  try {
-    const text = await file.text()
+// File validation and processing
+const validateAndProcessFile = async (file: File): Promise<string> => {
+  // File size validation (5MB limit)
+  const MAX_FILE_SIZE = 5 * 1024 * 1024
+  if (file.size > MAX_FILE_SIZE) {
+    throw new Error(`File size exceeds 5MB limit. Current size: ${(file.size / 1024 / 1024).toFixed(2)}MB`)
+  }
 
-    // Basic content validation
-    if (!text || text.trim().length === 0) {
-      throw new Error("File appears to be empty")
+  // File type validation
+  const allowedTypes = [
+    "text/plain",
+    "application/pdf",
+    "application/msword",
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  ]
+
+  if (!allowedTypes.includes(file.type)) {
+    throw new Error(`Unsupported file type: ${file.type}. Supported types: TXT, PDF, DOC, DOCX`)
+  }
+
+  try {
+    const content = await file.text()
+
+    // Content length validation (increased to 3000 chars for better context)
+    const MAX_CONTENT_LENGTH = 3000
+    if (content.length > MAX_CONTENT_LENGTH) {
+      return content.substring(0, MAX_CONTENT_LENGTH) + "\n\n[Content truncated for processing...]"
     }
 
-    // Limit content size and clean it
-    const cleanedText = text.replace(/\r\n/g, "\n").replace(/\r/g, "\n").trim()
-
-    return cleanedText.substring(0, 3000) // Increased limit for better context
+    return content
   } catch (error) {
-    throw new Error(`Failed to parse file: ${error instanceof Error ? error.message : "Unknown error"}`)
+    throw new Error(`Failed to read file content: ${error instanceof Error ? error.message : "Unknown error"}`)
   }
 }
 
-// Enhanced validation
-const validateRequest = (requestData: any): SlideGenerationRequest => {
-  if (!requestData.prompt || typeof requestData.prompt !== "string") {
-    throw new Error("Prompt is required and must be a string")
-  }
+// Main API route handler
+export async function POST(request: NextRequest): Promise<NextResponse<APIResponse | APIError>> {
+  const startTime = Date.now()
 
-  if (requestData.prompt.length < 10) {
-    throw new Error("Prompt must be at least 10 characters long")
-  }
-
-  if (requestData.prompt.length > 2000) {
-    throw new Error("Prompt must be less than 2000 characters")
-  }
-
-  const validPresentationTypes = ["business", "academic", "creative", "technical", "marketing"]
-  const validAudiences = ["executive", "team", "public", "students", "clients"]
-  const validTones = ["professional", "casual", "persuasive", "educational", "inspiring"]
-
-  return {
-    prompt: requestData.prompt,
-    slideCount: requestData.slideCount || "auto",
-    presentationType: validPresentationTypes.includes(requestData.presentationType)
-      ? requestData.presentationType
-      : "business",
-    audience: validAudiences.includes(requestData.audience) ? requestData.audience : "team",
-    tone: validTones.includes(requestData.tone) ? requestData.tone : "professional",
-    editMode: requestData.editMode || "all",
-    selectedSlideId: requestData.selectedSlideId,
-    selectedSlideTitle: requestData.selectedSlideTitle,
-    existingSlides: requestData.existingSlides || [],
-    hasFile: requestData.hasFile || false,
-  }
-}
-
-export async function POST(request: NextRequest) {
   try {
-    // Enhanced request parsing with validation
+    // Parse form data
     const formData = await request.formData()
     const dataField = formData.get("data") as string
-
-    if (!dataField) {
-      return NextResponse.json({ error: "Missing request data", type: "validation_error" }, { status: 400 })
-    }
-
-    let requestData: SlideGenerationRequest
-    try {
-      const rawData = JSON.parse(dataField)
-      requestData = validateRequest(rawData)
-    } catch (parseError) {
-      return NextResponse.json({ error: "Invalid JSON data", type: "validation_error" }, { status: 400 })
-    }
-
-    // Enhanced file handling
     const uploadedFile = formData.get("file") as File | null
-    let fileContent = ""
 
+    // Validate request data
+    if (!dataField) {
+      return NextResponse.json(
+        {
+          error: "Missing request data",
+          type: "validation_error" as const,
+          details: "The 'data' field is required in the form submission",
+        },
+        { status: 400 },
+      )
+    }
+
+    let requestData: SlideRequest
+    try {
+      requestData = JSON.parse(dataField)
+    } catch (error) {
+      return NextResponse.json(
+        {
+          error: "Invalid JSON in request data",
+          type: "validation_error" as const,
+          details: "The 'data' field must contain valid JSON",
+        },
+        { status: 400 },
+      )
+    }
+
+    // Validate required fields
+    if (!requestData.prompt || requestData.prompt.trim().length === 0) {
+      return NextResponse.json(
+        {
+          error: "Prompt is required",
+          type: "validation_error" as const,
+          details: "Please provide a prompt describing the presentation you want to create",
+        },
+        { status: 400 },
+      )
+    }
+
+    // Process uploaded file if present
+    let fileContent = ""
     if (uploadedFile) {
       try {
-        // Validate file size (5MB limit)
-        if (uploadedFile.size > 5 * 1024 * 1024) {
-          return NextResponse.json({ error: "File size must be less than 5MB", type: "file_error" }, { status: 400 })
-        }
-
-        // Validate file type
-        const allowedTypes = [
-          "text/plain",
-          "application/pdf",
-          "application/msword",
-          "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-        ]
-
-        if (!allowedTypes.includes(uploadedFile.type)) {
-          return NextResponse.json(
-            { error: "Unsupported file type. Please use TXT, PDF, DOC, or DOCX files.", type: "file_error" },
-            { status: 400 },
-          )
-        }
-
-        fileContent = await parseFileContent(uploadedFile)
-        requestData.hasFile = true
-      } catch (fileError) {
+        fileContent = await validateAndProcessFile(uploadedFile)
+        console.log(`📄 Processed file: ${uploadedFile.name} (${(uploadedFile.size / 1024).toFixed(2)}KB)`)
+      } catch (error) {
         return NextResponse.json(
           {
-            error: fileError instanceof Error ? fileError.message : "File processing failed",
-            type: "file_error",
+            error: error instanceof Error ? error.message : "File processing failed",
+            type: "file_error" as const,
           },
           { status: 400 },
         )
       }
     }
 
-    // Create enhanced prompt
-    const prompt = createEnhancedPrompt(requestData, fileContent)
+    // Create enhanced AI prompt
+    const prompt = createEnhancedPrompt(requestData)
 
-    console.log("🎨 Generating varied slides with v0.dev-level design intelligence")
+    console.log("🎨 Generating Fortune 500-caliber slides with advanced AI design intelligence")
     console.log(`📊 Request: ${requestData.presentationType} presentation for ${requestData.audience}`)
 
-    // Enhanced AI generation with better error handling
-    const message = await anthropic.messages.create({
-      model: "claude-3-5-sonnet-20241022",
-      max_tokens: 8000,
-      temperature: 0.9, // Higher temperature for more creative variety
-      system: `You are SlydPRO AI, the world's most sophisticated presentation design system with the creative intelligence of v0.dev.
-
-CORE MISSION: Create visually stunning, Fortune 500-caliber presentations with DESIGN VARIETY like v0.dev creates for websites.
-
-DESIGN EXCELLENCE MANDATE:
-• Each slide must be a visual masterpiece with UNIQUE styling
-• Use DIFFERENT color themes across slides for visual interest
-• Automatically suggest charts when content mentions data, metrics, or numbers
-• Include meaningful business icons that reinforce the message
-• Apply cutting-edge design effects: glassmorphism, premium shadows, gradients
-• Perfect typography hierarchy with responsive scaling that FITS within slide boundaries
-• Masterful composition with optimal white space and visual flow
-• CRITICAL: Keep text concise - titles under 60 chars, bullets under 80 chars
-
-VARIETY REQUIREMENT: Like v0.dev creates diverse website designs, create slides with varied themes, layouts, and visual styles.
-
-CRITICAL: Always return valid JSON with no markdown formatting. Never compromise on visual excellence or text fitting.`,
-      messages: [
-        {
-          role: "user",
-          content: prompt,
-        },
-      ],
-    })
-
-    const responseText = message.content[0].type === "text" ? message.content[0].text : ""
-
-    // Enhanced JSON extraction with better error handling
-    const jsonMatch = responseText.match(/\{[\s\S]*\}/)
-    if (!jsonMatch) {
-      console.error("Claude response without JSON:", responseText.substring(0, 500))
-      return NextResponse.json({ error: "AI did not return valid JSON format", type: "ai_error" }, { status: 500 })
-    }
-
-    let result: GenerationResult
+    // Call Anthropic API with enhanced error handling
+    let message
     try {
-      result = JSON.parse(jsonMatch[0])
-    } catch (parseError) {
-      console.error("JSON parse error:", parseError)
-      return NextResponse.json({ error: "Invalid JSON structure from AI", type: "ai_error" }, { status: 500 })
-    }
+      message = await anthropic.messages.create({
+        model: "claude-sonnet-4-20250514",
+        max_tokens: 8000,
+        temperature: 0.9,
+        system: `You are SlydPRO AI, the world's most sophisticated presentation designer. You create slides that would win design awards and close Fortune 500 deals. 
 
-    // Enhanced validation of AI response
-    if (!result.slides || !Array.isArray(result.slides)) {
-      return NextResponse.json({ error: "Invalid slides data structure from AI", type: "ai_error" }, { status: 500 })
-    }
+CRITICAL: Return ONLY clean, valid JSON with no markdown formatting, code blocks, or explanatory text. The response must be parseable JSON that starts with { and ends with }.
 
-    if (result.slides.length === 0) {
-      return NextResponse.json({ error: "AI generated no slides", type: "ai_error" }, { status: 500 })
-    }
+Your slides must be:
+- Visually stunning with premium design aesthetics
+- Strategically structured for maximum impact
+- Data-driven with professional insights
+- Executive-ready for boardroom presentations`,
+        messages: [
+          {
+            role: "user",
+            content: fileContent ? `${prompt}\n\nSOURCE MATERIAL FOR CONTEXT:\n${fileContent}` : prompt,
+          },
+        ],
+      })
+    } catch (error: any) {
+      console.error("❌ Anthropic API Error:", error)
 
-    // Apply enhanced design system with variety
-    const enhancedSlides = enhanceSlides(result.slides, result.designTheme)
-
-    console.log(
-      `✅ Generated ${enhancedSlides.length} varied slides with themes: ${enhancedSlides.map((s) => s.designTheme).join(", ")}`,
-    )
-    console.log(`🎯 Key metrics identified: ${result.keyMetrics?.join(", ") || "None"}`)
-
-    return NextResponse.json({
-      slides: enhancedSlides,
-      message:
-        result.message ||
-        `Generated ${enhancedSlides.length} professionally designed slides with v0.dev-level variety and intelligence.`,
-      designNotes: `Applied varied themes (${[...new Set(enhancedSlides.map((s) => s.designTheme))].join(", ")}) with modern design principles, intelligent visual enhancements, and Fortune 500-level quality standards.`,
-      overallTheme: result.designTheme,
-      keyMetrics: result.keyMetrics || [],
-      generationStats: {
-        slideCount: enhancedSlides.length,
-        hasCharts: enhancedSlides.some((s) => s.chartData),
-        hasTables: enhancedSlides.some((s) => s.tableData),
-        hasIcons: enhancedSlides.some((s) => s.icons && s.icons.length > 0),
-        designTheme: result.designTheme,
-        processingTime: Date.now(),
-        themeVariety: [...new Set(enhancedSlides.map((s) => s.designTheme))].length,
-      },
-    })
-  } catch (error) {
-    console.error("❌ Enhanced SlydPRO API Error:", error)
-
-    // Enhanced error handling with specific error types
-    if (error instanceof Error) {
-      if (error.message.includes("rate_limit")) {
+      if (error.status === 429) {
         return NextResponse.json(
           {
-            error: "Too many requests. Please wait a moment and try again.",
-            type: "rate_limit",
+            error: "Rate limit exceeded. Please try again in a moment.",
+            type: "rate_limit_error" as const,
             retryAfter: 60,
           },
           { status: 429 },
         )
       }
 
-      if (error.message.includes("invalid_api_key")) {
+      if (error.status === 401) {
         return NextResponse.json(
           {
-            error: "API configuration error. Please check your Claude API key.",
-            type: "auth_error",
+            error: "Authentication failed. Please check API configuration.",
+            type: "auth_error" as const,
           },
           { status: 401 },
         )
       }
 
-      if (error.message.includes("context_length")) {
-        return NextResponse.json(
-          {
-            error: "Content too long. Please reduce the prompt or file size.",
-            type: "content_error",
-          },
-          { status: 400 },
-        )
-      }
-
       return NextResponse.json(
         {
-          error: `Enhanced generation failed: ${error.message}`,
-          type: "generation_error",
-          timestamp: new Date().toISOString(),
+          error: "AI service temporarily unavailable",
+          type: "ai_error" as const,
+          details: error.message || "Please try again in a few moments",
+        },
+        { status: 503 },
+      )
+    }
+
+    // Parse AI response
+    const responseText = message.content[0].type === "text" ? message.content[0].text : ""
+
+    // Extract JSON from response (handle potential markdown formatting)
+    const jsonMatch = responseText.match(/\{[\s\S]*\}/)
+    if (!jsonMatch) {
+      console.error("❌ No valid JSON found in AI response:", responseText.substring(0, 200))
+      return NextResponse.json(
+        {
+          error: "Invalid response format from AI service",
+          type: "ai_error" as const,
+          details: "The AI service returned an unexpected response format",
         },
         { status: 500 },
       )
     }
 
+    let result
+    try {
+      result = JSON.parse(jsonMatch[0])
+    } catch (error) {
+      console.error("❌ JSON parsing failed:", error)
+      return NextResponse.json(
+        {
+          error: "Failed to parse AI response",
+          type: "ai_error" as const,
+          details: "The AI service returned malformed data",
+        },
+        { status: 500 },
+      )
+    }
+
+    // Validate response structure
+    if (!result.slides || !Array.isArray(result.slides) || result.slides.length === 0) {
+      return NextResponse.json(
+        {
+          error: "Invalid slides data in AI response",
+          type: "ai_error" as const,
+          details: "The AI service did not return valid slide data",
+        },
+        { status: 500 },
+      )
+    }
+
+    // Apply enhanced design system
+    const enhancedSlides = enhanceSlides(result.slides, result.designTheme)
+    const processingTime = Date.now() - startTime
+
+    // Generate response with comprehensive metadata
+    const response: APIResponse = {
+      slides: enhancedSlides,
+      message: result.message || `Generated ${enhancedSlides.length} professionally designed slides.`,
+      designNotes: `Applied ${result.designTheme || "business"} theme with Fortune 500-caliber design principles, intelligent visual enhancements, and premium typography.`,
+      overallTheme: result.designTheme || "business",
+      keyMetrics: result.keyMetrics || [],
+      generationStats: {
+        slideCount: enhancedSlides.length,
+        processingTime,
+        hasCharts: enhancedSlides.some((slide) => slide.chartData),
+        hasTables: enhancedSlides.some((slide) => slide.tableData),
+      },
+    }
+
+    console.log(`✅ Generated ${enhancedSlides.length} premium slides in ${processingTime}ms`)
+    console.log(
+      `🎯 Theme: ${result.designTheme}, Charts: ${response.generationStats.hasCharts}, Tables: ${response.generationStats.hasTables}`,
+    )
+
+    return NextResponse.json(response)
+  } catch (error) {
+    const processingTime = Date.now() - startTime
+    console.error("❌ SlydPRO API Critical Error:", error)
+    console.error(`⏱️ Failed after ${processingTime}ms`)
+
     return NextResponse.json(
       {
-        error: "An unexpected error occurred in the enhanced design system.",
-        type: "unknown_error",
-        timestamp: new Date().toISOString(),
+        error: error instanceof Error ? error.message : "An unexpected error occurred during slide generation",
+        type: "ai_error" as const,
+        details: "Please try again. If the problem persists, contact support.",
       },
       { status: 500 },
     )
