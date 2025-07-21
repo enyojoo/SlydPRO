@@ -1,580 +1,438 @@
 "use client"
 
 import type React from "react"
-import { useState, useEffect, useRef } from "react"
 import {
   BarChart,
   Bar,
+  LineChart,
+  Line,
+  PieChart,
+  Pie,
+  Cell,
   XAxis,
   YAxis,
   CartesianGrid,
   Tooltip,
   ResponsiveContainer,
-  PieChart,
-  Pie,
-  Cell,
-  LineChart,
-  Line,
   AreaChart,
   Area,
-  Legend,
 } from "recharts"
-import {
-  TrendingUp,
-  Users,
-  DollarSign,
-  Target,
-  Zap,
-  Star,
-  Award,
-  Globe,
-  Lightbulb,
-  BarChart3,
-  ArrowRight,
-  CheckCircle,
-  AlertCircle,
-  Play,
-  Pause,
-  RotateCcw,
-  Maximize2,
-  Download,
-} from "lucide-react"
+import { TrendingUp, Users, DollarSign, Target, Zap, Star, Award, Globe } from "lucide-react"
+import type { UltimateSlide } from "@/types/ultimate-slide"
 
-// Enhanced TypeScript interfaces
-interface ChartDataPoint {
-  name: string
-  value: number
-  [key: string]: string | number
-}
-
-interface ChartConfig {
-  type: "bar" | "line" | "pie" | "area" | "donut"
-  data: ChartDataPoint[]
-  config?: {
-    showGrid?: boolean
-    gradient?: boolean
-    colors?: string[]
-    showLegend?: boolean
-    responsive?: boolean
-    animation?: boolean
-  }
-  style?: string
-}
-
-interface TableData {
-  headers: string[]
-  rows: string[][]
-  style?: string
-  interactive?: boolean
-}
-
-interface IconData {
-  icon: string
-  position: "top-left" | "top-right" | "bottom-left" | "bottom-right" | "center"
-  color?: string
-  size?: string
-}
-
-interface ProfessionalIcon {
-  name: string
-  position: "top-left" | "top-right" | "bottom-left" | "bottom-right" | "center"
-  style: "outline" | "filled" | "material"
-  color: string
-  size?: number
-}
-
-interface EnhancedSlide {
-  id: string
-  title: string
-  content: string | React.ReactNode
-  background: string
-  textColor: string
-  titleColor?: string
-  accentColor?: string
-  layout: "title" | "content" | "two-column" | "image" | "chart" | "table" | "split"
-
-  // Enhanced typography
-  titleFont?: string
-  contentFont?: string
-  titleSize?: string
-  contentSize?: string
-
-  // Visual effects
-  shadowEffect?: string
-  borderRadius?: string
-  glassmorphism?: boolean
-
-  // Professional elements
-  professionalIcon?: ProfessionalIcon
-
-  // Data visualization
-  chartData?: ChartConfig
-  tableData?: TableData
-  icons?: IconData[]
-
-  // Content classification
-  contentType?: "opening" | "problem" | "solution" | "data" | "conclusion" | "transition"
-  designTheme?: string
-  spacing?: "compact" | "comfortable" | "generous"
-  alignment?: "left" | "center" | "right"
-}
-
-interface SlideRendererProps {
-  slide: EnhancedSlide
+interface UltimateSlideRendererProps {
+  slide: UltimateSlide
   isSelected?: boolean
   onClick?: () => void
   className?: string
   isPresentationMode?: boolean
-  showControls?: boolean
-  onEdit?: () => void
-  onDuplicate?: () => void
-  onDelete?: () => void
 }
 
-// Icon mapping for professional icons
-const ICON_COMPONENTS = {
-  TrendingUp,
-  Users,
-  DollarSign,
-  Target,
-  Zap,
-  Star,
-  Award,
-  Globe,
-  Lightbulb,
-  BarChart3,
-  ArrowRight,
-  CheckCircle,
-  AlertCircle,
-  Play,
-  Pause,
-  RotateCcw,
-  Maximize2,
-  Download,
-} as const
-
-// Enhanced color palettes for charts
-const CHART_COLORS = {
-  business: ["#3b82f6", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6", "#06b6d4"],
-  creative: ["#a855f7", "#ec4899", "#f97316", "#84cc16", "#06b6d4", "#f59e0b"],
-  minimal: ["#6366f1", "#8b5cf6", "#a855f7", "#ec4899", "#f472b6", "#fb7185"],
-  vibrant: ["#ef4444", "#f97316", "#f59e0b", "#84cc16", "#22c55e", "#10b981"],
-  nature: ["#10b981", "#059669", "#047857", "#065f46", "#064e3b", "#022c22"],
-  ocean: ["#06b6d4", "#0891b2", "#0e7490", "#155e75", "#164e63", "#0c4a6e"],
-  sunset: ["#f97316", "#ea580c", "#dc2626", "#b91c1c", "#991b1b", "#7f1d1d"],
-}
-
-// Icon positioning helper
-const getIconPosition = (position: string): string => {
-  const positions = {
-    "top-left": "top-4 left-4",
-    "top-right": "top-4 right-4",
-    "bottom-left": "bottom-4 left-4",
-    "bottom-right": "bottom-4 right-4",
-    center: "top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2",
-  }
-  return positions[position as keyof typeof positions] || positions["top-right"]
-}
-
-// Professional icon renderer component
-const IconRenderer: React.FC<{
-  name: string
-  size?: number
-  style?: "outline" | "filled" | "material"
-  className?: string
-}> = ({ name, size = 24, style = "outline", className = "" }) => {
-  const IconComponent = ICON_COMPONENTS[name as keyof typeof ICON_COMPONENTS]
-
-  if (!IconComponent) {
-    return <div className={`w-6 h-6 bg-current rounded ${className}`} />
-  }
-
-  return (
-    <IconComponent
-      size={size}
-      className={`${className} ${style === "filled" ? "fill-current" : ""}`}
-      strokeWidth={style === "outline" ? 2 : 1.5}
-    />
-  )
-}
-
-const UltimateSlideRenderer: React.FC<SlideRendererProps> = ({
+export const UltimateSlideRenderer: React.FC<UltimateSlideRendererProps> = ({
   slide,
   isSelected = false,
   onClick,
   className = "",
   isPresentationMode = false,
-  showControls = false,
-  onEdit,
-  onDuplicate,
-  onDelete,
 }) => {
-  const [isHovered, setIsHovered] = useState(false)
-  const [isAnimating, setIsAnimating] = useState(false)
-  const slideRef = useRef<HTMLDivElement>(null)
-
-  // Animation effect on mount
-  useEffect(() => {
-    setIsAnimating(true)
-    const timer = setTimeout(() => setIsAnimating(false), 600)
-    return () => clearTimeout(timer)
-  }, [slide.id])
-
-  // Professional icon renderer
-  const renderProfessionalIcon = () => {
-    if (!slide.professionalIcon) return null
-
-    return (
-      <div
-        className={`absolute ${getIconPosition(slide.professionalIcon.position)} z-20 transition-all duration-500 ${
-          isHovered ? "scale-110 rotate-3" : ""
-        }`}
-        role="img"
-        aria-label={`${slide.professionalIcon.name} icon`}
-      >
-        <div
-          className="group relative"
-          style={{
-            filter: `drop-shadow(0 8px 25px ${slide.professionalIcon.color}20)`,
-          }}
-        >
-          <div
-            className="relative w-12 h-12 rounded-2xl backdrop-blur-md flex items-center justify-center transition-all duration-300 group-hover:scale-110 group-hover:rotate-6"
-            style={{
-              background: slide.glassmorphism
-                ? `linear-gradient(135deg, ${slide.professionalIcon.color}15, ${slide.professionalIcon.color}25)`
-                : `${slide.professionalIcon.color}20`,
-              border: `1px solid ${slide.professionalIcon.color}30`,
-              color: slide.professionalIcon.color,
-            }}
-          >
-            <IconRenderer
-              name={slide.professionalIcon.name}
-              size={slide.professionalIcon.size || 24}
-              style={slide.professionalIcon.style}
-              className="transition-transform duration-300 group-hover:scale-110"
-            />
-          </div>
-        </div>
-      </div>
-    )
+  // Icon mapping with better icons
+  const iconMap: { [key: string]: React.ComponentType<any> } = {
+    "📈": TrendingUp,
+    "👥": Users,
+    "💰": DollarSign,
+    "🎯": Target,
+    "⚡": Zap,
+    "⭐": Star,
+    "🏆": Award,
+    "🌍": Globe,
+    "trending-up": TrendingUp,
+    users: Users,
+    "dollar-sign": DollarSign,
+    target: Target,
+    zap: Zap,
+    star: Star,
+    award: Award,
+    globe: Globe,
   }
 
-  // Enhanced chart renderer with all types
-  const renderEnhancedChart = () => {
-    if (!slide.chartData) return null
+  // Enhanced chart colors based on theme
+  const getChartColors = (theme: string) => {
+    const colorSets = {
+      business: ["#3b82f6", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6", "#06b6d4"],
+      creative: ["#a855f7", "#ec4899", "#f97316", "#84cc16", "#06b6d4", "#f59e0b"],
+      minimal: ["#6366f1", "#8b5cf6", "#a855f7", "#ec4899", "#f472b6", "#fb7185"],
+      vibrant: ["#ef4444", "#f97316", "#f59e0b", "#84cc16", "#22c55e", "#10b981"],
+      nature: ["#10b981", "#059669", "#047857", "#065f46", "#064e3b", "#022c22"],
+      ocean: ["#06b6d4", "#0891b2", "#0e7490", "#155e75", "#164e63", "#0c4a6e"],
+      sunset: ["#f97316", "#ea580c", "#dc2626", "#b91c1c", "#991b1b", "#7f1d1d"],
+    }
+    return colorSets[theme as keyof typeof colorSets] || colorSets.business
+  }
 
-    const colors = CHART_COLORS[slide.designTheme as keyof typeof CHART_COLORS] || CHART_COLORS.business
+  const chartColors = getChartColors(slide.designTheme || "business")
+
+  // Chart renderer with better styling and proper sizing
+  const renderChart = () => {
+    if (!slide.chartData || !slide.chartData.data || slide.chartData.data.length === 0) return null
+
     const { type, data, config = {} } = slide.chartData
+    const height = isPresentationMode ? 350 : 280 // Reduced height to prevent overflow
+
+    // Ensure data has proper structure
+    const chartData = data.map((item, index) => ({
+      name: item.name || item.label || item.month || item.metric || item.region || `Item ${index + 1}`,
+      value:
+        typeof item.value === "number"
+          ? item.value
+          : typeof item.sales === "number"
+            ? item.sales
+            : typeof item.score === "number"
+              ? item.score
+              : typeof item.revenue === "number"
+                ? item.revenue
+                : 0,
+      ...item,
+    }))
 
     const commonProps = {
-      width: "100%",
-      height: "100%",
+      margin: { top: 10, right: 20, left: 10, bottom: 10 }, // Reduced margins
     }
 
-    const renderChart = () => {
-      switch (type) {
-        case "bar":
-          return (
-            <BarChart data={data} {...commonProps}>
-              {config.showGrid && <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />}
+    switch (type) {
+      case "bar":
+        return (
+          <ResponsiveContainer width="100%" height={height}>
+            <BarChart data={chartData} {...commonProps}>
+              <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.2)" />
               <XAxis
                 dataKey="name"
-                stroke={slide.textColor}
-                fontSize={12}
-                fontFamily={slide.contentFont}
-                tick={{ fill: slide.textColor }}
+                stroke="#ffffff"
+                fontSize={isPresentationMode ? 12 : 10}
+                tick={{ fill: "#ffffff" }}
+                interval={0}
+                angle={-45}
+                textAnchor="end"
+                height={60}
               />
-              <YAxis
-                stroke={slide.textColor}
-                fontSize={12}
-                fontFamily={slide.contentFont}
-                tick={{ fill: slide.textColor }}
-              />
+              <YAxis stroke="#ffffff" fontSize={isPresentationMode ? 12 : 10} tick={{ fill: "#ffffff" }} width={40} />
               <Tooltip
                 contentStyle={{
-                  backgroundColor: "rgba(0,0,0,0.9)",
+                  backgroundColor: "rgba(0,0,0,0.8)",
                   border: "none",
-                  borderRadius: "12px",
+                  borderRadius: "8px",
                   color: "#ffffff",
-                  fontFamily: slide.contentFont,
-                  backdropFilter: "blur(12px)",
-                  boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.25)",
+                  fontSize: "12px",
                 }}
-                cursor={{ fill: "rgba(255,255,255,0.1)" }}
               />
-              <Bar
-                dataKey="value"
-                fill={`url(#barGradient-${slide.id})`}
-                radius={[8, 8, 0, 0]}
-                animationDuration={1000}
-              />
-              <defs>
-                <linearGradient id={`barGradient-${slide.id}`} x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor={colors[0]} stopOpacity={1} />
-                  <stop offset="100%" stopColor={colors[0]} stopOpacity={0.6} />
-                </linearGradient>
-              </defs>
+              <Bar dataKey="value" fill={slide.accentColor || chartColors[0]} radius={[4, 4, 0, 0]} />
             </BarChart>
-          )
+          </ResponsiveContainer>
+        )
 
-        case "line":
-          return (
-            <LineChart data={data} {...commonProps}>
-              {config.showGrid && <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />}
+      case "line":
+        return (
+          <ResponsiveContainer width="100%" height={height}>
+            <LineChart data={chartData} {...commonProps}>
+              <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.2)" />
               <XAxis
                 dataKey="name"
-                stroke={slide.textColor}
-                fontSize={12}
-                fontFamily={slide.contentFont}
-                tick={{ fill: slide.textColor }}
+                stroke="#ffffff"
+                fontSize={isPresentationMode ? 12 : 10}
+                tick={{ fill: "#ffffff" }}
               />
-              <YAxis
-                stroke={slide.textColor}
-                fontSize={12}
-                fontFamily={slide.contentFont}
-                tick={{ fill: slide.textColor }}
-              />
+              <YAxis stroke="#ffffff" fontSize={isPresentationMode ? 12 : 10} tick={{ fill: "#ffffff" }} width={40} />
               <Tooltip
                 contentStyle={{
-                  backgroundColor: "rgba(0,0,0,0.9)",
+                  backgroundColor: "rgba(0,0,0,0.8)",
                   border: "none",
-                  borderRadius: "12px",
+                  borderRadius: "8px",
                   color: "#ffffff",
-                  fontFamily: slide.contentFont,
-                  backdropFilter: "blur(12px)",
+                  fontSize: "12px",
                 }}
               />
               <Line
                 type="monotone"
                 dataKey="value"
-                stroke={colors[0]}
+                stroke={slide.accentColor || chartColors[0]}
                 strokeWidth={3}
-                dot={{ fill: colors[0], strokeWidth: 2, r: 6 }}
-                activeDot={{ r: 8, stroke: colors[0], strokeWidth: 2, fill: "#ffffff" }}
-                animationDuration={1500}
+                dot={{ fill: slide.accentColor || chartColors[0], strokeWidth: 2, r: 4 }}
               />
             </LineChart>
-          )
+          </ResponsiveContainer>
+        )
 
-        case "area":
-          return (
-            <AreaChart data={data} {...commonProps}>
-              {config.showGrid && <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />}
+      case "area":
+        return (
+          <ResponsiveContainer width="100%" height={height}>
+            <AreaChart data={chartData} {...commonProps}>
+              <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.2)" />
               <XAxis
                 dataKey="name"
-                stroke={slide.textColor}
-                fontSize={12}
-                fontFamily={slide.contentFont}
-                tick={{ fill: slide.textColor }}
+                stroke="#ffffff"
+                fontSize={isPresentationMode ? 12 : 10}
+                tick={{ fill: "#ffffff" }}
               />
-              <YAxis
-                stroke={slide.textColor}
-                fontSize={12}
-                fontFamily={slide.contentFont}
-                tick={{ fill: slide.textColor }}
-              />
+              <YAxis stroke="#ffffff" fontSize={isPresentationMode ? 12 : 10} tick={{ fill: "#ffffff" }} width={40} />
               <Tooltip
                 contentStyle={{
-                  backgroundColor: "rgba(0,0,0,0.9)",
+                  backgroundColor: "rgba(0,0,0,0.8)",
                   border: "none",
-                  borderRadius: "12px",
+                  borderRadius: "8px",
                   color: "#ffffff",
-                  fontFamily: slide.contentFont,
-                  backdropFilter: "blur(12px)",
+                  fontSize: "12px",
                 }}
               />
               <Area
                 type="monotone"
                 dataKey="value"
-                stroke={colors[0]}
-                strokeWidth={2}
-                fill={`url(#areaGradient-${slide.id})`}
-                animationDuration={1500}
+                stroke={slide.accentColor || chartColors[0]}
+                fill={slide.accentColor || chartColors[0]}
+                fillOpacity={0.3}
               />
-              <defs>
-                <linearGradient id={`areaGradient-${slide.id}`} x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor={colors[0]} stopOpacity={0.8} />
-                  <stop offset="95%" stopColor={colors[0]} stopOpacity={0.1} />
-                </linearGradient>
-              </defs>
             </AreaChart>
-          )
+          </ResponsiveContainer>
+        )
 
-        case "pie":
-        case "donut":
-          const innerRadius = type === "donut" ? 60 : 0
-          return (
-            <PieChart {...commonProps}>
+      case "pie":
+      case "donut":
+        return (
+          <ResponsiveContainer width="100%" height={height}>
+            <PieChart>
               <Pie
-                data={data}
+                data={chartData}
                 cx="50%"
                 cy="50%"
-                innerRadius={innerRadius}
-                outerRadius={120}
-                paddingAngle={2}
+                innerRadius={type === "donut" ? 50 : 0}
+                outerRadius={isPresentationMode ? 120 : 90}
                 dataKey="value"
-                animationDuration={1000}
+                label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
+                labelLine={false}
+                fontSize={10}
               >
-                {data.map((entry, index) => (
-                  <Cell key={`cell-${index}`} fill={colors[index % colors.length]} />
+                {chartData.map((entry, index) => (
+                  <Cell key={`cell-${index}`} fill={chartColors[index % chartColors.length]} />
                 ))}
               </Pie>
-              {config.showLegend && (
-                <Legend
-                  wrapperStyle={{
-                    color: slide.textColor,
-                    fontFamily: slide.contentFont,
-                    fontSize: "12px",
-                  }}
-                />
-              )}
               <Tooltip
                 contentStyle={{
-                  backgroundColor: "rgba(0,0,0,0.9)",
+                  backgroundColor: "rgba(0,0,0,0.8)",
                   border: "none",
-                  borderRadius: "12px",
+                  borderRadius: "8px",
                   color: "#ffffff",
-                  fontFamily: slide.contentFont,
-                  backdropFilter: "blur(12px)",
+                  fontSize: "12px",
                 }}
               />
             </PieChart>
-          )
-
-        default:
-          return null
-      }
-    }
-
-    return (
-      <div className="w-full h-80 mt-8 relative group">
-        <div
-          className="absolute inset-0 rounded-2xl backdrop-blur-sm border transition-all duration-500 group-hover:scale-[1.02]"
-          style={{
-            background: slide.glassmorphism
-              ? "linear-gradient(135deg, rgba(255,255,255,0.1) 0%, rgba(255,255,255,0.05) 100%)"
-              : "rgba(255,255,255,0.05)",
-            borderColor: "rgba(255,255,255,0.2)",
-            boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.25)",
-          }}
-        />
-        <div className="relative z-10 p-6 h-full">
-          <ResponsiveContainer width="100%" height="100%">
-            {renderChart()}
           </ResponsiveContainer>
-        </div>
-      </div>
-    )
+        )
+
+      default:
+        return null
+    }
   }
 
-  // Enhanced table renderer with glassmorphism
-  const renderEnhancedTable = () => {
-    if (!slide.tableData) return null
+  // Enhanced table renderer with proper sizing
+  const renderTable = () => {
+    if (!slide.tableData || !slide.tableData.headers || !slide.tableData.rows) return null
 
-    const { headers, rows, interactive = false } = slide.tableData
+    const { headers, rows } = slide.tableData
 
     return (
-      <div className="w-full mt-8 relative group">
-        <div
-          className="rounded-2xl backdrop-blur-sm border overflow-hidden transition-all duration-500 group-hover:scale-[1.01]"
-          style={{
-            background: slide.glassmorphism
-              ? "linear-gradient(135deg, rgba(255,255,255,0.1) 0%, rgba(255,255,255,0.05) 100%)"
-              : "rgba(255,255,255,0.05)",
-            borderColor: "rgba(255,255,255,0.2)",
-            boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.25)",
-          }}
-        >
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead>
-                <tr className="border-b border-white/20">
-                  {headers.map((header, index) => (
-                    <th
-                      key={index}
-                      className="px-6 py-4 text-left font-semibold transition-colors duration-300"
-                      style={{
-                        color: slide.titleColor || slide.textColor,
-                        fontFamily: slide.titleFont,
-                        fontSize: "0.875rem",
-                      }}
-                    >
-                      {header}
-                    </th>
+      <div className="rounded-xl overflow-hidden bg-white/10 border border-white/20 backdrop-blur-sm mt-4">
+        <div className="overflow-x-auto">
+          <table className="w-full text-xs">
+            {" "}
+            {/* Reduced font size */}
+            <thead>
+              <tr className="bg-white/20">
+                {headers.map((header, index) => (
+                  <th key={index} className="px-3 py-2 text-left font-semibold text-white text-xs">
+                    {header}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((row, rowIndex) => (
+                <tr key={rowIndex} className={rowIndex % 2 === 0 ? "bg-white/5" : "bg-transparent"}>
+                  {row.map((cell, cellIndex) => (
+                    <td key={cellIndex} className="px-3 py-2 text-white border-b border-white/10 text-xs">
+                      {cell}
+                    </td>
                   ))}
                 </tr>
-              </thead>
-              <tbody>
-                {rows.map((row, rowIndex) => (
-                  <tr
-                    key={rowIndex}
-                    className={`border-b border-white/10 transition-all duration-300 ${
-                      interactive ? "hover:bg-white/5 cursor-pointer" : ""
-                    }`}
-                  >
-                    {row.map((cell, cellIndex) => (
-                      <td
-                        key={cellIndex}
-                        className="px-6 py-4 transition-all duration-300"
-                        style={{
-                          color: slide.textColor,
-                          fontFamily: slide.contentFont,
-                          fontSize: "0.875rem",
-                        }}
-                      >
-                        {cell}
-                      </td>
-                    ))}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+              ))}
+            </tbody>
+          </table>
         </div>
       </div>
     )
   }
 
-  // Enhanced content renderer with animations
-  const renderEnhancedContent = () => {
+  // Enhanced icon renderer
+  const renderIcons = () => {
+    if (!slide.icons || slide.icons.length === 0) return null
+
+    return (
+      <>
+        {slide.icons.map((iconData, index) => {
+          // Try to get React icon first
+          const IconComponent = iconMap[iconData.icon]
+
+          if (IconComponent) {
+            return (
+              <div
+                key={index}
+                className={`absolute ${
+                  iconData.position === "top-right"
+                    ? "top-4 right-4"
+                    : iconData.position === "top-left"
+                      ? "top-4 left-4"
+                      : iconData.position === "bottom-right"
+                        ? "bottom-4 right-4"
+                        : iconData.position === "bottom-left"
+                          ? "bottom-4 left-4"
+                          : "top-4 right-4"
+                } opacity-80`}
+                style={{ color: iconData.color || slide.accentColor || "#ffffff" }}
+              >
+                <IconComponent size={iconData.size || 24} />
+              </div>
+            )
+          }
+
+          // Fallback to emoji
+          return (
+            <div
+              key={index}
+              className={`absolute ${
+                iconData.position === "top-right"
+                  ? "top-4 right-4"
+                  : iconData.position === "top-left"
+                    ? "top-4 left-4"
+                    : iconData.position === "bottom-right"
+                      ? "bottom-4 right-4"
+                      : iconData.position === "bottom-left"
+                        ? "bottom-4 left-4"
+                        : "top-4 right-4"
+              } opacity-80 text-2xl`}
+            >
+              {iconData.icon}
+            </div>
+          )
+        })}
+      </>
+    )
+  }
+
+  // Enhanced slide styles with modern gradients
+  const getSlideBackground = () => {
+    if (slide.background) {
+      // Check if it's already a gradient
+      if (slide.background.includes("gradient")) {
+        return slide.background
+      }
+      // Create a beautiful gradient from the base color
+      return `linear-gradient(135deg, ${slide.background} 0%, ${adjustBrightness(slide.background, -20)} 100%)`
+    }
+    return "linear-gradient(135deg, #027659 0%, #065f46 100%)"
+  }
+
+  // Helper function to adjust color brightness
+  const adjustBrightness = (color: string, amount: number) => {
+    const usePound = color[0] === "#"
+    const col = usePound ? color.slice(1) : color
+    const num = Number.parseInt(col, 16)
+    let r = (num >> 16) + amount
+    let g = ((num >> 8) & 0x00ff) + amount
+    let b = (num & 0x0000ff) + amount
+    r = r > 255 ? 255 : r < 0 ? 0 : r
+    g = g > 255 ? 255 : g < 0 ? 0 : g
+    b = b > 255 ? 255 : b < 0 ? 0 : b
+    return (usePound ? "#" : "") + ((r << 16) | (g << 8) | b).toString(16).padStart(6, "0")
+  }
+
+  const slideStyle: React.CSSProperties = {
+    background: getSlideBackground(),
+    color: slide.textColor || "#ffffff",
+    fontFamily: slide.contentFont || "Inter, system-ui, sans-serif",
+    borderRadius: slide.borderRadius || "16px",
+    boxShadow: slide.shadowEffect || "0 20px 40px rgba(0,0,0,0.15)",
+    position: "relative",
+    overflow: "hidden",
+    minHeight: isPresentationMode ? "100vh" : "400px",
+    ...(slide.glassmorphism && {
+      backdropFilter: "blur(10px)",
+      background: `${getSlideBackground()}dd`,
+    }),
+  }
+
+  const titleStyle: React.CSSProperties = {
+    fontSize:
+      slide.titleSize || (slide.layout === "title" ? "clamp(1.75rem, 3.5vw, 3rem)" : "clamp(1.25rem, 2.2vw, 2rem)"),
+    fontFamily: slide.titleFont || "Inter, system-ui, sans-serif",
+    color: slide.titleColor || slide.textColor || "#ffffff",
+    fontWeight: "700",
+    lineHeight: "1.2",
+    marginBottom: "1rem", // Reduced margin
+    wordWrap: "break-word",
+    hyphens: "auto",
+  }
+
+  const contentStyle: React.CSSProperties = {
+    fontSize: slide.contentSize || "clamp(0.875rem, 1.1vw, 1rem)",
+    fontFamily: slide.contentFont || "Inter, system-ui, sans-serif",
+    color: slide.textColor || "#ffffff",
+    lineHeight: "1.6",
+    wordWrap: "break-word",
+    hyphens: "auto",
+  }
+
+  const getSpacing = () => {
+    switch (slide.spacing) {
+      case "generous":
+        return isPresentationMode ? "p-12" : "p-8" // Reduced padding
+      case "comfortable":
+        return isPresentationMode ? "p-8" : "p-6"
+      case "compact":
+        return isPresentationMode ? "p-6" : "p-4"
+      default:
+        return isPresentationMode ? "p-8" : "p-6"
+    }
+  }
+
+  const getAlignment = () => {
+    switch (slide.alignment) {
+      case "center":
+        return "text-center items-center justify-center"
+      case "right":
+        return "text-right items-end"
+      default:
+        return "text-left items-start justify-start"
+    }
+  }
+
+  // Enhanced content renderer with proper text wrapping
+  const renderContent = () => {
     if (typeof slide.content === "string") {
       const lines = slide.content.split("\n").filter((line) => line.trim())
 
       return (
-        <div className="space-y-4">
+        <div className="space-y-3">
+          {" "}
+          {/* Reduced spacing */}
           {lines.map((line, index) => {
             const trimmedLine = line.trim()
 
             if (trimmedLine.startsWith("•") || trimmedLine.startsWith("-")) {
               const content = trimmedLine.substring(1).trim()
               return (
-                <div
-                  key={index}
-                  className={`flex items-start space-x-4 group transition-all duration-500 ${
-                    isAnimating ? "opacity-0 translate-x-4" : "opacity-100 translate-x-0"
-                  }`}
-                  style={{
-                    animationDelay: `${index * 100}ms`,
-                    animation: isAnimating ? `slideInLeft 0.6s ease-out ${index * 100}ms forwards` : undefined,
-                  }}
-                >
+                <div key={index} className="flex items-start space-x-3">
                   <div
-                    className="mt-2 w-2 h-2 rounded-full flex-shrink-0 transition-all duration-300 group-hover:scale-125 group-hover:shadow-lg"
-                    style={{
-                      backgroundColor: slide.accentColor,
-                      boxShadow: `0 0 10px ${slide.accentColor}40`,
-                    }}
+                    className="mt-1.5 w-2 h-2 rounded-full flex-shrink-0"
+                    style={{ backgroundColor: slide.accentColor }}
                   />
-                  <p
-                    className="leading-relaxed transition-all duration-300 group-hover:translate-x-1"
-                    style={{
-                      color: slide.textColor,
-                      fontFamily: slide.contentFont,
-                      fontSize: slide.contentSize || "1.125rem",
-                      lineHeight: "1.7",
-                    }}
-                  >
+                  <p style={contentStyle} className="flex-1">
                     {content}
                   </p>
                 </div>
@@ -582,20 +440,7 @@ const UltimateSlideRenderer: React.FC<SlideRendererProps> = ({
             }
 
             return (
-              <p
-                key={index}
-                className={`leading-relaxed transition-all duration-500 ${
-                  isAnimating ? "opacity-0 translate-y-4" : "opacity-100 translate-y-0"
-                }`}
-                style={{
-                  color: slide.textColor,
-                  fontFamily: slide.contentFont,
-                  fontSize: slide.contentSize || "1.125rem",
-                  lineHeight: "1.7",
-                  animationDelay: `${index * 150}ms`,
-                  animation: isAnimating ? `fadeInUp 0.6s ease-out ${index * 150}ms forwards` : undefined,
-                }}
-              >
+              <p key={index} style={contentStyle} className="mb-2">
                 {trimmedLine}
               </p>
             )
@@ -604,296 +449,136 @@ const UltimateSlideRenderer: React.FC<SlideRendererProps> = ({
       )
     }
 
-    return <div className="leading-relaxed">{slide.content}</div>
-  }
-
-  // Slide controls for editing
-  const renderSlideControls = () => {
-    if (!showControls || isPresentationMode) return null
-
-    return (
-      <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300 z-30">
-        <div className="flex space-x-2">
-          {onEdit && (
-            <button
-              onClick={(e) => {
-                e.stopPropagation()
-                onEdit()
-              }}
-              className="p-2 rounded-lg bg-black/50 backdrop-blur-sm border border-white/20 text-white hover:bg-black/70 transition-all duration-200"
-              aria-label="Edit slide"
-            >
-              <IconRenderer name="Edit" size={16} />
-            </button>
-          )}
-          {onDuplicate && (
-            <button
-              onClick={(e) => {
-                e.stopPropagation()
-                onDuplicate()
-              }}
-              className="p-2 rounded-lg bg-black/50 backdrop-blur-sm border border-white/20 text-white hover:bg-black/70 transition-all duration-200"
-              aria-label="Duplicate slide"
-            >
-              <IconRenderer name="Copy" size={16} />
-            </button>
-          )}
-          {onDelete && (
-            <button
-              onClick={(e) => {
-                e.stopPropagation()
-                onDelete()
-              }}
-              className="p-2 rounded-lg bg-red-500/50 backdrop-blur-sm border border-red-300/20 text-white hover:bg-red-500/70 transition-all duration-200"
-              aria-label="Delete slide"
-            >
-              <IconRenderer name="Trash2" size={16} />
-            </button>
-          )}
-        </div>
-      </div>
-    )
-  }
-
-  // Main slide styling
-  const backgroundStyle = {
-    background: slide.background,
-    color: slide.textColor,
-    fontFamily: slide.titleFont,
-    borderRadius: slide.borderRadius || "20px",
-    boxShadow: slide.shadowEffect || "0 25px 50px -12px rgba(0, 0, 0, 0.25)",
-    position: "relative" as const,
-    overflow: "hidden" as const,
+    return <div style={contentStyle}>{slide.content}</div>
   }
 
   return (
-    <>
-      <style jsx>{`
-        @keyframes slideInLeft {
-          from {
-            opacity: 0;
-            transform: translateX(20px);
-          }
-          to {
-            opacity: 1;
-            transform: translateX(0);
-          }
-        }
-        
-        @keyframes fadeInUp {
-          from {
-            opacity: 0;
-            transform: translateY(20px);
-          }
-          to {
-            opacity: 1;
-            transform: translateY(0);
-          }
-        }
-        
-        @keyframes scaleIn {
-          from {
-            opacity: 0;
-            transform: scale(0.95);
-          }
-          to {
-            opacity: 1;
-            transform: scale(1);
-          }
-        }
-      `}</style>
+    <div
+      className={`relative w-full h-full cursor-pointer transition-all duration-300 ${
+        isSelected ? "ring-4 ring-blue-400 ring-opacity-60" : ""
+      } ${className}`}
+      style={slideStyle}
+      onClick={onClick}
+    >
+      {/* Glassmorphism overlay */}
+      {slide.glassmorphism && (
+        <div className="absolute inset-0 bg-gradient-to-br from-white/5 to-transparent pointer-events-none" />
+      )}
 
-      <div
-        ref={slideRef}
-        className={`group relative w-full h-full cursor-pointer transition-all duration-500 ${
-          isSelected ? "ring-4 ring-blue-400/50 ring-opacity-60 scale-[1.02]" : ""
-        } ${className} ${isAnimating ? "animate-scaleIn" : ""}`}
-        style={backgroundStyle}
-        onClick={onClick}
-        onMouseEnter={() => setIsHovered(true)}
-        onMouseLeave={() => setIsHovered(false)}
-        role="button"
-        tabIndex={0}
-        aria-label={`Slide: ${slide.title}`}
-        onKeyDown={(e) => {
-          if (e.key === "Enter" || e.key === " ") {
-            onClick?.()
-          }
-        }}
-      >
-        {/* Glassmorphism overlay */}
-        {slide.glassmorphism && (
-          <div className="absolute inset-0 bg-gradient-to-br from-white/10 via-white/5 to-transparent backdrop-blur-sm" />
+      {/* Background pattern (optional) */}
+      <div className="absolute inset-0 opacity-5">
+        <svg width="100%" height="100%" viewBox="0 0 100 100" preserveAspectRatio="none">
+          <defs>
+            <pattern id="grid" width="10" height="10" patternUnits="userSpaceOnUse">
+              <path d="M 10 0 L 0 0 0 10" fill="none" stroke="currentColor" strokeWidth="0.5" />
+            </pattern>
+          </defs>
+          <rect width="100%" height="100%" fill="url(#grid)" />
+        </svg>
+      </div>
+
+      {renderIcons()}
+
+      <div className={`relative z-10 h-full flex flex-col ${getSpacing()} ${getAlignment()}`}>
+        {slide.layout === "title" && (
+          <div className="flex flex-col justify-center h-full">
+            <h1 style={titleStyle}>{slide.title}</h1>
+            {slide.content && <div className="opacity-90 max-w-4xl mx-auto">{renderContent()}</div>}
+          </div>
         )}
 
-        {/* Background pattern */}
-        <div className="absolute inset-0 opacity-5">
-          <div
-            className="absolute top-0 left-0 w-full h-full"
-            style={{
-              backgroundImage: `radial-gradient(circle at 25% 25%, ${slide.accentColor}20 0%, transparent 50%), radial-gradient(circle at 75% 75%, ${slide.accentColor}15 0%, transparent 50%)`,
-            }}
-          />
-        </div>
+        {slide.layout === "chart" && (
+          <div className="h-full flex flex-col">
+            <h2 style={titleStyle}>{slide.title}</h2>
+            <div className="flex-1 flex items-center justify-center min-h-0 overflow-hidden">{renderChart()}</div>
+            {slide.content && <div className="mt-4 opacity-90">{renderContent()}</div>}
+          </div>
+        )}
 
-        {/* Professional icon */}
-        {renderProfessionalIcon()}
+        {slide.layout === "table" && (
+          <div className="h-full flex flex-col">
+            <h2 style={titleStyle}>{slide.title}</h2>
+            <div className="flex-1 overflow-auto min-h-0">{renderTable()}</div>
+            {slide.content && <div className="mt-4 opacity-90">{renderContent()}</div>}
+          </div>
+        )}
 
-        {/* Slide controls */}
-        {renderSlideControls()}
-
-        {/* Main content */}
-        <div className="relative z-10 p-12 h-full flex flex-col justify-center">
-          {slide.layout === "title" ? (
-            <div className="text-center max-w-4xl mx-auto">
-              <h1
-                className="font-bold mb-8 leading-tight tracking-tight transition-all duration-500"
-                style={{
-                  fontSize: slide.titleSize || "clamp(2.5rem, 4vw, 4rem)",
-                  color: slide.titleColor || slide.textColor,
-                  fontFamily: slide.titleFont,
-                  textShadow: "0 2px 20px rgba(0,0,0,0.3)",
-                }}
-              >
-                {slide.title}
-              </h1>
-              <div
-                className="opacity-90 leading-relaxed max-w-2xl mx-auto"
-                style={{
-                  fontSize: slide.contentSize || "clamp(1.125rem, 1.5vw, 1.5rem)",
-                  color: slide.textColor,
-                  fontFamily: slide.contentFont,
-                }}
-              >
-                {renderEnhancedContent()}
+        {slide.layout === "two-column" && (
+          <div className="h-full flex flex-col">
+            <h2 style={titleStyle}>{slide.title}</h2>
+            <div className="flex-1 grid grid-cols-1 lg:grid-cols-2 gap-6 items-center">
+              <div className="space-y-3">
+                {typeof slide.content === "string" &&
+                  slide.content
+                    .split("\n")
+                    .slice(0, Math.ceil(slide.content.split("\n").length / 2))
+                    .map((line, index) => {
+                      if (line.startsWith("•")) {
+                        return (
+                          <div key={index} className="flex items-start space-x-3">
+                            <div
+                              className="w-2 h-2 rounded-full mt-1.5 flex-shrink-0"
+                              style={{ backgroundColor: slide.accentColor || "#10b981" }}
+                            />
+                            <span style={contentStyle}>{line.substring(1).trim()}</span>
+                          </div>
+                        )
+                      }
+                      return line ? (
+                        <p key={index} style={contentStyle}>
+                          {line}
+                        </p>
+                      ) : (
+                        <div key={index} className="mb-1" />
+                      )
+                    })}
+              </div>
+              <div className="space-y-3">
+                {typeof slide.content === "string" &&
+                  slide.content
+                    .split("\n")
+                    .slice(Math.ceil(slide.content.split("\n").length / 2))
+                    .map((line, index) => {
+                      if (line.startsWith("•")) {
+                        return (
+                          <div key={index} className="flex items-start space-x-3">
+                            <div
+                              className="w-2 h-2 rounded-full mt-1.5 flex-shrink-0"
+                              style={{ backgroundColor: slide.accentColor || "#10b981" }}
+                            />
+                            <span style={contentStyle}>{line.substring(1).trim()}</span>
+                          </div>
+                        )
+                      }
+                      return line ? (
+                        <p key={index} style={contentStyle}>
+                          {line}
+                        </p>
+                      ) : (
+                        <div key={index} className="mb-1" />
+                      )
+                    })}
               </div>
             </div>
-          ) : slide.layout === "chart" ? (
-            <div>
-              <h1
-                className="font-bold mb-6 leading-tight tracking-tight"
-                style={{
-                  fontSize: slide.titleSize || "clamp(1.75rem, 2.5vw, 2.5rem)",
-                  color: slide.titleColor || slide.textColor,
-                  fontFamily: slide.titleFont,
-                  textShadow: "0 2px 15px rgba(0,0,0,0.2)",
-                }}
-              >
-                {slide.title}
-              </h1>
-              <div
-                className="leading-relaxed opacity-90 mb-6"
-                style={{
-                  fontSize: slide.contentSize || "1.125rem",
-                  color: slide.textColor,
-                  fontFamily: slide.contentFont,
-                }}
-              >
-                {renderEnhancedContent()}
-              </div>
-              {renderEnhancedChart()}
-            </div>
-          ) : slide.layout === "table" ? (
-            <div>
-              <h1
-                className="font-bold mb-6 leading-tight tracking-tight"
-                style={{
-                  fontSize: slide.titleSize || "clamp(1.75rem, 2.5vw, 2.5rem)",
-                  color: slide.titleColor || slide.textColor,
-                  fontFamily: slide.titleFont,
-                  textShadow: "0 2px 15px rgba(0,0,0,0.2)",
-                }}
-              >
-                {slide.title}
-              </h1>
-              <div
-                className="leading-relaxed opacity-90 mb-6"
-                style={{
-                  fontSize: slide.contentSize || "1.125rem",
-                  color: slide.textColor,
-                  fontFamily: slide.contentFont,
-                }}
-              >
-                {renderEnhancedContent()}
-              </div>
-              {renderEnhancedTable()}
-            </div>
-          ) : slide.layout === "two-column" || slide.layout === "split" ? (
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
-              <div>
-                <h1
-                  className="font-bold mb-6 leading-tight tracking-tight"
-                  style={{
-                    fontSize: slide.titleSize || "clamp(1.75rem, 2.5vw, 2.5rem)",
-                    color: slide.titleColor || slide.textColor,
-                    fontFamily: slide.titleFont,
-                    textShadow: "0 2px 15px rgba(0,0,0,0.2)",
-                  }}
-                >
-                  {slide.title}
-                </h1>
-                <div
-                  className="leading-relaxed"
-                  style={{
-                    fontSize: slide.contentSize || "1.125rem",
-                    color: slide.textColor,
-                    fontFamily: slide.contentFont,
-                  }}
-                >
-                  {renderEnhancedContent()}
-                </div>
-              </div>
-              <div className="flex justify-center">
-                {slide.chartData ? (
-                  renderEnhancedChart()
-                ) : slide.tableData ? (
-                  renderEnhancedTable()
-                ) : (
-                  <div
-                    className="w-full h-64 rounded-2xl backdrop-blur-sm border border-white/20 flex items-center justify-center"
-                    style={{
-                      background: "linear-gradient(135deg, rgba(255,255,255,0.1) 0%, rgba(255,255,255,0.05) 100%)",
-                    }}
-                  >
-                    <IconRenderer name="Image" size={48} className="opacity-50" />
-                  </div>
-                )}
-              </div>
-            </div>
-          ) : (
-            <div>
-              <h1
-                className="font-bold mb-8 leading-tight tracking-tight"
-                style={{
-                  fontSize: slide.titleSize || "clamp(1.75rem, 2.5vw, 2.5rem)",
-                  color: slide.titleColor || slide.textColor,
-                  fontFamily: slide.titleFont,
-                  textShadow: "0 2px 15px rgba(0,0,0,0.2)",
-                }}
-              >
-                {slide.title}
-              </h1>
-              <div
-                className="leading-relaxed"
-                style={{
-                  fontSize: slide.contentSize || "1.125rem",
-                  color: slide.textColor,
-                  fontFamily: slide.contentFont,
-                }}
-              >
-                {renderEnhancedContent()}
-              </div>
-            </div>
-          )}
-        </div>
+          </div>
+        )}
 
-        {/* Hover effect overlay */}
-        <div className="absolute inset-0 bg-gradient-to-r from-white/0 via-white/5 to-white/0 opacity-0 transition-opacity duration-500 hover:opacity-100 pointer-events-none" />
-
-        {/* Selection indicator */}
-        {isSelected && <div className="absolute inset-0 border-4 border-blue-400/50 rounded-2xl pointer-events-none" />}
+        {(slide.layout === "content" || !slide.layout) && (
+          <div className="h-full flex flex-col justify-center">
+            <h2 style={titleStyle}>{slide.title}</h2>
+            <div className="flex-1 flex flex-col justify-center">{renderContent()}</div>
+          </div>
+        )}
       </div>
-    </>
+
+      {/* Accent bar at bottom */}
+      {slide.accentColor && (
+        <div
+          className="absolute bottom-0 left-0 h-1 w-full opacity-80"
+          style={{ backgroundColor: slide.accentColor }}
+        />
+      )}
+    </div>
   )
 }
 
