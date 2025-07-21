@@ -1,144 +1,242 @@
 import { type NextRequest, NextResponse } from "next/server"
 import jsPDF from "jspdf"
 
+interface SlideData {
+  id: string
+  title: string
+  content: string
+  background: string
+  textColor: string
+  titleColor?: string
+  accentColor?: string
+  layout: string
+  chartData?: {
+    type: string
+    data: Array<{ name: string; value: number }>
+  }
+  tableData?: {
+    headers: string[]
+    rows: string[][]
+  }
+}
+
+interface ExportRequest {
+  slides: SlideData[]
+  projectName: string
+}
+
+// Helper function to extract color from CSS string
+function extractColor(cssColor: string): string {
+  if (cssColor.startsWith("#")) {
+    return cssColor
+  }
+
+  if (cssColor.startsWith("rgb")) {
+    const matches = cssColor.match(/\d+/g)
+    if (matches && matches.length >= 3) {
+      const r = Number.parseInt(matches[0])
+      const g = Number.parseInt(matches[1])
+      const b = Number.parseInt(matches[2])
+      return `#${r.toString(16).padStart(2, "0")}${g.toString(16).padStart(2, "0")}${b.toString(16).padStart(2, "0")}`
+    }
+  }
+
+  if (cssColor.includes("gradient")) {
+    // Extract first color from gradient
+    const colorMatch = cssColor.match(/#[0-9a-fA-F]{6}|rgb$$[^)]+$$/)
+    if (colorMatch) {
+      return extractColor(colorMatch[0])
+    }
+  }
+
+  // Default colors for common CSS color names
+  const colorMap: { [key: string]: string } = {
+    white: "#ffffff",
+    black: "#000000",
+    red: "#ff0000",
+    green: "#008000",
+    blue: "#0000ff",
+    yellow: "#ffff00",
+    purple: "#800080",
+    orange: "#ffa500",
+    gray: "#808080",
+    grey: "#808080",
+  }
+
+  return colorMap[cssColor.toLowerCase()] || "#000000"
+}
+
+// Helper function to wrap text
+function wrapText(text: string, maxWidth: number, fontSize: number): string[] {
+  const words = text.split(" ")
+  const lines: string[] = []
+  let currentLine = ""
+
+  const avgCharWidth = fontSize * 0.6 // Approximate character width
+  const maxCharsPerLine = Math.floor(maxWidth / avgCharWidth)
+
+  for (const word of words) {
+    if ((currentLine + word).length <= maxCharsPerLine) {
+      currentLine += (currentLine ? " " : "") + word
+    } else {
+      if (currentLine) {
+        lines.push(currentLine)
+        currentLine = word
+      } else {
+        lines.push(word)
+      }
+    }
+  }
+
+  if (currentLine) {
+    lines.push(currentLine)
+  }
+
+  return lines
+}
+
 export async function POST(request: NextRequest) {
   try {
-    const { slides, projectName } = await request.json()
+    const { slides, projectName }: ExportRequest = await request.json()
 
-    if (!slides || !Array.isArray(slides)) {
-      return NextResponse.json({ error: "Invalid slides data" }, { status: 400 })
+    if (!slides || slides.length === 0) {
+      return NextResponse.json({ error: "No slides provided" }, { status: 400 })
     }
 
+    // Create PDF document in landscape mode
     const pdf = new jsPDF({
       orientation: "landscape",
       unit: "mm",
       format: "a4",
     })
 
-    // Remove the first page that's automatically created
-    pdf.deletePage(1)
+    const pageWidth = pdf.internal.pageSize.getWidth()
+    const pageHeight = pdf.internal.pageSize.getHeight()
+    const margin = 20
 
-    for (let i = 0; i < slides.length; i++) {
-      const slide = slides[i]
-
-      // Add a new page for each slide
-      pdf.addPage("a4", "landscape")
-
-      // Set background
-      if (slide.background) {
-        if (slide.background.includes("gradient")) {
-          // Handle gradient backgrounds
-          const gradientMatch = slide.background.match(/linear-gradient$$([^)]+)$$/)
-          if (gradientMatch) {
-            const gradientColors = gradientMatch[1].split(",").map((c) => c.trim())
-            const startColor = extractColor(gradientColors[1]) || "#ffffff"
-            const endColor = extractColor(gradientColors[2]) || "#f0f0f0"
-
-            pdf.setFillColor(startColor)
-            pdf.rect(0, 0, 297, 210, "F")
-          }
-        } else {
-          // Solid color background
-          const bgColor = extractColor(slide.background) || "#ffffff"
-          pdf.setFillColor(bgColor)
-          pdf.rect(0, 0, 297, 210, "F")
-        }
+    slides.forEach((slide, index) => {
+      if (index > 0) {
+        pdf.addPage()
       }
 
-      // Add title
-      if (slide.title) {
-        pdf.setFontSize(24)
-        pdf.setTextColor(slide.titleColor || slide.textColor || "#000000")
+      // Set background color
+      const bgColor = extractColor(slide.background)
+      pdf.setFillColor(bgColor)
+      pdf.rect(0, 0, pageWidth, pageHeight, "F")
 
-        const titleLines = pdf.splitTextToSize(slide.title, 250)
-        const yPosition = slide.layout === "title" ? 80 : 40
+      // Set text color
+      const textColor = extractColor(slide.textColor || "#000000")
+      pdf.setTextColor(textColor)
 
-        titleLines.forEach((line: string, index: number) => {
-          const textWidth = pdf.getTextWidth(line)
-          const xPosition = slide.layout === "title" ? (297 - textWidth) / 2 : 20
-          pdf.text(line, xPosition, yPosition + index * 12)
-        })
-      }
+      // Title
+      const titleColor = extractColor(slide.titleColor || slide.textColor || "#000000")
+      pdf.setTextColor(titleColor)
+      pdf.setFontSize(24)
+      pdf.setFont("helvetica", "bold")
 
-      // Add content
-      if (slide.content && typeof slide.content === "string") {
-        pdf.setFontSize(14)
-        pdf.setTextColor(slide.textColor || "#000000")
+      const titleLines = wrapText(slide.title, pageWidth - margin * 2, 24)
+      let yPosition = margin + 15
 
+      titleLines.forEach((line, lineIndex) => {
+        pdf.text(line, margin, yPosition + lineIndex * 10)
+      })
+
+      yPosition += titleLines.length * 10 + 10
+
+      // Content
+      pdf.setTextColor(textColor)
+      pdf.setFontSize(14)
+      pdf.setFont("helvetica", "normal")
+
+      if (slide.content) {
         const contentLines = slide.content.split("\n").filter((line) => line.trim())
-        const yPosition = slide.layout === "title" ? 120 : 70
 
-        contentLines.forEach((line: string, index: number) => {
-          const cleanLine = line.replace(/^[•-]\s*/, "")
-          const wrappedLines = pdf.splitTextToSize(cleanLine, 250)
+        contentLines.forEach((line) => {
+          const trimmedLine = line.trim()
 
-          wrappedLines.forEach((wrappedLine: string, wrapIndex: number) => {
-            const xPosition =
-              slide.layout === "title"
-                ? (297 - pdf.getTextWidth(wrappedLine)) / 2
-                : line.startsWith("•") || line.startsWith("-")
-                  ? 30
-                  : 20
+          if (trimmedLine.startsWith("•") || trimmedLine.startsWith("-")) {
+            // Bullet point
+            const bulletContent = trimmedLine.substring(1).trim()
+            const wrappedLines = wrapText(bulletContent, pageWidth - margin * 3, 14)
 
-            pdf.text(wrappedLine, xPosition, yPosition + index * 8 + wrapIndex * 6)
-          })
+            wrappedLines.forEach((wrappedLine, lineIndex) => {
+              if (lineIndex === 0) {
+                pdf.text("•", margin + 5, yPosition)
+                pdf.text(wrappedLine, margin + 15, yPosition)
+              } else {
+                pdf.text(wrappedLine, margin + 15, yPosition)
+              }
+              yPosition += 7
+            })
+          } else {
+            // Regular text
+            const wrappedLines = wrapText(trimmedLine, pageWidth - margin * 2, 14)
+            wrappedLines.forEach((wrappedLine) => {
+              pdf.text(wrappedLine, margin, yPosition)
+              yPosition += 7
+            })
+          }
+
+          yPosition += 3 // Extra spacing between paragraphs
         })
       }
 
       // Add chart data as text if present
-      if (slide.chartData) {
+      if (slide.chartData && slide.chartData.data) {
+        yPosition += 10
         pdf.setFontSize(12)
-        pdf.setTextColor(slide.textColor || "#000000")
+        pdf.setFont("helvetica", "bold")
+        pdf.text("Chart Data:", margin, yPosition)
+        yPosition += 8
 
-        const chartY = 140
-        pdf.text("Chart Data:", 20, chartY)
-
-        slide.chartData.data.forEach((item: any, index: number) => {
-          pdf.text(`${item.name}: ${item.value}`, 20, chartY + 10 + index * 6)
+        pdf.setFont("helvetica", "normal")
+        slide.chartData.data.forEach((item) => {
+          pdf.text(`${item.name}: ${item.value}`, margin + 10, yPosition)
+          yPosition += 6
         })
       }
-    }
 
+      // Add table data if present
+      if (slide.tableData && slide.tableData.headers) {
+        yPosition += 10
+        pdf.setFontSize(12)
+        pdf.setFont("helvetica", "bold")
+
+        // Headers
+        slide.tableData.headers.forEach((header, colIndex) => {
+          pdf.text(header, margin + colIndex * 60, yPosition)
+        })
+        yPosition += 8
+
+        // Rows
+        pdf.setFont("helvetica", "normal")
+        slide.tableData.rows.forEach((row) => {
+          row.forEach((cell, colIndex) => {
+            pdf.text(cell, margin + colIndex * 60, yPosition)
+          })
+          yPosition += 6
+        })
+      }
+
+      // Add slide number
+      pdf.setFontSize(10)
+      pdf.setTextColor("#666666")
+      pdf.text(`${index + 1} / ${slides.length}`, pageWidth - margin - 20, pageHeight - 10)
+    })
+
+    // Generate PDF buffer
     const pdfBuffer = pdf.output("arraybuffer")
 
     return new NextResponse(pdfBuffer, {
+      status: 200,
       headers: {
         "Content-Type": "application/pdf",
         "Content-Disposition": `attachment; filename="${projectName || "presentation"}.pdf"`,
+        "Content-Length": pdfBuffer.byteLength.toString(),
       },
     })
   } catch (error) {
-    console.error("PDF generation error:", error)
+    console.error("PDF export error:", error)
     return NextResponse.json({ error: "Failed to generate PDF" }, { status: 500 })
   }
-}
-
-function extractColor(colorString: string): string {
-  if (!colorString) return "#ffffff"
-
-  // Handle hex colors
-  const hexMatch = colorString.match(/#[0-9a-fA-F]{6}/)
-  if (hexMatch) return hexMatch[0]
-
-  // Handle rgb colors
-  const rgbMatch = colorString.match(/rgb$$(\d+),\s*(\d+),\s*(\d+)$$/)
-  if (rgbMatch) {
-    const r = Number.parseInt(rgbMatch[1])
-    const g = Number.parseInt(rgbMatch[2])
-    const b = Number.parseInt(rgbMatch[3])
-    return `#${r.toString(16).padStart(2, "0")}${g.toString(16).padStart(2, "0")}${b.toString(16).padStart(2, "0")}`
-  }
-
-  // Default colors for common names
-  const colorMap: { [key: string]: string } = {
-    white: "#ffffff",
-    black: "#000000",
-    red: "#ff0000",
-    blue: "#0000ff",
-    green: "#008000",
-    gray: "#808080",
-    grey: "#808080",
-  }
-
-  return colorMap[colorString.toLowerCase()] || "#ffffff"
 }
